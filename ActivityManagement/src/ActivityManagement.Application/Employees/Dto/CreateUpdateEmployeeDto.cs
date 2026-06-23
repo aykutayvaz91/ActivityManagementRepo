@@ -25,6 +25,9 @@ namespace ActivityManagement.Employees.Dto
         [MaxLength(128)]
         public string Department { get; set; }
 
+        [MaxLength(32)]
+        public string AppRole { get; set; } = "Uzman";
+
         [MaxLength(500)]
         public string ExpertiseAreas { get; set; }
 

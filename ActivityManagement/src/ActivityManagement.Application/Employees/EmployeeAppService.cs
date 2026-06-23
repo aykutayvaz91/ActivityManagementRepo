@@ -118,6 +118,13 @@ namespace ActivityManagement.Employees
             await _employeeRepository.DeleteAsync(id);
         }
 
+        public async Task UpdateRoleAsync(long id, string appRole)
+        {
+            var employee = await _employeeRepository.GetAsync(id);
+            employee.AppRole = appRole;
+            await _employeeRepository.UpdateAsync(employee);
+        }
+
         public async Task<ListResultDto<EmployeeDto>> GetAllListAsync()
         {
             var employees = await _employeeRepository.GetAll()

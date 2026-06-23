@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Abp.AspNetCore;
@@ -35,35 +36,33 @@ namespace ActivityManagement.Web
             var googleClientSecret = _configuration["Authentication:Google:ClientSecret"];
             var allowedDomain = _configuration["Authentication:Google:HostedDomain"] ?? "cmit.com.tr";
             var googleEnabled = !string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret);
+            var connStr = _configuration.GetConnectionString("Default");
 
+            // Tüm sayfalar giriş ister; giriş ekranı (/Account/Login) anonim.
             services.AddControllersWithViews(options =>
             {
-                // Google yapılandırıldıysa giriş zorunlu (tüm sayfalar kimlik doğrulaması ister).
-                if (googleEnabled)
-                {
-                    var policy = new AuthorizationPolicyBuilder()
-                        .RequireAuthenticatedUser()
-                        .Build();
-                    options.Filters.Add(new AuthorizeFilter(policy));
-                }
+                var policy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+                options.Filters.Add(new AuthorizeFilter(policy));
             })
             .AddNewtonsoftJson();
 
             services.AddSession();
 
+            var authBuilder = services.AddAuthentication(options =>
+            {
+                options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            })
+            .AddCookie(options =>
+            {
+                options.LoginPath = "/Account/Login";
+                options.AccessDeniedPath = "/Account/Denied";
+                options.ExpireTimeSpan = TimeSpan.FromHours(8);
+            });
+
             if (googleEnabled)
             {
-                services.AddAuthentication(options =>
-                {
-                    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                    options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme;
-                })
-                .AddCookie(options =>
-                {
-                    options.LoginPath = "/Account/Login";
-                    options.AccessDeniedPath = "/Account/Denied";
-                })
-                .AddGoogle(options =>
+                authBuilder.AddGoogle(options =>
                 {
                     options.ClientId = googleClientId;
                     options.ClientSecret = googleClientSecret;
@@ -72,7 +71,6 @@ namespace ActivityManagement.Web
                     options.Scope.Add("email");
                     options.Scope.Add("profile");
 
-                    // Hesap seçiminde sadece cmit.com.tr alanını öner
                     options.Events.OnRedirectToAuthorizationEndpoint = context =>
                     {
                         var uri = context.RedirectUri;
@@ -81,7 +79,6 @@ namespace ActivityManagement.Web
                         return Task.CompletedTask;
                     };
 
-                    // Sunucu tarafı sıkı kontrol: e-posta alanı cmit.com.tr değilse reddet
                     options.Events.OnTicketReceived = context =>
                     {
                         var email = context.Principal?.FindFirst(ClaimTypes.Email)?.Value;
@@ -90,6 +87,16 @@ namespace ActivityManagement.Web
                         {
                             context.Response.Redirect("/Account/Denied");
                             context.HandleResponse();
+                            return Task.CompletedTask;
+                        }
+
+                        // Çalışanın rolünü DB'den oku, claim ekle (Admin ise Admin rolü)
+                        var role = LookupEmployeeRole(connStr, email);
+                        if (context.Principal?.Identity is ClaimsIdentity id)
+                        {
+                            id.AddClaim(new Claim(ClaimTypes.Role, role));
+                            if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+                                id.AddClaim(new Claim("IsAdmin", "true"));
                         }
                         return Task.CompletedTask;
                     };
@@ -97,6 +104,21 @@ namespace ActivityManagement.Web
             }
 
             return services.AddAbp<ActivityManagementWebMvcModule>();
+        }
+
+        // Google girişinde e-postaya göre çalışan rolünü DB'den çeker (login anında, isteğe bağlı tek sorgu).
+        private static string LookupEmployeeRole(string connectionString, string email)
+        {
+            try
+            {
+                var ob = new DbContextOptionsBuilder<ActivityManagementDbContext>();
+                ob.UseSqlServer(connectionString);
+                using var db = new ActivityManagementDbContext(ob.Options);
+                var emp = db.Employees.IgnoreQueryFilters()
+                    .FirstOrDefault(e => e.Email == email);
+                return string.IsNullOrWhiteSpace(emp?.AppRole) ? "Uzman" : emp.AppRole;
+            }
+            catch { return "Uzman"; }
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)

@@ -14,5 +14,6 @@ namespace ActivityManagement.Employees
         Task<EmployeeDto> UpdateAsync(CreateUpdateEmployeeDto input);
         Task DeleteAsync(long id);
         Task<ListResultDto<EmployeeDto>> GetAllListAsync();
+        Task UpdateRoleAsync(long id, string appRole);
     }
 }

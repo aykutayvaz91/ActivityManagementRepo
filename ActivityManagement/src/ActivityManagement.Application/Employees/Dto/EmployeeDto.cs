@@ -16,6 +16,7 @@ namespace ActivityManagement.Employees.Dto
         public string FullName => $"{FirstName} {LastName}";
         public string Title { get; set; }
         public string Department { get; set; }
+        public string AppRole { get; set; }
         public string ExpertiseAreas { get; set; }
         public string PhotoUrl { get; set; }
         public string Email { get; set; }

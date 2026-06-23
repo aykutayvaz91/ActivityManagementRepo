@@ -13,9 +13,12 @@ namespace ActivityManagement.EntityFrameworkCore
         public ActivityManagementDbContext CreateDbContext(string[] args)
         {
             // appsettings.json Web.Mvc projesinden okunur
+            var webDir = Path.Combine(Directory.GetCurrentDirectory(), "../ActivityManagement.Web.Mvc");
             var configuration = new ConfigurationBuilder()
-                .SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "../ActivityManagement.Web.Mvc"))
+                .SetBasePath(webDir)
                 .AddJsonFile("appsettings.json", optional: false)
+                .AddJsonFile("appsettings.Production.json", optional: true)  // gerçek connection string burada
+                .AddEnvironmentVariables()
                 .Build();
 
             var builder = new DbContextOptionsBuilder<ActivityManagementDbContext>();

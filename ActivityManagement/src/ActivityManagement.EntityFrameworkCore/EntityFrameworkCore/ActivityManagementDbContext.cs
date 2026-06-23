@@ -34,6 +34,7 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.Property(e => e.LastName).IsRequired().HasMaxLength(64);
                 b.Property(e => e.Title).HasMaxLength(128);
                 b.Property(e => e.Department).HasMaxLength(128);
+                b.Property(e => e.AppRole).HasMaxLength(32);
                 b.Property(e => e.Email).HasMaxLength(256);
                 b.Property(e => e.Phone).HasMaxLength(32);
                 b.Property(e => e.PhotoUrl).HasMaxLength(512);

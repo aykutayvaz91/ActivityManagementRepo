@@ -45,6 +45,14 @@
                             <input asp-for="Department" class="form-control" />
                         </div>
                         <div class="col-md-6">
+                            <label asp-for="AppRole" class="form-label">Rol</label>
+                            <select asp-for="AppRole" class="form-select">
+                                <option value="Uzman">Uzman</option>
+                                <option value="TakımLideri">Takım Lideri</option>
+                                <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
                             <label asp-for="Email" class="form-label">E-posta</label>
                             <input asp-for="Email" class="form-control" type="email" />
                         </div>

@@ -37,10 +37,12 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
 
             var employees = new[]
             {
-                new Employee { TenantId = 1, FirstName = "Ahmet", LastName = "Yılmaz", Title = "Takım Lideri", Department = "Sistem Yönetimi", ExpertiseAreas = "Sanallaştırma, Active Directory, Azure", Email = "ahmet.yilmaz@cmit.com.tr", HireDate = new DateTime(2018, 3, 15), IsActive = true },
-                new Employee { TenantId = 1, FirstName = "Ayşe", LastName = "Kaya", Title = "Sistem Mühendisi", Department = "Network", ExpertiseAreas = "Cisco, Palo Alto, Güvenlik Duvarı", Email = "ayse.kaya@cmit.com.tr", HireDate = new DateTime(2020, 6, 1), IsActive = true },
-                new Employee { TenantId = 1, FirstName = "Mehmet", LastName = "Demir", Title = "Sistem Mühendisi", Department = "Yedekleme", ExpertiseAreas = "Veeam, Storage, Replikasyon", Email = "mehmet.demir@cmit.com.tr", HireDate = new DateTime(2019, 9, 1), IsActive = true },
-                new Employee { TenantId = 1, FirstName = "Fatma", LastName = "Çelik", Title = "Bulut Uzmanı", Department = "Bulut Hizmetleri", ExpertiseAreas = "Azure, Microsoft 365, IAM", Email = "fatma.celik@cmit.com.tr", HireDate = new DateTime(2021, 1, 15), IsActive = true }
+                new Employee { TenantId = 1, FirstName = "Emin",    LastName = "Akkurt",   Title = "Sistem Takım Lideri",        Department = "Sistem Yönetimi", AppRole = "Admin",        Email = "emin.akkurt@cmit.com.tr",   HireDate = new DateTime(2018, 1, 1), IsActive = true },
+                new Employee { TenantId = 1, FirstName = "Aykut",   LastName = "Ayvaz",    Title = "Sistem Uzmanı",              Department = "Sistem Yönetimi", AppRole = "Uzman",        Email = "aykut.ayvaz@cmit.com.tr",   HireDate = new DateTime(2019, 1, 1), IsActive = true },
+                new Employee { TenantId = 1, FirstName = "İsmail",  LastName = "Demirtaş", Title = "Sistem Uzmanı",              Department = "Sistem Yönetimi", AppRole = "Uzman",        Email = "ismail.demirtas@cmit.com.tr", HireDate = new DateTime(2019, 6, 1), IsActive = true },
+                new Employee { TenantId = 1, FirstName = "Mustafa", LastName = "Keser",    Title = "Sistem Uzmanı",              Department = "Sistem Yönetimi", AppRole = "Uzman",        Email = "mustafa.keser@cmit.com.tr", HireDate = new DateTime(2020, 1, 1), IsActive = true },
+                new Employee { TenantId = 1, FirstName = "Mehmet",  LastName = "Güngör",   Title = "Network ve Güvenlik Uzmanı", Department = "Network",         AppRole = "Uzman",        Email = "mehmet.gungor@cmit.com.tr", HireDate = new DateTime(2020, 6, 1), IsActive = true },
+                new Employee { TenantId = 1, FirstName = "Bektaş",  LastName = "Ayas",     Title = "Network Uzmanı",             Department = "Network",         AppRole = "Uzman",        Email = "bektas.ayas@cmit.com.tr",   HireDate = new DateTime(2021, 1, 1), IsActive = true }
             };
             _context.Employees.AddRange(employees);
             _context.SaveChanges();

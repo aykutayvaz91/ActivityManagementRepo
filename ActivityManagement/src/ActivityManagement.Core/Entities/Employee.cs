@@ -17,6 +17,10 @@ namespace ActivityManagement.Entities
 
         public string Title { get; set; }
         public string Department { get; set; }
+
+        // Uygulama rolü: "Admin" | "TakımLideri" | "Uzman"
+        public string AppRole { get; set; } = "Uzman";
+
         public string ExpertiseAreas { get; set; }
         public string PhotoUrl { get; set; }
         public string Email { get; set; }

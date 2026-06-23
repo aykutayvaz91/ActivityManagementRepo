@@ -1,0 +1,75 @@
+@{
+    ViewData["Title"] = "Admin Panel";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-user-shield text-primary me-2"></i>Admin Panel</h2>
+    <span class="badge bg-danger">Yönetici</span>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white shadow-sm"><div class="card-body text-center">
+            <i class="fas fa-users fa-2x mb-2 opacity-75"></i>
+            <div class="h3 mb-0">@ViewBag.EmployeeCount</div><div>Çalışan</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white shadow-sm"><div class="card-body text-center">
+            <i class="fas fa-project-diagram fa-2x mb-2 opacity-75"></i>
+            <div class="h3 mb-0">@ViewBag.ProjectCount</div><div>Proje</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white shadow-sm"><div class="card-body text-center">
+            <i class="fas fa-tasks fa-2x mb-2 opacity-75"></i>
+            <div class="h3 mb-0">@ViewBag.TaskCount</div><div>Görev</div>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white shadow-sm"><div class="card-body text-center">
+            <i class="fas fa-user-shield fa-2x mb-2 opacity-75"></i>
+            <div class="h3 mb-0">@ViewBag.AdminCount</div><div>Admin</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm"><div class="card-body">
+            <h6><i class="fas fa-user-tag text-primary me-2"></i>Rol Yönetimi</h6>
+            <p class="text-muted small">Çalışanlara Admin / Takım Lideri / Uzman rolü ata.</p>
+            <a href="/Admin/Roles" class="btn btn-sm btn-primary">Rolleri Yönet</a>
+        </div></div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm"><div class="card-body">
+            <h6><i class="fas fa-users text-success me-2"></i>Çalışanlar</h6>
+            <p class="text-muted small">Çalışan ekle, düzenle, sil; kişi kartlarını gör.</p>
+            <a href="/Employees" class="btn btn-sm btn-success">Çalışanlar</a>
+        </div></div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm"><div class="card-body">
+            <h6><i class="fas fa-project-diagram text-info me-2"></i>Projeler</h6>
+            <p class="text-muted small">Proje oluştur, üye ata, durum yönet.</p>
+            <a href="/Projects" class="btn btn-sm btn-info text-white">Projeler</a>
+        </div></div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm"><div class="card-body">
+            <h6><i class="fas fa-clipboard-list text-warning me-2"></i>Görevler</h6>
+            <p class="text-muted small">Görev oluştur, ata ve takip et.</p>
+            <a href="/Tasks" class="btn btn-sm btn-warning">Görevler</a>
+            <a href="/Tasks/Create" class="btn btn-sm btn-outline-warning">Yeni Görev</a>
+        </div></div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm"><div class="card-body">
+            <h6><i class="fas fa-chart-bar text-secondary me-2"></i>Raporlar</h6>
+            <p class="text-muted small">Kişisel ve ekip faaliyet raporları.</p>
+            <a href="/Reports/Team" class="btn btn-sm btn-secondary">Ekip Raporu</a>
+        </div></div>
+    </div>
+</div>
