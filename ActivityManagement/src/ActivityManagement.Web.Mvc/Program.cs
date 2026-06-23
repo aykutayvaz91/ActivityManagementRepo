@@ -15,6 +15,8 @@ namespace ActivityManagement.Web
         // gerektirir. Bunu yalnızca WebHost destekler; GenericHost desteklemez.
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder<Startup>(args)
+                // wwwroot statik dosyaları Production'da da servis edilsin
+                .UseStaticWebAssets()
                 .ConfigureAppConfiguration((hostingContext, config) =>
                 {
                     config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
