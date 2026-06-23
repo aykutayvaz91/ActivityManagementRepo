@@ -1,0 +1,116 @@
+@model ActivityManagement.Reports.Dto.TeamReportDto
+@{
+    ViewData["Title"] = "Ekip Raporu";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-users text-primary me-2"></i>Ekip Faaliyet Raporu</h2>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2">
+            <input type="date" name="startDate" class="form-control form-control-sm"
+                   value="@Model.StartDate.ToString("yyyy-MM-dd")" />
+            <input type="date" name="endDate" class="form-control form-control-sm"
+                   value="@Model.EndDate.ToString("yyyy-MM-dd")" />
+            <button type="submit" class="btn btn-primary btn-sm">Filtrele</button>
+        </form>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-print"></i>
+        </button>
+    </div>
+</div>
+
+<p class="text-muted mb-3">
+    <i class="fas fa-calendar me-1"></i>
+    @Model.StartDate.ToString("dd.MM.yyyy") - @Model.EndDate.ToString("dd.MM.yyyy") dönemi
+</p>
+
+<!-- Ekip Özet Kartlar -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <div class="h3 mb-0">@Model.EmployeeSummaries.Count</div>
+                <small>Toplam Personel</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <div class="h3 mb-0">@Model.EmployeeSummaries.Sum(e => e.TotalHours).ToString("F1")</div>
+                <small>Toplam Saat</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <div class="h3 mb-0">@Model.EmployeeSummaries.Sum(e => e.CompletedTasks)</div>
+                <small>Tamamlanan Görev</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <div class="h3 mb-0">@Model.EmployeeSummaries.Sum(e => e.TotalActivities)</div>
+                <small>Faaliyet Kaydı</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-transparent">
+        <h6 class="mb-0">Personel Bazında Özet</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Personel</th>
+                    <th>Departman</th>
+                    <th>Unvan</th>
+                    <th class="text-center">Faaliyet</th>
+                    <th class="text-center">Toplam Saat</th>
+                    <th class="text-center">Tamamlanan</th>
+                    <th class="text-center">Bekleyen</th>
+                    <th>Etkinlik</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var maxHours = Model.EmployeeSummaries.Any() ? Model.EmployeeSummaries.Max(e => e.TotalHours) : 1;
+                }
+                @foreach (var emp in Model.EmployeeSummaries.OrderByDescending(e => e.TotalHours))
+                {
+                    var barWidth = maxHours > 0 ? (int)(emp.TotalHours / maxHours * 100) : 0;
+                    <tr>
+                        <td>
+                            <a href="/Employees/Card/@emp.EmployeeId" class="text-decoration-none">
+                                <strong>@emp.FullName</strong>
+                            </a>
+                        </td>
+                        <td><small class="text-muted">@emp.Department</small></td>
+                        <td><small>@emp.Title</small></td>
+                        <td class="text-center"><span class="badge bg-light text-dark">@emp.TotalActivities</span></td>
+                        <td class="text-center"><span class="badge bg-primary">@emp.TotalHours.ToString("F1") s</span></td>
+                        <td class="text-center"><span class="badge bg-success">@emp.CompletedTasks</span></td>
+                        <td class="text-center"><span class="badge bg-warning">@emp.PendingTasks</span></td>
+                        <td style="width:120px">
+                            <div class="progress" style="height:8px">
+                                <div class="progress-bar bg-success" style="width:@barWidth%"></div>
+                            </div>
+                        </td>
+                        <td>
+                            <a href="/Reports/Personal?employeeId=@emp.EmployeeId&startDate=@Model.StartDate.ToString("yyyy-MM-dd")&endDate=@Model.EndDate.ToString("yyyy-MM-dd")"
+                               class="btn btn-sm btn-outline-primary">Detay</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

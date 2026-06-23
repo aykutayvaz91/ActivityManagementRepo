@@ -1,0 +1,144 @@
+@{
+    ViewData["Title"] = "Personel Yönetimi";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-users text-primary me-2"></i>Personeller</h2>
+    <a href="/Employees/Create" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>Yeni Personel
+    </a>
+</div>
+
+<!-- Filtreler -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2">
+            <div class="col-md-6">
+                <input type="text" id="filterInput" class="form-control" placeholder="Ad, soyad veya departman ara..." />
+            </div>
+            <div class="col-md-4">
+                <select id="activeFilter" class="form-select">
+                    <option value="">Tüm Durumlar</option>
+                    <option value="true">Aktif</option>
+                    <option value="false">Pasif</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-primary w-100" onclick="loadEmployees()">
+                    <i class="fas fa-search me-1"></i>Ara
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Personel Kartları -->
+<div class="row g-3" id="employeeCards">
+    <div class="col-12 text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-muted">Yükleniyor...</p>
+    </div>
+</div>
+
+<!-- Sayfalama -->
+<div id="paginationArea" class="d-flex justify-content-center mt-3"></div>
+
+@section Scripts {
+<script>
+var currentPage = 1;
+var pageSize = 12;
+
+$(document).ready(function () {
+    loadEmployees();
+    $('#filterInput').on('keypress', function(e) {
+        if (e.which == 13) loadEmployees(1);
+    });
+});
+
+function loadEmployees(page) {
+    currentPage = page || 1;
+    var filter = $('#filterInput').val();
+    var isActive = $('#activeFilter').val();
+
+    $.ajax({
+        url: '/api/services/app/Employee/GetAll',
+        data: {
+            filter: filter,
+            isActive: isActive || null,
+            maxResultCount: pageSize,
+            skipCount: (currentPage - 1) * pageSize
+        },
+        success: function(result) {
+            renderCards(result.result.items, result.result.totalCount);
+        },
+        error: function() {
+            $('#employeeCards').html('<div class="col-12"><div class="alert alert-danger">Veri yüklenirken hata oluştu.</div></div>');
+        }
+    });
+}
+
+function renderCards(employees, total) {
+    var html = '';
+    if (employees.length === 0) {
+        html = '<div class="col-12 text-center py-5 text-muted"><i class="fas fa-user-slash fa-3x mb-3"></i><p>Kayıt bulunamadı.</p></div>';
+    } else {
+        employees.forEach(function(emp) {
+            var photoHtml = emp.photoUrl
+                ? '<img src="' + emp.photoUrl + '" class="rounded-circle" width="60" height="60" style="object-fit:cover">'
+                : '<div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white" style="width:60px;height:60px;font-size:1.5rem"><i class="fas fa-user"></i></div>';
+
+            var statusBadge = emp.isActive
+                ? '<span class="badge bg-success">Aktif</span>'
+                : '<span class="badge bg-secondary">Pasif</span>';
+
+            html += '<div class="col-md-4 col-lg-3">';
+            html += '<div class="card h-100 shadow-sm hover-card">';
+            html += '<div class="card-body text-center">';
+            html += '<div class="d-flex justify-content-center mb-3">' + photoHtml + '</div>';
+            html += '<h6 class="card-title mb-1">' + emp.firstName + ' ' + emp.lastName + '</h6>';
+            html += '<small class="text-muted d-block">' + (emp.title || '') + '</small>';
+            html += '<small class="text-muted d-block mb-2"><i class="fas fa-building me-1"></i>' + (emp.department || '') + '</small>';
+            html += statusBadge;
+            html += '</div>';
+            html += '<div class="card-footer bg-transparent border-0">';
+            html += '<div class="d-flex gap-1 justify-content-center">';
+            html += '<a href="/Employees/Card/' + emp.id + '" class="btn btn-sm btn-outline-primary flex-fill"><i class="fas fa-id-card me-1"></i>Kart</a>';
+            html += '<a href="/Employees/Edit/' + emp.id + '" class="btn btn-sm btn-outline-secondary"><i class="fas fa-edit"></i></a>';
+            html += '<button onclick="deleteEmployee(' + emp.id + ')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>';
+            html += '</div></div></div></div>';
+        });
+    }
+
+    $('#employeeCards').html(html);
+
+    // Sayfalama
+    var totalPages = Math.ceil(total / pageSize);
+    renderPagination(totalPages);
+}
+
+function renderPagination(totalPages) {
+    if (totalPages <= 1) { $('#paginationArea').html(''); return; }
+    var html = '<nav><ul class="pagination">';
+    for (var i = 1; i <= totalPages; i++) {
+        html += '<li class="page-item ' + (i === currentPage ? 'active' : '') + '">';
+        html += '<a class="page-link" href="#" onclick="loadEmployees(' + i + ');return false;">' + i + '</a></li>';
+    }
+    html += '</ul></nav>';
+    $('#paginationArea').html(html);
+}
+
+function deleteEmployee(id) {
+    if (!confirm('Bu personeli silmek istediğinizden emin misiniz?')) return;
+    $.ajax({
+        url: '/api/services/app/Employee/Delete',
+        type: 'DELETE',
+        data: { id: id },
+        success: function() {
+            abp.notify.success('Personel silindi.');
+            loadEmployees(currentPage);
+        }
+    });
+}
+</script>
+}

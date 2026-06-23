@@ -1,0 +1,101 @@
+@model ActivityManagement.Projects.Dto.CreateUpdateProjectDto
+@{
+    ViewData["Title"] = "Yeni Proje";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var employees = ViewBag.Employees as IList<ActivityManagement.Employees.Dto.EmployeeDto>;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Projects">Projeler</a></li>
+            <li class="breadcrumb-item active">Yeni Proje</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Yeni Proje Oluştur</h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="Create" method="post">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label asp-for="Name" class="form-label">Proje Adı <span class="text-danger">*</span></label>
+                            <input asp-for="Name" class="form-control" />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="Code" class="form-label">Proje Kodu <span class="text-danger">*</span></label>
+                            <input asp-for="Code" class="form-control" placeholder="PRJ-001" />
+                            <span asp-validation-for="Code" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Description" class="form-label">Açıklama</label>
+                            <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="StartDate" class="form-label">Başlangıç Tarihi <span class="text-danger">*</span></label>
+                            <input asp-for="StartDate" class="form-control" type="date" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="PlannedEndDate" class="form-label">Planlanan Bitiş Tarihi</label>
+                            <input asp-for="PlannedEndDate" class="form-control" type="date" />
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="Status" class="form-label">Durum</label>
+                            <select asp-for="Status" class="form-select">
+                                <option value="0">Planlandı</option>
+                                <option value="1">Devam Ediyor</option>
+                                <option value="2">Tamamlandı</option>
+                                <option value="3">İptal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="Priority" class="form-label">Öncelik</label>
+                            <select asp-for="Priority" class="form-select">
+                                <option value="1">Düşük</option>
+                                <option value="2">Normal</option>
+                                <option value="3">Yüksek</option>
+                                <option value="4">Kritik</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="ManagerId" class="form-label">Proje Yöneticisi</label>
+                            <select asp-for="ManagerId" class="form-select">
+                                <option value="">Seçiniz...</option>
+                                @if (employees != null)
+                                {
+                                    foreach (var emp in employees)
+                                    {
+                                        <option value="@emp.Id">@emp.FullName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr />
+                    <div class="d-flex gap-2 justify-content-end">
+                        <a href="/Projects" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>İptal
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Oluştur
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

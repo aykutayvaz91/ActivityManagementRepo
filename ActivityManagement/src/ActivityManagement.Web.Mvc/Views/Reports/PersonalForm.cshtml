@@ -1,0 +1,71 @@
+@{
+    ViewData["Title"] = "Kişisel Rapor";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var employees = ViewBag.Employees as IList<ActivityManagement.Employees.Dto.EmployeeDto>;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-user-chart me-2"></i>Kişisel Faaliyet Raporu</h5>
+            </div>
+            <div class="card-body">
+                <form method="get" action="/Reports/Personal">
+                    <div class="mb-3">
+                        <label class="form-label">Personel <span class="text-danger">*</span></label>
+                        <select name="employeeId" class="form-select" required>
+                            <option value="">Personel seçiniz...</option>
+                            @if (employees != null)
+                            {
+                                foreach (var e in employees)
+                                {
+                                    <option value="@e.Id">@e.FullName - @e.Department</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Başlangıç Tarihi</label>
+                            <input type="date" name="startDate" class="form-control"
+                                   value="@DateTime.Today.AddDays(-30).ToString("yyyy-MM-dd")" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Bitiş Tarihi</label>
+                            <input type="date" name="endDate" class="form-control"
+                                   value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuickDate(7)">Son 7 Gün</button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" onclick="setQuickDate(30)">Son 30 Gün</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm flex-fill" onclick="setThisMonth()">Bu Ay</button>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-2">
+                            <i class="fas fa-chart-line me-1"></i>Raporu Oluştur
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function setQuickDate(days) {
+    var end = new Date();
+    var start = new Date(Date.now() - days * 86400000);
+    document.querySelector('[name=startDate]').value = start.toISOString().split('T')[0];
+    document.querySelector('[name=endDate]').value = end.toISOString().split('T')[0];
+}
+function setThisMonth() {
+    var now = new Date();
+    var start = new Date(now.getFullYear(), now.getMonth(), 1);
+    document.querySelector('[name=startDate]').value = start.toISOString().split('T')[0];
+    document.querySelector('[name=endDate]').value = now.toISOString().split('T')[0];
+}
+</script>
+}

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UserSecretsId>ActivityManagement-Web-Mvc</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Abp.AspNetCore hem MVC authorization hem Zero ASP.NET Core entegrasyonunu içerir -->
+    <PackageReference Include="Abp.AspNetCore" Version="8.4.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ActivityManagement.EntityFrameworkCore\ActivityManagement.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\ActivityManagement.Application\ActivityManagement.Application.csproj" />
+  </ItemGroup>
+
+</Project>

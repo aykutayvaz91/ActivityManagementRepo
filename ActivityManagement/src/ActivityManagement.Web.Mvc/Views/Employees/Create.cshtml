@@ -1,0 +1,98 @@
+@model ActivityManagement.Employees.Dto.CreateUpdateEmployeeDto
+@{
+    ViewData["Title"] = "Yeni Personel";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Employees">Personeller</a></li>
+            <li class="breadcrumb-item active">Yeni Personel</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-user-plus me-2"></i>Yeni Personel Ekle</h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="Create" method="post">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="FirstName" class="form-label">Ad <span class="text-danger">*</span></label>
+                            <input asp-for="FirstName" class="form-control" />
+                            <span asp-validation-for="FirstName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="LastName" class="form-label">Soyad <span class="text-danger">*</span></label>
+                            <input asp-for="LastName" class="form-control" />
+                            <span asp-validation-for="LastName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Title" class="form-label">Unvan</label>
+                            <input asp-for="Title" class="form-control" placeholder="örn. Sistem Mühendisi" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Department" class="form-label">Departman</label>
+                            <input asp-for="Department" class="form-control" placeholder="örn. Yazılım Geliştirme" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Email" class="form-label">E-posta</label>
+                            <input asp-for="Email" class="form-control" type="email" />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Phone" class="form-label">Telefon</label>
+                            <input asp-for="Phone" class="form-control" placeholder="05XX XXX XXXX" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="HireDate" class="form-label">İşe Başlama Tarihi <span class="text-danger">*</span></label>
+                            <input asp-for="HireDate" class="form-control" type="date" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="BirthDate" class="form-label">Doğum Tarihi</label>
+                            <input asp-for="BirthDate" class="form-control" type="date" />
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="ExpertiseAreas" class="form-label">Uzmanlık Alanları</label>
+                            <input asp-for="ExpertiseAreas" class="form-control" placeholder="virgülle ayırın: ASP.NET, SQL, Docker" />
+                            <small class="text-muted">Virgül ile ayırın</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="PhotoUrl" class="form-label">Fotoğraf URL</label>
+                            <input asp-for="PhotoUrl" class="form-control" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label d-block">Durum</label>
+                            <div class="form-check form-switch mt-2">
+                                <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                                <label asp-for="IsActive" class="form-check-label">Aktif</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr />
+                    <div class="d-flex gap-2 justify-content-end">
+                        <a href="/Employees" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>İptal
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Kaydet
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

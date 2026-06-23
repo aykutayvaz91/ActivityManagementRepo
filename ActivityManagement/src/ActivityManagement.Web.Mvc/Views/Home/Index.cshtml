@@ -1,0 +1,221 @@
+@{
+    ViewData["Title"] = "Ana Sayfa";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white shadow">
+            <div class="card-body d-flex align-items-center">
+                <i class="fas fa-users fa-3x opacity-75 me-3"></i>
+                <div>
+                    <div class="h2 mb-0">@ViewBag.EmployeeCount</div>
+                    <div>Aktif Personel</div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="/Employees" class="text-white text-decoration-none small">
+                    Tümünü Gör <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white shadow">
+            <div class="card-body d-flex align-items-center">
+                <i class="fas fa-project-diagram fa-3x opacity-75 me-3"></i>
+                <div>
+                    <div class="h2 mb-0">@ViewBag.ProjectCount</div>
+                    <div>Toplam Proje</div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="/Projects" class="text-white text-decoration-none small">
+                    Tümünü Gör <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white shadow">
+            <div class="card-body d-flex align-items-center">
+                <i class="fas fa-tasks fa-3x opacity-75 me-3"></i>
+                <div>
+                    <div class="h2 mb-0">@ViewBag.InProgressTaskCount</div>
+                    <div>Devam Eden Görev</div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="/Tasks?status=1" class="text-white text-decoration-none small">
+                    Görevler <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white shadow">
+            <div class="card-body d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle fa-3x opacity-75 me-3"></i>
+                <div>
+                    <div class="h2 mb-0">@ViewBag.PendingTaskCount</div>
+                    <div>Bekleyen Görev</div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0 pt-0">
+                <a href="/Tasks?status=0" class="text-white text-decoration-none small">
+                    Görüntüle <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Görev İstatistikleri -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="fas fa-chart-pie me-2 text-primary"></i>Görev Durumu</h6>
+            </div>
+            <div class="card-body">
+                @{
+                    var total = (int)ViewBag.TotalTaskCount;
+                    var pending = (int)ViewBag.PendingTaskCount;
+                    var inprogress = (int)ViewBag.InProgressTaskCount;
+                    var completed = (int)ViewBag.CompletedTaskCount;
+                }
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small>Beklemede</small>
+                        <small>@pending</small>
+                    </div>
+                    <div class="progress mb-1" style="height:10px">
+                        <div class="progress-bar bg-secondary" style="width:@(total>0?pending*100/total:0)%"></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small>Devam Ediyor</small>
+                        <small>@inprogress</small>
+                    </div>
+                    <div class="progress mb-1" style="height:10px">
+                        <div class="progress-bar bg-primary" style="width:@(total>0?inprogress*100/total:0)%"></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small>Tamamlandı</small>
+                        <small>@completed</small>
+                    </div>
+                    <div class="progress mb-1" style="height:10px">
+                        <div class="progress-bar bg-success" style="width:@(total>0?completed*100/total:0)%"></div>
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <span class="badge bg-success fs-6">%@(total>0?completed*100/total:0) Tamamlandı</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="fas fa-fire me-2 text-danger"></i>Aktif Projeler</h6>
+            </div>
+            <ul class="list-group list-group-flush">
+                @{
+                    var activeProjects = ViewBag.ActiveProjects as List<ActivityManagement.Projects.Dto.ProjectDto>;
+                }
+                @if (activeProjects != null && activeProjects.Any())
+                {
+                    foreach (var p in activeProjects)
+                    {
+                        var prg = p.TaskCount > 0 ? p.CompletedTaskCount * 100 / p.TaskCount : 0;
+                        <li class="list-group-item small">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <a href="/Projects/Detail/@p.Id" class="text-decoration-none fw-semibold">@p.Name</a>
+                                <span class="badge bg-secondary">@p.Code</span>
+                            </div>
+                            <div class="progress mt-1" style="height:4px">
+                                <div class="progress-bar bg-success" style="width:@prg%"></div>
+                            </div>
+                            <small class="text-muted">@p.CompletedTaskCount / @p.TaskCount görev · @prg% tamamlandı</small>
+                        </li>
+                    }
+                }
+                else
+                {
+                    <li class="list-group-item text-muted text-center">Aktif proje yok</li>
+                }
+            </ul>
+            <div class="card-footer bg-transparent">
+                <a href="/Projects" class="btn btn-sm btn-outline-primary w-100">Tüm Projeler</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="fas fa-clock me-2 text-warning"></i>Son Görevler</h6>
+            </div>
+            <ul class="list-group list-group-flush">
+                @{
+                    var recentTasks = ViewBag.RecentTasks as List<ActivityManagement.Tasks.Dto.TaskItemDto>;
+                }
+                @if (recentTasks != null && recentTasks.Any())
+                {
+                    foreach (var t in recentTasks)
+                    {
+                        var statusBg = t.Status == ActivityManagement.Entities.TaskStatus.Tamamlandi ? "success" :
+                                       t.Status == ActivityManagement.Entities.TaskStatus.DevamEdiyor ? "primary" : "secondary";
+                        <li class="list-group-item small py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <a href="/Tasks/Detail/@t.Id" class="text-decoration-none text-truncate me-2">@t.Title</a>
+                                <span class="badge bg-@statusBg flex-shrink-0">@t.StatusText</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(t.AssignedEmployeeName))
+                            {
+                                <small class="text-muted"><i class="fas fa-user me-1"></i>@t.AssignedEmployeeName</small>
+                            }
+                        </li>
+                    }
+                }
+                else
+                {
+                    <li class="list-group-item text-muted text-center">Görev yok</li>
+                }
+            </ul>
+            <div class="card-footer bg-transparent">
+                <a href="/Tasks" class="btn btn-sm btn-outline-primary w-100">Tüm Görevler</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hızlı Eylemler -->
+<div class="card shadow-sm">
+    <div class="card-header bg-transparent">
+        <h6 class="mb-0"><i class="fas fa-bolt me-2 text-warning"></i>Hızlı Eylemler</h6>
+    </div>
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+            <a href="/Employees/Create" class="btn btn-outline-primary">
+                <i class="fas fa-user-plus me-1"></i>Personel Ekle
+            </a>
+            <a href="/Projects/Create" class="btn btn-outline-success">
+                <i class="fas fa-folder-plus me-1"></i>Proje Oluştur
+            </a>
+            <a href="/Tasks/Create" class="btn btn-outline-info">
+                <i class="fas fa-plus-circle me-1"></i>Görev Oluştur
+            </a>
+            <a href="/Reports/Personal" class="btn btn-outline-secondary">
+                <i class="fas fa-chart-line me-1"></i>Rapor Oluştur
+            </a>
+            <a href="/Reports/Team" class="btn btn-outline-secondary">
+                <i class="fas fa-chart-bar me-1"></i>Ekip Raporu
+            </a>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,127 @@
+@{
+    ViewData["Title"] = "Görev Yönetimi";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-clipboard-list text-primary me-2"></i>Görevler</h2>
+    <a href="/Tasks/Create" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>Yeni Görev
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <input type="text" id="filterInput" class="form-control" placeholder="Görev adı ara..." />
+            </div>
+            <div class="col-md-3">
+                <select id="statusFilter" class="form-select">
+                    <option value="">Tüm Durumlar</option>
+                    <option value="0">Beklemede</option>
+                    <option value="1">Devam Ediyor</option>
+                    <option value="2">Tamamlandı</option>
+                    <option value="3">İptal</option>
+                    <option value="4">Ertelendi</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select id="priorityFilter" class="form-select">
+                    <option value="">Tüm Öncelikler</option>
+                    <option value="0">Düşük</option>
+                    <option value="1">Normal</option>
+                    <option value="2">Yüksek</option>
+                    <option value="3">Kritik</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-primary w-100" onclick="loadTasks()">
+                    <i class="fas fa-search me-1"></i>Ara
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="tasksContainer">
+    <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+</div>
+
+@section Scripts {
+<script>
+$(document).ready(function() { loadTasks(); });
+
+var statusColors = { 0: 'secondary', 1: 'primary', 2: 'success', 3: 'dark', 4: 'warning' };
+var priorityColors = { 0: 'light text-dark', 1: 'info', 2: 'warning', 3: 'danger' };
+
+function loadTasks() {
+    $.ajax({
+        url: '/api/services/app/TaskItem/GetAll',
+        data: {
+            filter: $('#filterInput').val(),
+            status: $('#statusFilter').val() !== '' ? parseInt($('#statusFilter').val()) : null,
+            priority: $('#priorityFilter').val() !== '' ? parseInt($('#priorityFilter').val()) : null,
+            maxResultCount: 100
+        },
+        success: function(result) {
+            renderTasks(result.result.items, result.result.totalCount);
+        }
+    });
+}
+
+function renderTasks(tasks, total) {
+    if (tasks.length === 0) {
+        $('#tasksContainer').html('<div class="text-center py-5 text-muted"><i class="fas fa-inbox fa-3x mb-3"></i><p>Görev bulunamadı.</p></div>');
+        return;
+    }
+
+    var html = '<div class="table-responsive"><table class="table table-hover align-middle">';
+    html += '<thead class="table-dark"><tr>';
+    html += '<th>Görev</th><th>Kategori</th><th>Proje</th><th>Atanan</th><th>Öncelik</th><th>Durum</th><th>Son Tarih</th><th>Tamamlanma</th><th>İşlemler</th>';
+    html += '</tr></thead><tbody>';
+
+    tasks.forEach(function(t) {
+        var overdueClass = t.dueDate && new Date(t.dueDate) < new Date() && t.status != 2 ? 'table-danger' : '';
+        html += '<tr class="' + overdueClass + '">';
+        html += '<td><a href="/Tasks/Detail/' + t.id + '" class="text-decoration-none fw-semibold">' + t.title + '</a>';
+        if (t.isRoutine) html += ' <span class="badge bg-info ms-1" title="Rutin"><i class="fas fa-redo"></i></span>';
+        html += '</td>';
+        html += '<td><small class="text-muted">' + (t.category || '-') + '</small></td>';
+        html += '<td><small class="text-muted">' + (t.projectName || '-') + '</small></td>';
+        html += '<td><small>' + (t.assignedEmployeeName || '-') + '</small></td>';
+        html += '<td><span class="badge bg-' + (priorityColors[t.priority] || 'secondary') + '">' + t.priorityText + '</span></td>';
+        html += '<td><span class="badge bg-' + (statusColors[t.status] || 'secondary') + '">' + t.statusText + '</span></td>';
+        html += '<td><small>' + (t.dueDate ? new Date(t.dueDate).toLocaleDateString("tr-TR") : '-') + '</small></td>';
+        html += '<td style="width:120px">';
+        html += '<div class="d-flex align-items-center gap-1">';
+        html += '<div class="progress flex-grow-1" style="height:6px"><div class="progress-bar" style="width:' + t.completionPercentage + '%"></div></div>';
+        html += '<small>' + t.completionPercentage + '%</small></div></td>';
+        html += '<td>';
+        html += '<div class="d-flex gap-1">';
+        html += '<a href="/Tasks/Detail/' + t.id + '" class="btn btn-sm btn-outline-info" title="Detay"><i class="fas fa-eye"></i></a>';
+        html += '<a href="/Tasks/Edit/' + t.id + '" class="btn btn-sm btn-outline-warning" title="Düzenle"><i class="fas fa-edit"></i></a>';
+        html += '<button onclick="deleteTask(' + t.id + ')" class="btn btn-sm btn-outline-danger" title="Sil"><i class="fas fa-trash"></i></button>';
+        html += '</div></td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    html += '<small class="text-muted">Toplam ' + total + ' görev</small>';
+    $('#tasksContainer').html(html);
+}
+
+function deleteTask(id) {
+    if (!confirm('Bu görevi silmek istediğinizden emin misiniz?')) return;
+    $.ajax({
+        url: '/api/services/app/TaskItem/Delete',
+        type: 'DELETE',
+        data: { id: id },
+        success: function() {
+            abp.notify.success('Görev silindi.');
+            loadTasks();
+        }
+    });
+}
+</script>
+}

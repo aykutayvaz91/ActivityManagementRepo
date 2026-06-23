@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<localizationDictionary culture="en">
+  <texts>
+    <text name="ActivityManagement" value="Activity Management" />
+    <text name="Create" value="Create" />
+    <text name="Edit" value="Edit" />
+    <text name="Delete" value="Delete" />
+    <text name="Save" value="Save" />
+    <text name="Cancel" value="Cancel" />
+    <text name="Search" value="Search" />
+    <text name="Yes" value="Yes" />
+    <text name="No" value="No" />
+    <text name="Actions" value="Actions" />
+    <text name="Detail" value="Detail" />
+    <text name="Back" value="Back" />
+    <text name="ExportExcel" value="Export Excel" />
+    <text name="ExportPdf" value="Export PDF" />
+    <text name="NoDataFound" value="No data found." />
+    <text name="AreYouSure" value="Are you sure?" />
+    <text name="AreYouSureDeleteEmployee" value="Are you sure you want to delete this employee?" />
+    <text name="AreYouSureDeleteProject" value="Are you sure you want to delete this project?" />
+    <text name="AreYouSureDeleteTask" value="Are you sure you want to delete this task?" />
+    <text name="DeletedSuccessfully" value="Deleted successfully." />
+    <text name="SavedSuccessfully" value="Saved successfully." />
+    <text name="Status" value="Status" />
+    <text name="Priority" value="Priority" />
+    <text name="StartDate" value="Start Date" />
+    <text name="EndDate" value="End Date" />
+    <text name="DueDate" value="Due Date" />
+    <text name="Description" value="Description" />
+    <text name="Title" value="Title" />
+    <text name="Name" value="Name" />
+    <text name="All" value="All" />
+    <text name="Active" value="Active" />
+    <text name="Passive" value="Passive" />
+    <text name="Employees" value="Employees" />
+    <text name="Employee" value="Employee" />
+    <text name="EmployeeManagement" value="Employee Management" />
+    <text name="NewEmployee" value="New Employee" />
+    <text name="FirstName" value="First Name" />
+    <text name="LastName" value="Last Name" />
+    <text name="FullName" value="Full Name" />
+    <text name="EmployeeTitle" value="Title" />
+    <text name="Department" value="Department" />
+    <text name="ExpertiseAreas" value="Expertise Areas" />
+    <text name="HireDate" value="Hire Date" />
+    <text name="EmployeeDashboard" value="Employee Dashboard" />
+    <text name="PersonCard" value="Person Card" />
+    <text name="Responsibilities" value="Responsibilities" />
+    <text name="AssignedProjects" value="Assigned Projects" />
+    <text name="AssignedTasks" value="Assigned Tasks" />
+    <text name="WeeklyCalendar" value="Weekly Calendar" />
+    <text name="Projects" value="Projects" />
+    <text name="Project" value="Project" />
+    <text name="ProjectManagement" value="Project Management" />
+    <text name="NewProject" value="New Project" />
+    <text name="ProjectCode" value="Project Code" />
+    <text name="ProjectStatus" value="Project Status" />
+    <text name="ProjectManager" value="Project Manager" />
+    <text name="TeamMembers" value="Team Members" />
+    <text name="Planlandi" value="Planned" />
+    <text name="Devam" value="In Progress" />
+    <text name="Tamamlandi" value="Completed" />
+    <text name="Iptal" value="Cancelled" />
+    <text name="AddMember" value="Add Member" />
+    <text name="RemoveMember" value="Remove Member" />
+    <text name="Tasks" value="Tasks" />
+    <text name="Task" value="Task" />
+    <text name="TaskManagement" value="Task Management" />
+    <text name="NewTask" value="New Task" />
+    <text name="TaskTitle" value="Task Title" />
+    <text name="AssignedTo" value="Assigned To" />
+    <text name="AssignedBy" value="Assigned By" />
+    <text name="AssignTask" value="Assign Task" />
+    <text name="EstimatedHours" value="Estimated Hours" />
+    <text name="ActualHours" value="Actual Hours" />
+    <text name="CompletionPercentage" value="Completion %" />
+    <text name="Comments" value="Comments" />
+    <text name="AddComment" value="Add Comment" />
+    <text name="Attachments" value="Attachments" />
+    <text name="AddAttachment" value="Add Attachment" />
+    <text name="Beklemede" value="Pending" />
+    <text name="DevamEdiyor" value="In Progress" />
+    <text name="Ertelendi" value="Postponed" />
+    <text name="Dusuk" value="Low" />
+    <text name="Normal" value="Normal" />
+    <text name="Yuksek" value="High" />
+    <text name="Kritik" value="Critical" />
+    <text name="RoutineTasks" value="Routine Tasks" />
+    <text name="RoutineTask" value="Routine Task" />
+    <text name="NewRoutineTask" value="New Routine Task" />
+    <text name="RecurrenceType" value="Recurrence Type" />
+    <text name="Gunluk" value="Daily" />
+    <text name="Haftalik" value="Weekly" />
+    <text name="Aylik" value="Monthly" />
+    <text name="Ozel" value="Custom" />
+    <text name="RecurrenceDays" value="Recurrence Days" />
+    <text name="ValidFrom" value="Valid From" />
+    <text name="ValidTo" value="Valid To" />
+    <text name="Activities" value="Activities" />
+    <text name="Activity" value="Activity" />
+    <text name="ActivityLog" value="Activity Log" />
+    <text name="NewActivity" value="New Activity" />
+    <text name="ActivityDate" value="Activity Date" />
+    <text name="HoursSpent" value="Hours Spent" />
+    <text name="ActivityType" value="Activity Type" />
+    <text name="LogActivity" value="Log Activity" />
+    <text name="Reports" value="Reports" />
+    <text name="PersonalReport" value="Personal Report" />
+    <text name="TeamReport" value="Team Report" />
+    <text name="ExportReport" value="Export Report" />
+    <text name="Last7Days" value="Last 7 Days" />
+    <text name="Last30Days" value="Last 30 Days" />
+    <text name="Monthly" value="Monthly" />
+    <text name="ActivitySummary" value="Activity Summary" />
+    <text name="TotalHours" value="Total Hours" />
+    <text name="CompletedTasks" value="Completed Tasks" />
+    <text name="PendingTasks" value="Pending Tasks" />
+    <text name="InProgressTasks" value="In Progress Tasks" />
+    <text name="DateRange" value="Date Range" />
+    <text name="From" value="From" />
+    <text name="To" value="To" />
+    <text name="Generate" value="Generate" />
+  </texts>
+</localizationDictionary>

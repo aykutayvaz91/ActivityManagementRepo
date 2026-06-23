@@ -1,0 +1,8 @@
+.claude/
+appsettings.Production.json
+**/appsettings.Production.json
+**/bin/
+**/obj/
+*.log
+*.err
+.vs/

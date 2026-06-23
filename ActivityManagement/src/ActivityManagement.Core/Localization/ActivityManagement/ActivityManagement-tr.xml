@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<localizationDictionary culture="tr">
+  <texts>
+    <!-- Genel -->
+    <text name="ActivityManagement" value="Faaliyet Yönetimi" />
+    <text name="Create" value="Oluştur" />
+    <text name="Edit" value="Düzenle" />
+    <text name="Delete" value="Sil" />
+    <text name="Save" value="Kaydet" />
+    <text name="Cancel" value="İptal" />
+    <text name="Search" value="Ara" />
+    <text name="Yes" value="Evet" />
+    <text name="No" value="Hayır" />
+    <text name="Actions" value="İşlemler" />
+    <text name="Detail" value="Detay" />
+    <text name="Back" value="Geri" />
+    <text name="ExportExcel" value="Excel'e Aktar" />
+    <text name="ExportPdf" value="PDF'e Aktar" />
+    <text name="NoDataFound" value="Kayıt bulunamadı." />
+    <text name="AreYouSure" value="Emin misiniz?" />
+    <text name="AreYouSureDeleteEmployee" value="Bu personeli silmek istediğinizden emin misiniz?" />
+    <text name="AreYouSureDeleteProject" value="Bu projeyi silmek istediğinizden emin misiniz?" />
+    <text name="AreYouSureDeleteTask" value="Bu görevi silmek istediğinizden emin misiniz?" />
+    <text name="DeletedSuccessfully" value="Başarıyla silindi." />
+    <text name="SavedSuccessfully" value="Başarıyla kaydedildi." />
+    <text name="Status" value="Durum" />
+    <text name="Priority" value="Öncelik" />
+    <text name="StartDate" value="Başlangıç Tarihi" />
+    <text name="EndDate" value="Bitiş Tarihi" />
+    <text name="DueDate" value="Son Teslim Tarihi" />
+    <text name="Description" value="Açıklama" />
+    <text name="Title" value="Başlık" />
+    <text name="Name" value="Ad" />
+    <text name="All" value="Tümü" />
+    <text name="Active" value="Aktif" />
+    <text name="Passive" value="Pasif" />
+
+    <!-- Personel -->
+    <text name="Employees" value="Personeller" />
+    <text name="Employee" value="Personel" />
+    <text name="EmployeeManagement" value="Personel Yönetimi" />
+    <text name="NewEmployee" value="Yeni Personel" />
+    <text name="FirstName" value="Ad" />
+    <text name="LastName" value="Soyad" />
+    <text name="FullName" value="Ad Soyad" />
+    <text name="EmployeeTitle" value="Unvan" />
+    <text name="Department" value="Departman" />
+    <text name="ExpertiseAreas" value="Uzmanlık Alanları" />
+    <text name="HireDate" value="İşe Başlama Tarihi" />
+    <text name="EmployeeDashboard" value="Personel Paneli" />
+    <text name="PersonCard" value="Kişi Kartı" />
+    <text name="Responsibilities" value="Sorumluluklar" />
+    <text name="AssignedProjects" value="Atanmış Projeler" />
+    <text name="AssignedTasks" value="Atanmış Görevler" />
+    <text name="WeeklyCalendar" value="Haftalık Takvim" />
+
+    <!-- Proje -->
+    <text name="Projects" value="Projeler" />
+    <text name="Project" value="Proje" />
+    <text name="ProjectManagement" value="Proje Yönetimi" />
+    <text name="NewProject" value="Yeni Proje" />
+    <text name="ProjectCode" value="Proje Kodu" />
+    <text name="ProjectStatus" value="Proje Durumu" />
+    <text name="ProjectManager" value="Proje Yöneticisi" />
+    <text name="TeamMembers" value="Takım Üyeleri" />
+    <text name="Planlandi" value="Planlandı" />
+    <text name="Devam" value="Devam Ediyor" />
+    <text name="Tamamlandi" value="Tamamlandı" />
+    <text name="Iptal" value="İptal" />
+    <text name="AddMember" value="Üye Ekle" />
+    <text name="RemoveMember" value="Üyeyi Çıkar" />
+
+    <!-- Görev -->
+    <text name="Tasks" value="Görevler" />
+    <text name="Task" value="Görev" />
+    <text name="TaskManagement" value="Görev Yönetimi" />
+    <text name="NewTask" value="Yeni Görev" />
+    <text name="TaskTitle" value="Görev Başlığı" />
+    <text name="AssignedTo" value="Atanan" />
+    <text name="AssignedBy" value="Atayan" />
+    <text name="AssignTask" value="Görev Ata" />
+    <text name="EstimatedHours" value="Tahmini Süre (Saat)" />
+    <text name="ActualHours" value="Gerçek Süre (Saat)" />
+    <text name="CompletionPercentage" value="Tamamlanma %" />
+    <text name="Comments" value="Yorumlar" />
+    <text name="AddComment" value="Yorum Ekle" />
+    <text name="Attachments" value="Dosyalar" />
+    <text name="AddAttachment" value="Dosya Ekle" />
+    <text name="Beklemede" value="Beklemede" />
+    <text name="DevamEdiyor" value="Devam Ediyor" />
+    <text name="Ertelendi" value="Ertelendi" />
+    <text name="Dusuk" value="Düşük" />
+    <text name="Normal" value="Normal" />
+    <text name="Yuksek" value="Yüksek" />
+    <text name="Kritik" value="Kritik" />
+
+    <!-- Rutin Görevler -->
+    <text name="RoutineTasks" value="Rutin Görevler" />
+    <text name="RoutineTask" value="Rutin Görev" />
+    <text name="NewRoutineTask" value="Yeni Rutin Görev" />
+    <text name="RecurrenceType" value="Tekrar Tipi" />
+    <text name="Gunluk" value="Günlük" />
+    <text name="Haftalik" value="Haftalık" />
+    <text name="Aylik" value="Aylık" />
+    <text name="Ozel" value="Özel" />
+    <text name="RecurrenceDays" value="Tekrar Günleri" />
+    <text name="ValidFrom" value="Geçerlilik Başlangıcı" />
+    <text name="ValidTo" value="Geçerlilik Bitişi" />
+
+    <!-- Faaliyet -->
+    <text name="Activities" value="Faaliyetler" />
+    <text name="Activity" value="Faaliyet" />
+    <text name="ActivityLog" value="Faaliyet Kaydı" />
+    <text name="NewActivity" value="Yeni Faaliyet" />
+    <text name="ActivityDate" value="Faaliyet Tarihi" />
+    <text name="HoursSpent" value="Harcanan Süre (Saat)" />
+    <text name="ActivityType" value="Faaliyet Tipi" />
+    <text name="LogActivity" value="Faaliyet Kaydet" />
+
+    <!-- Raporlar -->
+    <text name="Reports" value="Raporlar" />
+    <text name="PersonalReport" value="Kişisel Rapor" />
+    <text name="TeamReport" value="Ekip Raporu" />
+    <text name="ExportReport" value="Rapor Dışa Aktar" />
+    <text name="Last7Days" value="Son 7 Gün" />
+    <text name="Last30Days" value="Son 30 Gün" />
+    <text name="Monthly" value="Aylık" />
+    <text name="ActivitySummary" value="Faaliyet Özeti" />
+    <text name="TotalHours" value="Toplam Saat" />
+    <text name="CompletedTasks" value="Tamamlanan Görevler" />
+    <text name="PendingTasks" value="Bekleyen Görevler" />
+    <text name="InProgressTasks" value="Devam Eden Görevler" />
+    <text name="DateRange" value="Tarih Aralığı" />
+    <text name="From" value="Başlangıç" />
+    <text name="To" value="Bitiş" />
+    <text name="Generate" value="Oluştur" />
+  </texts>
+</localizationDictionary>

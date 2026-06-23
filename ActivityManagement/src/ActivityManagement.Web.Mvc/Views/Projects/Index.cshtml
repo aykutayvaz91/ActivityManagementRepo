@@ -1,0 +1,125 @@
+@{
+    ViewData["Title"] = "Proje Yönetimi";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-project-diagram text-primary me-2"></i>Projeler</h2>
+    <a href="/Projects/Create" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>Yeni Proje
+    </a>
+</div>
+
+<!-- Filtreler -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2">
+            <div class="col-md-5">
+                <input type="text" id="filterInput" class="form-control" placeholder="Proje adı veya kodu ara..." />
+            </div>
+            <div class="col-md-4">
+                <select id="statusFilter" class="form-select">
+                    <option value="">Tüm Durumlar</option>
+                    <option value="0">Planlandı</option>
+                    <option value="1">Devam Ediyor</option>
+                    <option value="2">Tamamlandı</option>
+                    <option value="3">İptal</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-outline-primary w-100" onclick="loadProjects()">
+                    <i class="fas fa-search me-1"></i>Ara
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="projectsContainer">
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+$(document).ready(function() { loadProjects(); });
+
+function loadProjects() {
+    $.ajax({
+        url: '/api/services/app/Project/GetAll',
+        data: {
+            filter: $('#filterInput').val(),
+            status: $('#statusFilter').val() !== '' ? parseInt($('#statusFilter').val()) : null,
+            maxResultCount: 50
+        },
+        success: function(result) {
+            renderProjects(result.result.items, result.result.totalCount);
+        }
+    });
+}
+
+var statusColors = { 0: 'secondary', 1: 'primary', 2: 'success', 3: 'danger' };
+var statusTexts = { 0: 'Planlandı', 1: 'Devam Ediyor', 2: 'Tamamlandı', 3: 'İptal' };
+
+function renderProjects(projects, total) {
+    if (projects.length === 0) {
+        $('#projectsContainer').html('<div class="text-center py-5 text-muted"><i class="fas fa-folder-open fa-3x mb-3"></i><p>Proje bulunamadı.</p></div>');
+        return;
+    }
+
+    var html = '<div class="row g-3">';
+    projects.forEach(function(p) {
+        var progress = p.taskCount > 0 ? Math.round(p.completedTaskCount / p.taskCount * 100) : 0;
+        var statusColor = statusColors[p.status] || 'secondary';
+        var statusText = p.statusText || statusTexts[p.status] || '';
+
+        html += '<div class="col-md-6 col-lg-4">';
+        html += '<div class="card h-100 shadow-sm">';
+        html += '<div class="card-header d-flex justify-content-between align-items-center">';
+        html += '<span class="badge bg-' + statusColor + '">' + statusText + '</span>';
+        html += '<span class="badge bg-light text-dark">' + p.code + '</span>';
+        html += '</div>';
+        html += '<div class="card-body">';
+        html += '<h6 class="card-title">' + p.name + '</h6>';
+        if (p.description) {
+            html += '<p class="card-text text-muted small">' + p.description.substring(0, 100) + (p.description.length > 100 ? '...' : '') + '</p>';
+        }
+        html += '<div class="row small text-muted g-1 mb-2">';
+        html += '<div class="col-6"><i class="fas fa-user me-1"></i>' + (p.managerName || '-') + '</div>';
+        html += '<div class="col-6"><i class="fas fa-users me-1"></i>' + p.memberCount + ' üye</div>';
+        html += '<div class="col-6"><i class="fas fa-tasks me-1"></i>' + p.taskCount + ' görev</div>';
+        html += '<div class="col-6"><i class="fas fa-calendar-start me-1"></i>' + (p.startDate ? new Date(p.startDate).toLocaleDateString("tr-TR") : '-') + '</div>';
+        html += '</div>';
+        if (p.taskCount > 0) {
+            html += '<div class="progress" style="height:6px">';
+            html += '<div class="progress-bar" style="width:' + progress + '%"></div></div>';
+            html += '<small class="text-muted">' + progress + '% tamamlandı</small>';
+        }
+        html += '</div>';
+        html += '<div class="card-footer bg-transparent">';
+        html += '<div class="d-flex gap-1">';
+        html += '<a href="/Projects/Detail/' + p.id + '" class="btn btn-sm btn-outline-info flex-fill">Detay</a>';
+        html += '<a href="/Projects/Edit/' + p.id + '" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>';
+        html += '<button onclick="deleteProject(' + p.id + ')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>';
+        html += '</div></div></div></div>';
+    });
+    html += '</div>';
+    html += '<p class="text-muted mt-2 small">Toplam ' + total + ' proje</p>';
+    $('#projectsContainer').html(html);
+}
+
+function deleteProject(id) {
+    if (!confirm('Bu projeyi silmek istediğinizden emin misiniz?')) return;
+    $.ajax({
+        url: '/api/services/app/Project/Delete',
+        type: 'DELETE',
+        data: { id: id },
+        success: function() {
+            abp.notify.success('Proje silindi.');
+            loadProjects();
+        }
+    });
+}
+</script>
+}

@@ -1,0 +1,281 @@
+@model ActivityManagement.Employees.Dto.EmployeeDto
+@{
+    ViewData["Title"] = Model.FullName + " - Kişi Kartı";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Employees">Personeller</a></li>
+            <li class="breadcrumb-item active">@Model.FullName</li>
+        </ol>
+    </nav>
+    <a href="/Employees/Edit/@Model.Id" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-edit me-1"></i>Düzenle
+    </a>
+</div>
+
+<div class="row g-3">
+    <!-- Sol: Kişi Bilgileri -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card shadow-sm mb-3">
+            <div class="card-body text-center">
+                @if (!string.IsNullOrEmpty(Model.PhotoUrl))
+                {
+                    <img src="@Model.PhotoUrl" class="rounded-circle mb-3" width="100" height="100" style="object-fit:cover">
+                }
+                else
+                {
+                    <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white mx-auto mb-3" style="width:100px;height:100px;font-size:2.5rem">
+                        <i class="fas fa-user"></i>
+                    </div>
+                }
+                <h5 class="card-title mb-1">@Model.FullName</h5>
+                <p class="text-muted mb-1"><small>@Model.Title</small></p>
+                <span class="badge bg-info">@Model.Department</span>
+                <hr />
+                <div class="text-start small">
+                    @if (!string.IsNullOrEmpty(Model.Email))
+                    {
+                        <p class="mb-1"><i class="fas fa-envelope text-muted me-2"></i>@Model.Email</p>
+                    }
+                    @if (!string.IsNullOrEmpty(Model.Phone))
+                    {
+                        <p class="mb-1"><i class="fas fa-phone text-muted me-2"></i>@Model.Phone</p>
+                    }
+                    <p class="mb-1"><i class="fas fa-calendar text-muted me-2"></i>İşe Başlama: @Model.HireDate.ToString("dd.MM.yyyy")</p>
+                </div>
+                @if (!string.IsNullOrEmpty(Model.ExpertiseAreas))
+                {
+                    <hr />
+                    <div class="text-start">
+                        <small class="text-muted d-block mb-1">Uzmanlık Alanları:</small>
+                        @foreach (var area in Model.ExpertiseAreas.Split(','))
+                        {
+                            <span class="badge bg-secondary me-1 mb-1">@area.Trim()</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Görev Özeti -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="fas fa-tasks me-2 text-primary"></i>Görev Özeti</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center g-2">
+                    <div class="col-4">
+                        <div class="border rounded p-2">
+                            <div class="h4 text-warning mb-0">@Model.PendingTaskCount</div>
+                            <small class="text-muted">Bekleyen</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded p-2">
+                            <div class="h4 text-primary mb-0">@Model.InProgressTaskCount</div>
+                            <small class="text-muted">Devam</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded p-2">
+                            <div class="h4 text-success mb-0">@Model.CompletedTaskCount</div>
+                            <small class="text-muted">Bitti</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sorumluluklar -->
+        @if (Model.Responsibilities.Any())
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent">
+                    <h6 class="mb-0"><i class="fas fa-list-check me-2 text-success"></i>Sorumluluklar</h6>
+                </div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var r in Model.Responsibilities)
+                    {
+                        <li class="list-group-item small">
+                            <strong>@r.OrderNo. @r.Title</strong>
+                            @if (!string.IsNullOrEmpty(r.Description))
+                            {
+                                <br /><span class="text-muted">@r.Description</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+
+    <!-- Sağ: Takvim ve Projeler -->
+    <div class="col-md-8 col-lg-9">
+        <!-- Takvim -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-calendar-alt me-2 text-primary"></i>Haftalık Takvim</h6>
+                <a href="/Tasks/Create?assignedEmployeeId=@Model.Id" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-plus me-1"></i>Görev Ekle
+                </a>
+            </div>
+            <div class="card-body">
+                <div id="employeeCalendar"></div>
+            </div>
+        </div>
+
+        <!-- Projeler -->
+        @if (Model.AssignedProjects.Any())
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent">
+                    <h6 class="mb-0"><i class="fas fa-project-diagram me-2 text-info"></i>Atanmış Projeler</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Proje Adı</th>
+                                <th>Kod</th>
+                                <th>Rol</th>
+                                <th>Durum</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in Model.AssignedProjects)
+                            {
+                                <tr>
+                                    <td><strong>@p.Name</strong></td>
+                                    <td><span class="badge bg-secondary">@p.Code</span></td>
+                                    <td>@p.Role</td>
+                                    <td>
+                                        @{
+                                            var statusClass = p.Status == "Devam" ? "bg-primary" : p.Status == "Tamamlandi" ? "bg-success" : "bg-secondary";
+                                        }
+                                        <span class="badge @statusClass">@p.Status</span>
+                                    </td>
+                                    <td><a href="/Projects/Detail/@p.Id" class="btn btn-sm btn-outline-info">Detay</a></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <!-- Faaliyet Raporu Sekmesi -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent">
+                <ul class="nav nav-tabs card-header-tabs" id="activityTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#tab7">Son 7 Gün</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab30">Son 30 Gün</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="tab7">
+                        <div id="activities7" class="text-muted text-center py-3">
+                            <div class="spinner-border spinner-border-sm me-2"></div>Yükleniyor...
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="tab30">
+                        <div id="activities30" class="text-muted text-center py-3">
+                            <div class="spinner-border spinner-border-sm me-2"></div>Yükleniyor...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+$(document).ready(function () {
+    // FullCalendar
+    var calendarEl = document.getElementById('employeeCalendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'timeGridWeek',
+        locale: 'tr',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,listWeek'
+        },
+        height: 400,
+        events: function(info, successCallback, failureCallback) {
+            $.ajax({
+                url: '/api/services/app/TaskItem/GetCalendarTasks',
+                data: {
+                    employeeId: @Model.Id,
+                    year: info.start.getFullYear(),
+                    month: info.start.getMonth() + 1
+                },
+                success: function(result) {
+                    var events = result.result.items.map(function(t) {
+                        return {
+                            id: t.id,
+                            title: t.title,
+                            start: t.dueDate,
+                            color: t.priority === 3 ? '#dc3545' : t.priority === 2 ? '#fd7e14' : '#0d6efd',
+                            url: '/Tasks/Detail/' + t.id
+                        };
+                    });
+                    successCallback(events);
+                }
+            });
+        }
+    });
+    calendar.render();
+
+    // Faaliyetler
+    loadActivities(7, '#activities7');
+
+    $('#activityTabs a[href="#tab30"]').on('shown.bs.tab', function() {
+        loadActivities(30, '#activities30');
+    });
+});
+
+function loadActivities(days, target) {
+    var endDate = new Date().toISOString().split('T')[0];
+    var startDate = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
+
+    $.ajax({
+        url: '/api/services/app/ActivityLog/GetAll',
+        data: { employeeId: @Model.Id, startDate: startDate, endDate: endDate, maxResultCount: 50 },
+        success: function(result) {
+            var items = result.result.items;
+            if (items.length === 0) {
+                $(target).html('<p class="text-muted text-center py-3">Bu dönemde faaliyet kaydı yok.</p>');
+                return;
+            }
+
+            var totalHours = items.reduce(function(s, i) { return s + i.hoursSpent; }, 0);
+            var html = '<div class="alert alert-info py-2 small mb-3">';
+            html += '<strong>Toplam: ' + items.length + ' faaliyet, ' + totalHours.toFixed(1) + ' saat</strong>';
+            html += '</div>';
+            html += '<div class="table-responsive"><table class="table table-sm table-striped">';
+            html += '<thead><tr><th>Tarih</th><th>Faaliyet</th><th>Proje</th><th>Süre</th></tr></thead><tbody>';
+            items.forEach(function(a) {
+                html += '<tr>';
+                html += '<td><small>' + new Date(a.activityDate).toLocaleDateString("tr-TR") + '</small></td>';
+                html += '<td><small>' + a.description + '</small></td>';
+                html += '<td><small>' + (a.projectName || '-') + '</small></td>';
+                html += '<td><span class="badge bg-light text-dark">' + a.hoursSpent + ' s</span></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            $(target).html(html);
+        }
+    });
+}
+</script>
+}

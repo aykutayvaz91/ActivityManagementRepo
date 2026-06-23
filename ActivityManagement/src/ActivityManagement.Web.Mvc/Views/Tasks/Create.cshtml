@@ -1,0 +1,128 @@
+@model ActivityManagement.Tasks.Dto.CreateUpdateTaskItemDto
+@{
+    ViewData["Title"] = "Yeni Görev";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var employees = ViewBag.Employees as IList<ActivityManagement.Employees.Dto.EmployeeDto>;
+    var projects = ViewBag.Projects as IList<ActivityManagement.Projects.Dto.ProjectDto>;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Tasks">Görevler</a></li>
+            <li class="breadcrumb-item active">Yeni Görev</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-9">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Yeni Görev Oluştur</h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="Create" method="post">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label asp-for="Title" class="form-label">Görev Başlığı <span class="text-danger">*</span></label>
+                            <input asp-for="Title" class="form-control" />
+                            <span asp-validation-for="Title" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Description" class="form-label">Açıklama</label>
+                            <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="ProjectId" class="form-label">Proje</label>
+                            <select asp-for="ProjectId" class="form-select">
+                                <option value="">Seçiniz...</option>
+                                @if (projects != null)
+                                {
+                                    foreach (var p in projects)
+                                    {
+                                        <option value="@p.Id">[@p.Code] @p.Name</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="AssignedEmployeeId" class="form-label">Atanan Kişi</label>
+                            <select asp-for="AssignedEmployeeId" class="form-select">
+                                <option value="">Seçiniz...</option>
+                                @if (employees != null)
+                                {
+                                    foreach (var e in employees)
+                                    {
+                                        <option value="@e.Id">@e.FullName - @e.Title</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="AssignedByEmployeeId" class="form-label">Atayan Kişi</label>
+                            <select asp-for="AssignedByEmployeeId" class="form-select">
+                                <option value="">Seçiniz...</option>
+                                @if (employees != null)
+                                {
+                                    foreach (var e in employees)
+                                    {
+                                        <option value="@e.Id">@e.FullName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="Priority" class="form-label">Öncelik</label>
+                            <select asp-for="Priority" class="form-select">
+                                <option value="0">Düşük</option>
+                                <option value="1" selected>Normal</option>
+                                <option value="2">Yüksek</option>
+                                <option value="3">Kritik</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="Status" class="form-label">Durum</label>
+                            <select asp-for="Status" class="form-select">
+                                <option value="0">Beklemede</option>
+                                <option value="1">Devam Ediyor</option>
+                                <option value="2">Tamamlandı</option>
+                                <option value="3">İptal</option>
+                                <option value="4">Ertelendi</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="StartDate" class="form-label">Başlangıç</label>
+                            <input asp-for="StartDate" class="form-control" type="date" />
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="DueDate" class="form-label">Son Tarih</label>
+                            <input asp-for="DueDate" class="form-control" type="date" />
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="EstimatedHours" class="form-label">Tahmini Süre (saat)</label>
+                            <input asp-for="EstimatedHours" class="form-control" type="number" step="0.5" min="0" />
+                        </div>
+                    </div>
+
+                    <hr />
+                    <div class="d-flex gap-2 justify-content-end">
+                        <a href="/Tasks" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>İptal
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Oluştur
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

@@ -1,0 +1,206 @@
+@model ActivityManagement.Projects.Dto.ProjectDto
+@{
+    ViewData["Title"] = Model.Name;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var statusColor = Model.Status == ActivityManagement.Entities.ProjectStatus.Devam ? "primary" :
+                      Model.Status == ActivityManagement.Entities.ProjectStatus.Tamamlandi ? "success" :
+                      Model.Status == ActivityManagement.Entities.ProjectStatus.Iptal ? "danger" : "secondary";
+    var progress = Model.TaskCount > 0 ? (int)Math.Round((double)Model.CompletedTaskCount / Model.TaskCount * 100) : 0;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Projects">Projeler</a></li>
+            <li class="breadcrumb-item active">@Model.Name</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <a href="/Tasks/Create?projectId=@Model.Id" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-plus me-1"></i>Görev Ekle
+        </a>
+        <a href="/Projects/Edit/@Model.Id" class="btn btn-outline-warning btn-sm">
+            <i class="fas fa-edit me-1"></i>Düzenle
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Proje Bilgileri -->
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-@statusColor text-white">
+                <h6 class="mb-0">@Model.Name</h6>
+            </div>
+            <div class="card-body small">
+                <table class="table table-borderless table-sm mb-0">
+                    <tr><td class="text-muted">Kod:</td><td><strong>@Model.Code</strong></td></tr>
+                    <tr><td class="text-muted">Durum:</td><td><span class="badge bg-@statusColor">@Model.StatusText</span></td></tr>
+                    <tr><td class="text-muted">Yönetici:</td><td>@(Model.ManagerName ?? "-")</td></tr>
+                    <tr><td class="text-muted">Başlangıç:</td><td>@Model.StartDate.ToString("dd.MM.yyyy")</td></tr>
+                    @if (Model.PlannedEndDate.HasValue)
+                    {
+                        <tr><td class="text-muted">Plan. Bitiş:</td><td>@Model.PlannedEndDate.Value.ToString("dd.MM.yyyy")</td></tr>
+                    }
+                    @if (Model.EndDate.HasValue)
+                    {
+                        <tr><td class="text-muted">Bitiş:</td><td>@Model.EndDate.Value.ToString("dd.MM.yyyy")</td></tr>
+                    }
+                </table>
+                @if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    <hr /><p class="text-muted">@Model.Description</p>
+                }
+            </div>
+        </div>
+
+        <!-- Proje İlerlemesi -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent"><h6 class="mb-0">Görev İlerlemesi</h6></div>
+            <div class="card-body">
+                <div class="row text-center g-2 mb-3">
+                    <div class="col-4"><div class="border rounded p-2"><div class="h4 mb-0">@Model.TaskCount</div><small class="text-muted">Toplam</small></div></div>
+                    <div class="col-4"><div class="border rounded p-2 border-success"><div class="h4 text-success mb-0">@Model.CompletedTaskCount</div><small class="text-muted">Bitti</small></div></div>
+                    <div class="col-4"><div class="border rounded p-2 border-warning"><div class="h4 text-warning mb-0">@(Model.TaskCount - Model.CompletedTaskCount)</div><small class="text-muted">Kalan</small></div></div>
+                </div>
+                <div class="progress mb-1">
+                    <div class="progress-bar bg-success" style="width:@progress%">@progress%</div>
+                </div>
+                <small class="text-muted">Tamamlanma: @progress%</small>
+            </div>
+        </div>
+
+        <!-- Takım Üyeleri -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Takım (@Model.MemberCount üye)</h6>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addMemberModal">
+                    <i class="fas fa-user-plus"></i>
+                </button>
+            </div>
+            <ul class="list-group list-group-flush">
+                @foreach (var m in Model.Members)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center small">
+                        <div>
+                            <i class="fas fa-user-circle me-2 text-muted"></i>
+                            <a href="/Employees/Card/@m.EmployeeId">@m.FullName</a>
+                            @if (m.IsManager) { <span class="badge bg-warning text-dark ms-1">Lider</span> }
+                            <br/><small class="text-muted ms-4">@m.Role</small>
+                        </div>
+                        <form asp-action="RemoveMember" method="post" class="d-inline"
+                              onsubmit="return confirm('Üyeyi çıkarmak istiyor musunuz?')">
+                            <input type="hidden" name="projectId" value="@Model.Id" />
+                            <input type="hidden" name="employeeId" value="@m.EmployeeId" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    <!-- Görevler -->
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="fas fa-tasks me-2 text-primary"></i>Görevler</h6>
+            </div>
+            <div id="projectTasks">
+                <div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Üye Ekle Modal -->
+<div class="modal fade" id="addMemberModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Takım Üyesi Ekle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="AddMember" method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="projectId" value="@Model.Id" />
+                    <div class="mb-3">
+                        <label class="form-label">Personel</label>
+                        <select name="employeeId" class="form-select" id="memberEmployeeSelect">
+                            <option value="">Seçiniz...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rol</label>
+                        <input type="text" name="role" class="form-control" placeholder="örn. Backend Geliştirici" />
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="isManager" class="form-check-input" id="isManagerCheck" value="true" />
+                        <label class="form-check-label" for="isManagerCheck">Proje Yöneticisi</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-primary">Ekle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+$(document).ready(function() {
+    // Görevleri yükle
+    $.ajax({
+        url: '/api/services/app/TaskItem/GetAll',
+        data: { projectId: @Model.Id, maxResultCount: 100 },
+        success: function(result) {
+            var tasks = result.result.items;
+            if (tasks.length === 0) {
+                $('#projectTasks').html('<div class="text-center py-4 text-muted">Henüz görev eklenmemiş.</div>');
+                return;
+            }
+
+            var html = '<div class="table-responsive"><table class="table table-hover table-sm mb-0">';
+            html += '<thead class="table-light"><tr><th>Görev</th><th>Atanan</th><th>Öncelik</th><th>Durum</th><th>Son Tarih</th><th>%</th><th></th></tr></thead><tbody>';
+
+            var priorityColors = { 0: 'secondary', 1: 'info', 2: 'warning', 3: 'danger' };
+            var statusColors = { 0: 'secondary', 1: 'primary', 2: 'success', 3: 'dark', 4: 'warning' };
+
+            tasks.forEach(function(t) {
+                html += '<tr>';
+                html += '<td><a href="/Tasks/Detail/' + t.id + '">' + t.title + '</a></td>';
+                html += '<td><small>' + (t.assignedEmployeeName || '-') + '</small></td>';
+                html += '<td><span class="badge bg-' + (priorityColors[t.priority] || 'secondary') + '">' + t.priorityText + '</span></td>';
+                html += '<td><span class="badge bg-' + (statusColors[t.status] || 'secondary') + '">' + t.statusText + '</span></td>';
+                html += '<td><small>' + (t.dueDate ? new Date(t.dueDate).toLocaleDateString("tr-TR") : '-') + '</small></td>';
+                html += '<td>';
+                html += '<div class="progress" style="width:60px;height:8px"><div class="progress-bar" style="width:' + t.completionPercentage + '%"></div></div>';
+                html += '<small>' + t.completionPercentage + '%</small></td>';
+                html += '<td><a href="/Tasks/Detail/' + t.id + '" class="btn btn-sm btn-outline-info">Detay</a></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            $('#projectTasks').html(html);
+        }
+    });
+
+    // Üye modal - personel listesi
+    $('#addMemberModal').on('show.bs.modal', function() {
+        $.ajax({
+            url: '/api/services/app/Employee/GetAllList',
+            success: function(result) {
+                var options = '<option value="">Seçiniz...</option>';
+                result.result.items.forEach(function(e) {
+                    options += '<option value="' + e.id + '">' + e.firstName + ' ' + e.lastName + ' - ' + (e.title || '') + '</option>';
+                });
+                $('#memberEmployeeSelect').html(options);
+            }
+        });
+    });
+});
+</script>
+}
