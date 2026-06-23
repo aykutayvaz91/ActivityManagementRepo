@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Abp.AutoMapper" Version="8.4.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

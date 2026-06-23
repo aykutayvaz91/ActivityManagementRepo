@@ -19,9 +19,12 @@
         </ol>
     </nav>
     <div class="d-flex gap-2">
-        <a href="/Tasks/Edit/@Model.Id" class="btn btn-outline-warning btn-sm">
-            <i class="fas fa-edit me-1"></i>Düzenle
-        </a>
+        @if (ViewBag.CanModify == true)
+        {
+            <a href="/Tasks/Edit/@Model.Id" class="btn btn-outline-warning btn-sm">
+                <i class="fas fa-edit me-1"></i>Düzenle
+            </a>
+        }
     </div>
 </div>
 
@@ -62,6 +65,8 @@
             </div>
         </div>
 
+        @if (ViewBag.CanModify == true)
+        {
         <!-- Durum Güncelle -->
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-transparent"><h6 class="mb-0">Durum Güncelle</h6></div>
@@ -112,6 +117,7 @@
                 </div>
             </div>
         </div>
+        }
     </div>
 
     <div class="col-md-8">
@@ -138,16 +144,19 @@
                     </div>
                 }
 
-                <hr />
-                <form asp-action="AddComment" method="post">
-                    <input type="hidden" name="taskId" value="@Model.Id" />
-                    <div class="d-flex gap-2">
-                        <textarea name="comment" class="form-control form-control-sm" rows="2" placeholder="Yorum yazın..."></textarea>
-                        <button type="submit" class="btn btn-sm btn-primary align-self-end">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </form>
+                @if (ViewBag.CanModify == true)
+                {
+                    <hr />
+                    <form asp-action="AddComment" method="post">
+                        <input type="hidden" name="taskId" value="@Model.Id" />
+                        <div class="d-flex gap-2">
+                            <textarea name="comment" class="form-control form-control-sm" rows="2" placeholder="Yorum yazın..."></textarea>
+                            <button type="submit" class="btn btn-sm btn-primary align-self-end">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </form>
+                }
             </div>
         </div>
 

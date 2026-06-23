@@ -5,9 +5,12 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="fas fa-clipboard-list text-primary me-2"></i>Görevler</h2>
-    <a href="/Tasks/Create" class="btn btn-primary">
-        <i class="fas fa-plus me-1"></i>Yeni Görev
-    </a>
+    @if (User?.IsInRole("Admin") == true || User?.IsInRole("TakımLideri") == true)
+    {
+        <a href="/Tasks/Create" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Yeni Görev
+        </a>
+    }
 </div>
 
 <div class="card mb-3">
@@ -97,11 +100,14 @@ function renderTasks(tasks, total) {
         html += '<div class="d-flex align-items-center gap-1">';
         html += '<div class="progress flex-grow-1" style="height:6px"><div class="progress-bar" style="width:' + t.completionPercentage + '%"></div></div>';
         html += '<small>' + t.completionPercentage + '%</small></div></td>';
+        var canModify = window.AM && (window.AM.isManager || (t.assignedEmployeeId && t.assignedEmployeeId === window.AM.empId));
         html += '<td>';
         html += '<div class="d-flex gap-1">';
         html += '<a href="/Tasks/Detail/' + t.id + '" class="btn btn-sm btn-outline-info" title="Detay"><i class="fas fa-eye"></i></a>';
-        html += '<a href="/Tasks/Edit/' + t.id + '" class="btn btn-sm btn-outline-warning" title="Düzenle"><i class="fas fa-edit"></i></a>';
-        html += '<button onclick="deleteTask(' + t.id + ')" class="btn btn-sm btn-outline-danger" title="Sil"><i class="fas fa-trash"></i></button>';
+        if (canModify) {
+            html += '<a href="/Tasks/Edit/' + t.id + '" class="btn btn-sm btn-outline-warning" title="Düzenle"><i class="fas fa-edit"></i></a>';
+            html += '<button onclick="deleteTask(' + t.id + ')" class="btn btn-sm btn-outline-danger" title="Sil"><i class="fas fa-trash"></i></button>';
+        }
         html += '</div></td>';
         html += '</tr>';
     });

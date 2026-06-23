@@ -47,6 +47,7 @@ namespace ActivityManagement.Web
             .AddNewtonsoftJson();
 
             services.AddSession();
+            services.AddHttpContextAccessor();
 
             var authBuilder = services.AddAuthentication(options =>
             {
@@ -90,11 +91,13 @@ namespace ActivityManagement.Web
                             return Task.CompletedTask;
                         }
 
-                        // Çalışanın rolünü DB'den oku, claim ekle (Admin ise Admin rolü)
-                        var role = LookupEmployeeRole(connStr, email);
+                        // Çalışanın rol + kimliğini DB'den oku, claim ekle
+                        var (role, empId) = LookupEmployee(connStr, email);
                         if (context.Principal?.Identity is ClaimsIdentity id)
                         {
                             id.AddClaim(new Claim(ClaimTypes.Role, role));
+                            if (empId.HasValue)
+                                id.AddClaim(new Claim("EmployeeId", empId.Value.ToString()));
                             if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
                                 id.AddClaim(new Claim("IsAdmin", "true"));
                         }
@@ -106,8 +109,8 @@ namespace ActivityManagement.Web
             return services.AddAbp<ActivityManagementWebMvcModule>();
         }
 
-        // Google girişinde e-postaya göre çalışan rolünü DB'den çeker (login anında, isteğe bağlı tek sorgu).
-        private static string LookupEmployeeRole(string connectionString, string email)
+        // Google girişinde e-postaya göre çalışan rol + kimliğini DB'den çeker (login anında tek sorgu).
+        private static (string Role, long? EmployeeId) LookupEmployee(string connectionString, string email)
         {
             try
             {
@@ -116,9 +119,10 @@ namespace ActivityManagement.Web
                 using var db = new ActivityManagementDbContext(ob.Options);
                 var emp = db.Employees.IgnoreQueryFilters()
                     .FirstOrDefault(e => e.Email == email);
-                return string.IsNullOrWhiteSpace(emp?.AppRole) ? "Uzman" : emp.AppRole;
+                if (emp == null) return ("Uzman", null);
+                return (string.IsNullOrWhiteSpace(emp.AppRole) ? "Uzman" : emp.AppRole, emp.Id);
             }
-            catch { return "Uzman"; }
+            catch { return ("Uzman", null); }
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)

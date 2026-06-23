@@ -33,11 +33,16 @@ namespace ActivityManagement.Web.Controllers
         public async Task<IActionResult> Detail(long id)
         {
             var task = await _taskAppService.GetAsync(id);
+            ViewBag.CanModify = (User.IsInRole("Admin") || User.IsInRole("TakımLideri"))
+                                || task.AssignedEmployeeId == CurrentEmployeeId();
             return View(task);
         }
 
+        private bool IsManager() => User.IsInRole("Admin") || User.IsInRole("TakımLideri");
+
         public async Task<IActionResult> Create(long? projectId, long? assignedEmployeeId)
         {
+            if (!IsManager()) return Redirect("/Account/Denied");
             ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
             ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
             var dto = new CreateUpdateTaskItemDto
@@ -61,9 +66,18 @@ namespace ActivityManagement.Web.Controllers
             return RedirectToAction("Index");
         }
 
+        private long? CurrentEmployeeId()
+        {
+            var c = User.FindFirst("EmployeeId")?.Value;
+            return long.TryParse(c, out var id) ? id : (long?)null;
+        }
+
         public async Task<IActionResult> Edit(long id)
         {
             var task = await _taskAppService.GetAsync(id);
+            // Uzman yalnızca kendi görevini düzenleyebilir
+            if (!IsManager() && task.AssignedEmployeeId != CurrentEmployeeId())
+                return Redirect("/Account/Denied");
             ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
             ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
             return View(ObjectMapper.Map<CreateUpdateTaskItemDto>(task));

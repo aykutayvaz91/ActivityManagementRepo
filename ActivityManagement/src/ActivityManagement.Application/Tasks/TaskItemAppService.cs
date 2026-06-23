@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
 using Abp.Linq.Extensions;
+using Abp.UI;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using ActivityManagement.Authorization;
 using ActivityManagement.Entities;
@@ -13,18 +16,50 @@ using ActivityManagement.Tasks.Dto;
 
 namespace ActivityManagement.Tasks
 {
-    [AbpAuthorize(ActivityManagementPermissions.Tasks.Default)]
     public class TaskItemAppService : ActivityManagementAppServiceBase, ITaskItemAppService
     {
         private readonly IRepository<TaskItem, long> _taskRepository;
         private readonly IRepository<TaskComment, long> _commentRepository;
+        private readonly IRepository<Employee, long> _employeeRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public TaskItemAppService(
             IRepository<TaskItem, long> taskRepository,
-            IRepository<TaskComment, long> commentRepository)
+            IRepository<TaskComment, long> commentRepository,
+            IRepository<Employee, long> employeeRepository,
+            IHttpContextAccessor httpContextAccessor)
         {
             _taskRepository = taskRepository;
             _commentRepository = commentRepository;
+            _employeeRepository = employeeRepository;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        // Mevcut kullanıcının rolü ve çalışan kimliği (cookie claim'lerinden)
+        private (string Role, string Email, long? EmployeeId) CurrentContext()
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            var email = user?.FindFirst(ClaimTypes.Email)?.Value
+                        ?? user?.FindFirst(ClaimTypes.Name)?.Value;
+            long? empId = null;
+            if (!string.IsNullOrEmpty(email))
+                empId = _employeeRepository.GetAll().FirstOrDefault(e => e.Email == email)?.Id;
+            return (role, email, empId);
+        }
+
+        private bool IsManager(string role) =>
+            string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
+
+        // Uzman yalnızca kendisine atanmış görevde işlem yapabilir
+        private void EnsureCanModify(TaskItem task)
+        {
+            var ctx = CurrentContext();
+            if (IsManager(ctx.Role)) return;
+            if (task.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue &&
+                task.AssignedEmployeeId.Value == ctx.EmployeeId.Value) return;
+            throw new UserFriendlyException("Bu görev size atanmadığı için üzerinde işlem yapamazsınız.");
         }
 
         public async Task<PagedResultDto<TaskItemDto>> GetAllAsync(GetTasksInput input)
@@ -57,9 +92,13 @@ namespace ActivityManagement.Tasks
             return MapToDto(task);
         }
 
-        [AbpAuthorize(ActivityManagementPermissions.Tasks.Create)]
+        // Görev oluşturma ve atama yalnızca Admin / Takım Lideri
         public async Task<TaskItemDto> CreateAsync(CreateUpdateTaskItemDto input)
         {
+            var ctx = CurrentContext();
+            if (!IsManager(ctx.Role))
+                throw new UserFriendlyException("Görev oluşturma/atama yetkiniz yok. Bu işlem Takım Lideri/Yönetici tarafından yapılır.");
+
             var task = ObjectMapper.Map<TaskItem>(input);
             task.TenantId = AbpSession.TenantId ?? 1;
             await _taskRepository.InsertAsync(task);
@@ -67,23 +106,35 @@ namespace ActivityManagement.Tasks
             return MapToDto(task);
         }
 
-        [AbpAuthorize(ActivityManagementPermissions.Tasks.Edit)]
         public async Task<TaskItemDto> UpdateAsync(CreateUpdateTaskItemDto input)
         {
             var task = await _taskRepository.GetAsync(input.Id);
+            EnsureCanModify(task);
+
+            // Uzman; atama, proje ve atayan bilgilerini değiştiremesin (sadece yönetici)
+            var ctx = CurrentContext();
+            if (!IsManager(ctx.Role))
+            {
+                input.AssignedEmployeeId = task.AssignedEmployeeId;
+                input.AssignedByEmployeeId = task.AssignedByEmployeeId;
+                input.ProjectId = task.ProjectId;
+            }
+
             ObjectMapper.Map(input, task);
             return MapToDto(task);
         }
 
-        [AbpAuthorize(ActivityManagementPermissions.Tasks.Delete)]
         public async Task DeleteAsync(long id)
         {
+            var task = await _taskRepository.GetAsync(id);
+            EnsureCanModify(task);
             await _taskRepository.DeleteAsync(id);
         }
 
         public async Task UpdateStatusAsync(long id, Entities.TaskStatus status, int percentage)
         {
             var task = await _taskRepository.GetAsync(id);
+            EnsureCanModify(task);
             task.Status = status;
             task.CompletionPercentage = percentage;
             if (status == Entities.TaskStatus.Tamamlandi)
@@ -92,11 +143,17 @@ namespace ActivityManagement.Tasks
 
         public async Task AddCommentAsync(long taskId, string comment)
         {
+            var task = await _taskRepository.GetAsync(taskId);
+            EnsureCanModify(task);
+            var ctx = CurrentContext();
+            var author = ctx.EmployeeId.HasValue
+                ? _employeeRepository.Get(ctx.EmployeeId.Value).FullName
+                : (ctx.Email ?? "Bilinmiyor");
             await _commentRepository.InsertAsync(new TaskComment
             {
                 TaskItemId = taskId,
                 Comment = comment,
-                AuthorName = AbpSession.UserId.HasValue ? $"Kullanıcı #{AbpSession.UserId}" : "Bilinmiyor",
+                AuthorName = author,
                 TenantId = AbpSession.TenantId ?? 1
             });
         }
