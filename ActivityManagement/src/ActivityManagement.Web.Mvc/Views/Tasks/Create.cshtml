@@ -4,6 +4,8 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
     var employees = ViewBag.Employees as IList<ActivityManagement.Employees.Dto.EmployeeDto>;
     var projects = ViewBag.Projects as IList<ActivityManagement.Projects.Dto.ProjectDto>;
+    var parentTasks = ViewBag.ParentTasks as IList<ActivityManagement.Tasks.Dto.TaskItemDto>;
+    bool isManager = User.IsInRole("Admin") || User.IsInRole("TakımLideri");
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -27,6 +29,67 @@
                     <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
                     <div class="row g-3">
+                        @if (isManager)
+                        {
+                            <div class="col-12">
+                                <label class="form-label">Üst Görev <small class="text-muted">(seçmezseniz üst görev olarak oluşturulur)</small></label>
+                                <select asp-for="ParentTaskId" id="parentTaskSelect" class="form-select">
+                                    <option value="">— Üst Görev Yok (kök görev) —</option>
+                                    @if (parentTasks != null)
+                                    {
+                                        foreach (var pt in parentTasks.Where(pt => !pt.ParentTaskId.HasValue))
+                                        {
+                                            <option value="@pt.Id">@pt.Title</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-12">
+                                <label class="form-label">Üst Görev <span class="text-danger">*</span></label>
+                                <select asp-for="ParentTaskId" id="parentTaskSelect" class="form-select" required>
+                                    <option value="">Üst görevi seçiniz...</option>
+                                    @if (parentTasks != null)
+                                    {
+                                        foreach (var pt in parentTasks.Where(pt => !pt.ParentTaskId.HasValue))
+                                        {
+                                            <option value="@pt.Id">@pt.Title</option>
+                                        }
+                                    }
+                                </select>
+                                <small class="text-muted">Alt görev oluşturuyorsunuz; size otomatik atanacak.</small>
+                            </div>
+                        }
+
+                        <div class="col-12" id="activityTypeRow" style="display:none">
+                            <label asp-for="ActivityType" class="form-label">Aktivite Tipi</label>
+                            <select asp-for="ActivityType" class="form-select">
+                                <option value="">Seçiniz...</option>
+                                <option value="0">Bakım</option>
+                                <option value="1">Geliştirme</option>
+                                <option value="2">Kurulum</option>
+                                <option value="3">Destek</option>
+                                <option value="4">Test</option>
+                                <option value="5">Dokümantasyon</option>
+                                <option value="6">Eğitim</option>
+                                <option value="7">Analiz</option>
+                                <option value="8">Proje</option>
+                                <option value="9">Diğer</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6" id="groupNameRow">
+                            <label asp-for="GroupName" class="form-label">Görev Grubu</label>
+                            <select asp-for="GroupName" class="form-select">
+                                <option value="">Seçiniz...</option>
+                                <option value="Sistem Birimi">Sistem Birimi</option>
+                                <option value="Network Birimi">Network Birimi</option>
+                                <option value="Ortak">Ortak (Sistem & Network)</option>
+                            </select>
+                        </div>
+
                         <div class="col-12">
                             <label asp-for="Title" class="form-label">Görev Başlığı <span class="text-danger">*</span></label>
                             <input asp-for="Title" class="form-control" />
@@ -36,45 +99,67 @@
                             <label asp-for="Description" class="form-label">Açıklama</label>
                             <textarea asp-for="Description" class="form-control" rows="3"></textarea>
                         </div>
-                        <div class="col-md-6">
-                            <label asp-for="ProjectId" class="form-label">Proje</label>
-                            <select asp-for="ProjectId" class="form-select">
-                                <option value="">Seçiniz...</option>
-                                @if (projects != null)
-                                {
-                                    foreach (var p in projects)
+
+                        @if (isManager)
+                        {
+                            <div class="col-md-6">
+                                <label asp-for="ProjectId" class="form-label">Proje</label>
+                                <select asp-for="ProjectId" class="form-select">
+                                    <option value="">Seçiniz...</option>
+                                    @if (projects != null)
                                     {
-                                        <option value="@p.Id">[@p.Code] @p.Name</option>
+                                        foreach (var p in projects)
+                                        {
+                                            <option value="@p.Id">[@p.Code] @p.Name</option>
+                                        }
                                     }
-                                }
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="AssignedEmployeeId" class="form-label">Atanan Kişi</label>
-                            <select asp-for="AssignedEmployeeId" class="form-select">
-                                <option value="">Seçiniz...</option>
-                                @if (employees != null)
-                                {
-                                    foreach (var e in employees)
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="AssignedEmployeeId" class="form-label">
+                                    <i class="fas fa-user-tie text-primary me-1"></i>Ana Sorumlu
+                                </label>
+                                <select asp-for="AssignedEmployeeId" class="form-select">
+                                    <option value="">Seçiniz...</option>
+                                    @if (employees != null)
                                     {
-                                        <option value="@e.Id">@e.FullName - @e.Title</option>
+                                        foreach (var e in employees)
+                                        {
+                                            <option value="@e.Id">@e.FullName - @e.Title</option>
+                                        }
                                     }
-                                }
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="AssignedByEmployeeId" class="form-label">Atayan Kişi</label>
-                            <select asp-for="AssignedByEmployeeId" class="form-select">
-                                <option value="">Seçiniz...</option>
-                                @if (employees != null)
-                                {
-                                    foreach (var e in employees)
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="SecondaryEmployeeId" class="form-label">
+                                    <i class="fas fa-user text-secondary me-1"></i>2. Sorumlu <small class="text-muted">(yedek)</small>
+                                </label>
+                                <select asp-for="SecondaryEmployeeId" class="form-select">
+                                    <option value="">Seçiniz...</option>
+                                    @if (employees != null)
                                     {
-                                        <option value="@e.Id">@e.FullName</option>
+                                        foreach (var e in employees)
+                                        {
+                                            <option value="@e.Id">@e.FullName - @e.Title</option>
+                                        }
                                     }
-                                }
-                            </select>
-                        </div>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="AssignedByEmployeeId" class="form-label">Atayan Kişi</label>
+                                <select asp-for="AssignedByEmployeeId" class="form-select">
+                                    <option value="">Seçiniz...</option>
+                                    @if (employees != null)
+                                    {
+                                        foreach (var e in employees)
+                                        {
+                                            <option value="@e.Id">@e.FullName</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                        }
+
                         <div class="col-md-3">
                             <label asp-for="Priority" class="form-label">Öncelik</label>
                             <select asp-for="Priority" class="form-select">
@@ -125,4 +210,17 @@
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+    (function() {
+        var sel = document.getElementById('parentTaskSelect');
+        var actRow = document.getElementById('activityTypeRow');
+        var grpRow = document.getElementById('groupNameRow');
+        function toggle() {
+            actRow.style.display = sel.value ? '' : 'none';
+            if (grpRow) grpRow.style.display = sel.value ? 'none' : '';
+        }
+        sel.addEventListener('change', toggle);
+        toggle();
+    })();
+    </script>
 }

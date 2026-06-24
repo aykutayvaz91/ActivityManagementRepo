@@ -15,14 +15,24 @@
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="/Tasks">Görevler</a></li>
+            @if (!string.IsNullOrEmpty(Model.ParentTaskTitle))
+            {
+                <li class="breadcrumb-item"><a href="/Tasks/Detail/@Model.ParentTaskId">@Model.ParentTaskTitle</a></li>
+            }
             <li class="breadcrumb-item active">@Model.Title</li>
         </ol>
     </nav>
     <div class="d-flex gap-2">
-        @if (ViewBag.CanModify == true)
+        @if (Model.CanEdit)
         {
             <a href="/Tasks/Edit/@Model.Id" class="btn btn-outline-warning btn-sm">
                 <i class="fas fa-edit me-1"></i>Düzenle
+            </a>
+        }
+        @if (Model.IsParentTask)
+        {
+            <a href="/Tasks/Create?parentTaskId=@Model.Id" class="btn btn-outline-success btn-sm">
+                <i class="fas fa-plus me-1"></i>Alt Görev Ekle
             </a>
         }
     </div>
@@ -40,7 +50,11 @@
                     <tr><td class="text-muted">Durum:</td><td><span class="badge bg-@statusColor">@Model.StatusText</span></td></tr>
                     <tr><td class="text-muted">Öncelik:</td><td><span class="badge bg-@priorityColor">@Model.PriorityText</span></td></tr>
                     <tr><td class="text-muted">Proje:</td><td>@(Model.ProjectName ?? "-")</td></tr>
-                    <tr><td class="text-muted">Atanan:</td><td>@(Model.AssignedEmployeeName ?? "-")</td></tr>
+                    <tr><td class="text-muted"><i class="fas fa-user-tie text-primary me-1"></i>Ana Sorumlu:</td><td>@(Model.AssignedEmployeeName ?? "-")</td></tr>
+                    @if (!string.IsNullOrEmpty(Model.SecondaryEmployeeName))
+                    {
+                        <tr><td class="text-muted"><i class="fas fa-user text-secondary me-1"></i>2. Sorumlu:</td><td>@Model.SecondaryEmployeeName</td></tr>
+                    }
                     <tr><td class="text-muted">Atayan:</td><td>@(Model.AssignedByEmployeeName ?? "-")</td></tr>
                     @if (Model.StartDate.HasValue)
                     {
@@ -56,6 +70,14 @@
                     }
                     <tr><td class="text-muted">Tahmini:</td><td>@Model.EstimatedHours saat</td></tr>
                     <tr><td class="text-muted">Gerçek:</td><td>@Model.ActualHours saat</td></tr>
+                    @if (!string.IsNullOrEmpty(Model.ActivityTypeText))
+                    {
+                        <tr><td class="text-muted">Aktivite Tipi:</td><td><span class="badge bg-info">@Model.ActivityTypeText</span></td></tr>
+                    }
+                    @if (!string.IsNullOrEmpty(Model.ParentTaskTitle))
+                    {
+                        <tr><td class="text-muted">Üst Görev:</td><td><a href="/Tasks/Detail/@Model.ParentTaskId">@Model.ParentTaskTitle</a></td></tr>
+                    }
                 </table>
 
                 @if (!string.IsNullOrEmpty(Model.Description))
@@ -65,7 +87,7 @@
             </div>
         </div>
 
-        @if (ViewBag.CanModify == true)
+        @if (Model.CanEdit)
         {
         <!-- Durum Güncelle -->
         <div class="card shadow-sm mb-3">
@@ -121,6 +143,44 @@
     </div>
 
     <div class="col-md-8">
+        @if (Model.SubTasks != null && Model.SubTasks.Any())
+        {
+        <!-- Alt Görevler -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-sitemap me-2 text-success"></i>Alt Görevler (@Model.SubTasks.Count)</h6>
+                <a href="/Tasks/Create?parentTaskId=@Model.Id" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-plus me-1"></i>Ekle
+                </a>
+            </div>
+            <ul class="list-group list-group-flush">
+                @{
+                    var subStatusColors = new Dictionary<ActivityManagement.Entities.TaskStatus, string> {
+                        [ActivityManagement.Entities.TaskStatus.Beklemede] = "secondary",
+                        [ActivityManagement.Entities.TaskStatus.DevamEdiyor] = "primary",
+                        [ActivityManagement.Entities.TaskStatus.Tamamlandi] = "success",
+                        [ActivityManagement.Entities.TaskStatus.Iptal] = "dark",
+                        [ActivityManagement.Entities.TaskStatus.Ertelendi] = "warning"
+                    };
+                }
+                @foreach (var sub in Model.SubTasks)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                        <div>
+                            <a href="/Tasks/Detail/@sub.Id" class="text-decoration-none fw-semibold">@sub.Title</a>
+                            @if (!string.IsNullOrEmpty(sub.ActivityTypeText))
+                            {
+                                <span class="badge bg-light text-dark border ms-1 small">@sub.ActivityTypeText</span>
+                            }
+                            <small class="text-muted ms-2">@(sub.AssignedEmployeeName ?? "-")</small>
+                        </div>
+                        <span class="badge bg-@(subStatusColors.GetValueOrDefault(sub.Status, "secondary"))">@sub.StatusText</span>
+                    </li>
+                }
+            </ul>
+        </div>
+        }
+
         <!-- Yorumlar -->
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-transparent">
@@ -144,7 +204,7 @@
                     </div>
                 }
 
-                @if (ViewBag.CanModify == true)
+                @if (Model.CanEdit)
                 {
                     <hr />
                     <form asp-action="AddComment" method="post">

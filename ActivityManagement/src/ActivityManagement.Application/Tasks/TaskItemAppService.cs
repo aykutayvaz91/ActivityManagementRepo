@@ -35,16 +35,15 @@ namespace ActivityManagement.Tasks
             _httpContextAccessor = httpContextAccessor;
         }
 
-        // Mevcut kullanıcının rolü ve çalışan kimliği (cookie claim'lerinden)
+        // Mevcut kullanıcının rolü ve çalışan kimliği (cookie claim'lerinden - DB sorgusu yok)
         private (string Role, string Email, long? EmployeeId) CurrentContext()
         {
             var user = _httpContextAccessor.HttpContext?.User;
             var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
             var email = user?.FindFirst(ClaimTypes.Email)?.Value
                         ?? user?.FindFirst(ClaimTypes.Name)?.Value;
-            long? empId = null;
-            if (!string.IsNullOrEmpty(email))
-                empId = _employeeRepository.GetAll().FirstOrDefault(e => e.Email == email)?.Id;
+            var empIdStr = user?.FindFirst("EmployeeId")?.Value;
+            long? empId = long.TryParse(empIdStr, out var parsed) ? parsed : (long?)null;
             return (role, email, empId);
         }
 
@@ -52,14 +51,34 @@ namespace ActivityManagement.Tasks
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
 
-        // Uzman yalnızca kendisine atanmış görevde işlem yapabilir
+        // Düzenleme/durum/yorum yetkisi: yönetici VEYA görevin sahibi
+        private bool CanEdit(TaskItem task, (string Role, string Email, long? EmployeeId) ctx) =>
+            IsManager(ctx.Role) ||
+            (task.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue &&
+             task.AssignedEmployeeId.Value == ctx.EmployeeId.Value);
+
+        // Silme: Yönetici her şeyi silebilir; Uzman kendi alt görevini silebilir (üst görev silemez)
+        private bool CanDelete(TaskItem task, (string Role, string Email, long? EmployeeId) ctx)
+        {
+            if (IsManager(ctx.Role)) return true;
+            // Uzman kendi alt görevini silebilir
+            return task.ParentTaskId.HasValue
+                && task.AssignedEmployeeId.HasValue
+                && ctx.EmployeeId.HasValue
+                && task.AssignedEmployeeId.Value == ctx.EmployeeId.Value;
+        }
+
         private void EnsureCanModify(TaskItem task)
         {
-            var ctx = CurrentContext();
-            if (IsManager(ctx.Role)) return;
-            if (task.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue &&
-                task.AssignedEmployeeId.Value == ctx.EmployeeId.Value) return;
-            throw new UserFriendlyException("Bu görev size atanmadığı için üzerinde işlem yapamazsınız.");
+            if (!CanEdit(task, CurrentContext()))
+                throw new UserFriendlyException("Bu görev size atanmadığı için üzerinde işlem yapamazsınız.");
+        }
+
+        private async Task EnsureCanDeleteAsync(long id)
+        {
+            var task = await _taskRepository.GetAsync(id);
+            if (!CanDelete(task, CurrentContext()))
+                throw new UserFriendlyException("Bu görevi silme yetkiniz yok.");
         }
 
         public async Task<PagedResultDto<TaskItemDto>> GetAllAsync(GetTasksInput input)
@@ -67,12 +86,17 @@ namespace ActivityManagement.Tasks
             var query = _taskRepository.GetAll()
                 .Include(t => t.Project)
                 .Include(t => t.AssignedEmployee)
+                .Include(t => t.SecondaryEmployee)
                 .Include(t => t.AssignedByEmployee)
+                .Include(t => t.ParentTask)
                 .WhereIf(!string.IsNullOrWhiteSpace(input.Filter), t => t.Title.Contains(input.Filter))
                 .WhereIf(input.ProjectId.HasValue, t => t.ProjectId == input.ProjectId.Value)
                 .WhereIf(input.AssignedEmployeeId.HasValue, t => t.AssignedEmployeeId == input.AssignedEmployeeId.Value)
                 .WhereIf(input.Status.HasValue, t => t.Status == input.Status.Value)
-                .WhereIf(input.Priority.HasValue, t => t.Priority == input.Priority.Value);
+                .WhereIf(input.Priority.HasValue, t => t.Priority == input.Priority.Value)
+                .WhereIf(!string.IsNullOrWhiteSpace(input.GroupName),
+                    t => t.GroupName == input.GroupName ||
+                         (t.ParentTask != null && t.ParentTask.GroupName == input.GroupName));
 
             var count = await query.CountAsync();
             var items = await query.OrderByDescending(t => t.CreationTime).PageBy(input).ToListAsync();
@@ -85,19 +109,32 @@ namespace ActivityManagement.Tasks
             var task = await _taskRepository.GetAll()
                 .Include(t => t.Project)
                 .Include(t => t.AssignedEmployee)
+                .Include(t => t.SecondaryEmployee)
                 .Include(t => t.AssignedByEmployee)
+                .Include(t => t.ParentTask)
+                .Include(t => t.SubTasks).ThenInclude(s => s.AssignedEmployee)
+                .Include(t => t.SubTasks).ThenInclude(s => s.SecondaryEmployee)
                 .Include(t => t.Comments)
                 .Include(t => t.Attachments)
                 .FirstOrDefaultAsync(t => t.Id == id);
             return MapToDto(task);
         }
 
-        // Görev oluşturma ve atama yalnızca Admin / Takım Lideri
+        // Üst görev → yalnızca Admin/TakımLideri; Alt görev → herkes (kendi üstüne)
         public async Task<TaskItemDto> CreateAsync(CreateUpdateTaskItemDto input)
         {
             var ctx = CurrentContext();
-            if (!IsManager(ctx.Role))
-                throw new UserFriendlyException("Görev oluşturma/atama yetkiniz yok. Bu işlem Takım Lideri/Yönetici tarafından yapılır.");
+            bool isParent = !input.ParentTaskId.HasValue;
+
+            if (isParent && !IsManager(ctx.Role))
+                throw new UserFriendlyException("Üst görev oluşturma yetkiniz yok. Yalnızca Yönetici/Takım Lideri üst görev girebilir.");
+
+            // Alt görev oluşturan Uzman → kendine ata
+            if (!isParent && !IsManager(ctx.Role))
+            {
+                input.AssignedEmployeeId = ctx.EmployeeId;
+                input.AssignedByEmployeeId = ctx.EmployeeId;
+            }
 
             var task = ObjectMapper.Map<TaskItem>(input);
             task.TenantId = AbpSession.TenantId ?? 1;
@@ -116,18 +153,24 @@ namespace ActivityManagement.Tasks
             if (!IsManager(ctx.Role))
             {
                 input.AssignedEmployeeId = task.AssignedEmployeeId;
+                input.SecondaryEmployeeId = task.SecondaryEmployeeId;
                 input.AssignedByEmployeeId = task.AssignedByEmployeeId;
                 input.ProjectId = task.ProjectId;
             }
 
             ObjectMapper.Map(input, task);
+            await CurrentUnitOfWork.SaveChangesAsync();
             return MapToDto(task);
         }
 
         public async Task DeleteAsync(long id)
         {
-            var task = await _taskRepository.GetAsync(id);
-            EnsureCanModify(task);
+            await EnsureCanDeleteAsync(id);
+            // Üst görevi silerken alt görevleri de sil
+            var subTasks = await _taskRepository.GetAll()
+                .Where(t => t.ParentTaskId == id).ToListAsync();
+            foreach (var sub in subTasks)
+                await _taskRepository.DeleteAsync(sub.Id);
             await _taskRepository.DeleteAsync(id);
         }
 
@@ -181,15 +224,28 @@ namespace ActivityManagement.Tasks
             return new ListResultDto<TaskItemDto>(tasks.Select(MapToDto).ToList());
         }
 
+        private static readonly string[] ActivityTypeLabels = new[]
+        {
+            "Bakım","Geliştirme","Kurulum","Destek","Test","Dokümantasyon","Eğitim","Analiz","Proje","Diğer"
+        };
+
         private TaskItemDto MapToDto(TaskItem t)
         {
             if (t == null) return null;
             var dto = ObjectMapper.Map<TaskItemDto>(t);
             dto.ProjectName = t.Project?.Name;
             dto.AssignedEmployeeName = t.AssignedEmployee?.FullName;
+            dto.SecondaryEmployeeName = t.SecondaryEmployee?.FullName;
             dto.AssignedByEmployeeName = t.AssignedByEmployee?.FullName;
             dto.StatusText = t.Status.ToString();
             dto.PriorityText = t.Priority.ToString();
+            dto.ParentTaskTitle = t.ParentTask?.Title;
+            dto.ActivityTypeText = t.ActivityType.HasValue
+                ? ActivityTypeLabels[(int)t.ActivityType.Value]
+                : null;
+            var ctx = CurrentContext();
+            dto.CanEdit = CanEdit(t, ctx);
+            dto.CanDelete = CanDelete(t, ctx);
             dto.Comments = t.Comments?.Select(c => new TaskCommentDto
             {
                 Id = c.Id, Comment = c.Comment, AuthorName = c.AuthorName, CreationTime = c.CreationTime

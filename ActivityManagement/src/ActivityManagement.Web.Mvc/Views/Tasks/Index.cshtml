@@ -5,19 +5,24 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="fas fa-clipboard-list text-primary me-2"></i>Görevler</h2>
-    @if (User?.IsInRole("Admin") == true || User?.IsInRole("TakımLideri") == true)
-    {
+    <div class="d-flex gap-2">
+        <a href="/Tasks/Board" class="btn btn-outline-primary">
+            <i class="fas fa-columns me-1"></i>Pano
+        </a>
         <a href="/Tasks/Create" class="btn btn-primary">
             <i class="fas fa-plus me-1"></i>Yeni Görev
         </a>
-    }
+    </div>
 </div>
 
-<div class="card mb-3">
+<div class="card mb-3 border-0 shadow-sm">
     <div class="card-body py-2">
-        <div class="row g-2">
+        <div class="row g-2 align-items-center">
             <div class="col-md-4">
-                <input type="text" id="filterInput" class="form-control" placeholder="Görev adı ara..." />
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" id="filterInput" class="form-control border-start-0" placeholder="Görev adı ara..." />
+                </div>
             </div>
             <div class="col-md-3">
                 <select id="statusFilter" class="form-select">
@@ -29,19 +34,23 @@
                     <option value="4">Ertelendi</option>
                 </select>
             </div>
-            <div class="col-md-3">
-                <select id="priorityFilter" class="form-select">
-                    <option value="">Tüm Öncelikler</option>
-                    <option value="0">Düşük</option>
-                    <option value="1">Normal</option>
-                    <option value="2">Yüksek</option>
-                    <option value="3">Kritik</option>
+            <div class="col-md-2">
+                <select id="groupFilter" class="form-select">
+                    <option value="">Tüm Birimler</option>
+                    <option value="Sistem Birimi">Sistem Birimi</option>
+                    <option value="Network Birimi">Network Birimi</option>
+                    <option value="Ortak">Ortak</option>
                 </select>
             </div>
             <div class="col-md-2">
-                <button class="btn btn-outline-primary w-100" onclick="loadTasks()">
-                    <i class="fas fa-search me-1"></i>Ara
-                </button>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-outline-primary flex-grow-1" onclick="loadTasks()">
+                        <i class="fas fa-search me-1"></i>Ara
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="toggleAll()" title="Tümünü Aç/Kapat" id="toggleAllBtn">
+                        <i class="fas fa-expand-alt"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -51,83 +60,273 @@
     <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
 </div>
 
+<!-- Silme onay modalı -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Görevi Sil</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="deleteModalBody">Bu görevi silmek istediğinizden emin misiniz?</div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>İptal
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash me-1"></i>Evet, Sil
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
 <script>
 $(document).ready(function() { loadTasks(); });
 
-var statusColors = { 0: 'secondary', 1: 'primary', 2: 'success', 3: 'dark', 4: 'warning' };
-var priorityColors = { 0: 'light text-dark', 1: 'info', 2: 'warning', 3: 'danger' };
+var statusColors  = { 0:'secondary', 1:'primary', 2:'success', 3:'dark', 4:'warning' };
+var statusLabels  = { 0:'Beklemede', 1:'Devam Ediyor', 2:'Tamamlandı', 3:'İptal', 4:'Ertelendi' };
+var priorityColors = { 0:'light text-dark border', 1:'info', 2:'warning', 3:'danger' };
+var pendingDeleteId = null;
+var allExpanded = false;
 
 function loadTasks() {
+    $('#tasksContainer').html('<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>');
     $.ajax({
         url: '/api/services/app/TaskItem/GetAll',
         data: {
             filter: $('#filterInput').val(),
             status: $('#statusFilter').val() !== '' ? parseInt($('#statusFilter').val()) : null,
-            priority: $('#priorityFilter').val() !== '' ? parseInt($('#priorityFilter').val()) : null,
-            maxResultCount: 100
+            groupName: $('#groupFilter').val() || null,
+            maxResultCount: 500
         },
-        success: function(result) {
-            renderTasks(result.result.items, result.result.totalCount);
-        }
+        success: function(res) { renderTasks(res.result.items, res.result.totalCount); }
     });
 }
 
 function renderTasks(tasks, total) {
-    if (tasks.length === 0) {
-        $('#tasksContainer').html('<div class="text-center py-5 text-muted"><i class="fas fa-inbox fa-3x mb-3"></i><p>Görev bulunamadı.</p></div>');
+    if (!tasks.length) {
+        $('#tasksContainer').html('<div class="text-center py-5 text-muted"><i class="fas fa-inbox fa-3x mb-3 d-block"></i>Görev bulunamadı.</div>');
         return;
     }
 
-    var html = '<div class="table-responsive"><table class="table table-hover align-middle">';
-    html += '<thead class="table-dark"><tr>';
-    html += '<th>Görev</th><th>Kategori</th><th>Proje</th><th>Atanan</th><th>Öncelik</th><th>Durum</th><th>Son Tarih</th><th>Tamamlanma</th><th>İşlemler</th>';
-    html += '</tr></thead><tbody>';
-
-    tasks.forEach(function(t) {
-        var overdueClass = t.dueDate && new Date(t.dueDate) < new Date() && t.status != 2 ? 'table-danger' : '';
-        html += '<tr class="' + overdueClass + '">';
-        html += '<td><a href="/Tasks/Detail/' + t.id + '" class="text-decoration-none fw-semibold">' + t.title + '</a>';
-        if (t.isRoutine) html += ' <span class="badge bg-info ms-1" title="Rutin"><i class="fas fa-redo"></i></span>';
-        html += '</td>';
-        html += '<td><small class="text-muted">' + (t.category || '-') + '</small></td>';
-        html += '<td><small class="text-muted">' + (t.projectName || '-') + '</small></td>';
-        html += '<td><small>' + (t.assignedEmployeeName || '-') + '</small></td>';
-        html += '<td><span class="badge bg-' + (priorityColors[t.priority] || 'secondary') + '">' + t.priorityText + '</span></td>';
-        html += '<td><span class="badge bg-' + (statusColors[t.status] || 'secondary') + '">' + t.statusText + '</span></td>';
-        html += '<td><small>' + (t.dueDate ? new Date(t.dueDate).toLocaleDateString("tr-TR") : '-') + '</small></td>';
-        html += '<td style="width:120px">';
-        html += '<div class="d-flex align-items-center gap-1">';
-        html += '<div class="progress flex-grow-1" style="height:6px"><div class="progress-bar" style="width:' + t.completionPercentage + '%"></div></div>';
-        html += '<small>' + t.completionPercentage + '%</small></div></td>';
-        var canModify = window.AM && (window.AM.isManager || (t.assignedEmployeeId && t.assignedEmployeeId === window.AM.empId));
-        html += '<td>';
-        html += '<div class="d-flex gap-1">';
-        html += '<a href="/Tasks/Detail/' + t.id + '" class="btn btn-sm btn-outline-info" title="Detay"><i class="fas fa-eye"></i></a>';
-        if (canModify) {
-            html += '<a href="/Tasks/Edit/' + t.id + '" class="btn btn-sm btn-outline-warning" title="Düzenle"><i class="fas fa-edit"></i></a>';
-            html += '<button onclick="deleteTask(' + t.id + ')" class="btn btn-sm btn-outline-danger" title="Sil"><i class="fas fa-trash"></i></button>';
-        }
-        html += '</div></td>';
-        html += '</tr>';
+    var parents  = tasks.filter(function(t) { return !t.parentTaskId; });
+    var children = tasks.filter(function(t) { return  t.parentTaskId; });
+    var childMap = {};
+    children.forEach(function(c) {
+        if (!childMap[c.parentTaskId]) childMap[c.parentTaskId] = [];
+        childMap[c.parentTaskId].push(c);
     });
 
-    html += '</tbody></table></div>';
-    html += '<small class="text-muted">Toplam ' + total + ' görev</small>';
+    var html = '';
+    parents.forEach(function(p) {
+        var subs = childMap[p.id] || [];
+        html += renderParentCard(p, subs);
+    });
+
+    // Orphan children
+    var parentIds = parents.map(function(p) { return p.id; });
+    var orphans = children.filter(function(c) { return parentIds.indexOf(c.parentTaskId) === -1; });
+    if (orphans.length) {
+        html += '<div class="card border-0 shadow-sm mb-2"><div class="card-header bg-light py-2 small text-muted">Diğer Alt Görevler</div><div class="card-body p-0">';
+        orphans.forEach(function(s) { html += renderChildRow(s); });
+        html += '</div></div>';
+    }
+
+    html += '<div class="text-muted small mt-2">Toplam ' + total + ' görev &bull; ' + parents.length + ' ana görev</div>';
     $('#tasksContainer').html(html);
 }
 
-function deleteTask(id) {
-    if (!confirm('Bu görevi silmek istediğinizden emin misiniz?')) return;
+function statusDot(status) {
+    var colors = { 0:'#6c757d', 1:'#0d6efd', 2:'#198754', 3:'#212529', 4:'#ffc107' };
+    return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + (colors[status]||'#ccc') + ';margin-right:6px"></span>';
+}
+
+function renderParentCard(p, subs) {
+    var overdueClass = p.dueDate && new Date(p.dueDate) < new Date() && p.status != 2 ? 'border-danger' : 'border-0';
+    var completedClass = p.status == 2 ? 'opacity-75' : '';
+    var hasChildren = subs.length > 0;
+
+    // Progress bar across sub-tasks
+    var avgPct = 0;
+    if (subs.length > 0) {
+        avgPct = Math.round(subs.reduce(function(a,b){return a+b.completionPercentage;},0)/subs.length);
+    } else {
+        avgPct = p.completionPercentage;
+    }
+
+    var html = '<div class="card shadow-sm mb-3 ' + overdueClass + ' ' + completedClass + '">';
+
+    // Card header — parent task row
+    html += '<div class="card-header bg-white py-3 px-3 d-flex align-items-center gap-3" style="cursor:' + (hasChildren?'pointer':'default') + '" ' + (hasChildren ? 'onclick="toggleSubs('+p.id+')"' : '') + '>';
+
+    // Expand toggle
+    if (hasChildren) {
+        html += '<span class="toggle-icon text-muted" id="icon-'+p.id+'" style="width:18px;flex-shrink:0"><i class="fas fa-chevron-down"></i></span>';
+    } else {
+        html += '<span style="width:18px;flex-shrink:0"></span>';
+    }
+
+    // Title + badges
+    html += '<div class="flex-grow-1 min-width-0">';
+    html += '<div class="d-flex align-items-center gap-2 flex-wrap">';
+    html += statusDot(p.status);
+    html += '<a href="/Tasks/Detail/'+p.id+'" class="text-decoration-none fw-semibold text-dark fs-6" onclick="event.stopPropagation()">'+escHtml(p.title)+'</a>';
+    if (p.isRoutine) html += '<span class="badge bg-info ms-1 small" title="Rutin"><i class="fas fa-redo"></i></span>';
+    if (p.groupName) {
+        var gc = { 'Sistem Birimi':'primary', 'Network Birimi':'success', 'Ortak':'secondary' };
+        html += '<span class="badge bg-'+( gc[p.groupName]||'secondary')+'-subtle text-'+(gc[p.groupName]||'secondary')+' border border-'+(gc[p.groupName]||'secondary')+'-subtle small ms-1">'+escHtml(p.groupName)+'</span>';
+    }
+    html += '</div>';
+
+    // Responsibles
+    var respHtml = '';
+    if (p.assignedEmployeeName) {
+        respHtml += '<span class="me-3"><i class="fas fa-user-tie text-primary me-1" style="font-size:0.75rem"></i><span class="small">' + escHtml(p.assignedEmployeeName) + '</span></span>';
+    }
+    if (p.secondaryEmployeeName) {
+        respHtml += '<span><i class="fas fa-user text-secondary me-1" style="font-size:0.75rem"></i><span class="small text-muted">' + escHtml(p.secondaryEmployeeName) + '</span></span>';
+    }
+    if (respHtml) html += '<div class="mt-1">' + respHtml + '</div>';
+    html += '</div>';
+
+    // Right side: meta + actions
+    html += '<div class="d-flex align-items-center gap-3 flex-shrink-0 ms-auto">';
+
+    // Progress
+    html += '<div style="width:90px" class="d-none d-md-block">';
+    html += '<div class="d-flex justify-content-between mb-1"><small class="text-muted">' + avgPct + '%</small>';
+    if (hasChildren) html += '<small class="text-muted">'+subs.length+' alt</small>';
+    html += '</div>';
+    html += '<div class="progress" style="height:5px"><div class="progress-bar bg-' + (statusColors[p.status]||'secondary') + '" style="width:'+avgPct+'%"></div></div>';
+    html += '</div>';
+
+    // Status badge
+    html += '<span class="badge bg-'+statusColors[p.status]+' d-none d-md-inline">' + (statusLabels[p.status]||'') + '</span>';
+
+    // Priority
+    var priBadge = { 0:'<span class="badge bg-light text-dark border small">Düşük</span>', 1:'<span class="badge bg-info small">Normal</span>', 2:'<span class="badge bg-warning small">Yüksek</span>', 3:'<span class="badge bg-danger small">Kritik</span>' };
+    html += (priBadge[p.priority]||'');
+
+    // Due date
+    if (p.dueDate) {
+        var due = new Date(p.dueDate);
+        var overdue = due < new Date() && p.status != 2;
+        html += '<small class="'+(overdue?'text-danger fw-semibold':'text-muted')+' d-none d-lg-inline"><i class="fas fa-calendar me-1"></i>'+due.toLocaleDateString("tr-TR")+'</small>';
+    }
+
+    // Actions
+    html += '<div class="d-flex gap-1" onclick="event.stopPropagation()">';
+    html += '<a href="/Tasks/Detail/'+p.id+'" class="btn btn-sm btn-outline-secondary" title="Detay"><i class="fas fa-eye"></i></a>';
+    if (p.canEdit) html += '<a href="/Tasks/Edit/'+p.id+'" class="btn btn-sm btn-outline-warning" title="Düzenle"><i class="fas fa-edit"></i></a>';
+    html += '<a href="/Tasks/Create?parentTaskId='+p.id+'" class="btn btn-sm btn-outline-success" title="Alt Görev Ekle"><i class="fas fa-plus"></i></a>';
+    if (p.canDelete) html += '<button onclick="confirmDelete('+p.id+',\''+escJs(p.title)+'\')" class="btn btn-sm btn-outline-danger" title="Sil"><i class="fas fa-trash"></i></button>';
+    html += '</div>';
+    html += '</div>'; // right side
+
+    html += '</div>'; // card-header
+
+    // Sub-tasks collapsible
+    if (hasChildren) {
+        html += '<div class="sub-tasks-container" id="subs-'+p.id+'" style="display:none">';
+        subs.forEach(function(s) { html += renderChildRow(s); });
+        html += '</div>';
+    }
+
+    html += '</div>'; // card
+    return html;
+}
+
+function renderChildRow(s) {
+    var overdueClass = s.dueDate && new Date(s.dueDate) < new Date() && s.status != 2 ? 'bg-danger bg-opacity-10' : 'bg-light bg-opacity-50';
+    var html = '<div class="d-flex align-items-center gap-3 px-4 py-2 border-top ' + overdueClass + '">';
+
+    html += '<span style="width:18px;flex-shrink:0;color:#ccc"><i class="fas fa-corner-down-right" style="font-size:0.8rem"></i></span>';
+
+    html += '<div class="flex-grow-1 min-width-0">';
+    html += '<div class="d-flex align-items-center gap-2">';
+    html += statusDot(s.status);
+    html += '<a href="/Tasks/Detail/'+s.id+'" class="text-decoration-none fw-semibold text-dark small">'+escHtml(s.title)+'</a>';
+    if (s.activityTypeText) html += '<span class="badge bg-light text-muted border small py-0 px-1">'+escHtml(s.activityTypeText)+'</span>';
+    html += '</div>';
+    if (s.assignedEmployeeName) {
+        html += '<small class="text-muted ms-3"><i class="fas fa-user me-1" style="font-size:0.7rem"></i>'+escHtml(s.assignedEmployeeName)+'</small>';
+    }
+    html += '</div>';
+
+    html += '<div class="d-flex align-items-center gap-2 flex-shrink-0 ms-auto">';
+    html += '<span class="badge bg-'+statusColors[s.status]+' small">' + (statusLabels[s.status]||'') + '</span>';
+    if (s.dueDate) {
+        var due = new Date(s.dueDate);
+        var overdue = due < new Date() && s.status != 2;
+        html += '<small class="'+(overdue?'text-danger':'text-muted')+' d-none d-lg-inline">'+due.toLocaleDateString("tr-TR")+'</small>';
+    }
+    html += '<div class="d-flex gap-1">';
+    html += '<a href="/Tasks/Detail/'+s.id+'" class="btn btn-sm btn-outline-secondary py-0" title="Detay"><i class="fas fa-eye"></i></a>';
+    if (s.canEdit) html += '<a href="/Tasks/Edit/'+s.id+'" class="btn btn-sm btn-outline-warning py-0" title="Düzenle"><i class="fas fa-edit"></i></a>';
+    if (s.canDelete) html += '<button onclick="confirmDelete('+s.id+',\''+escJs(s.title)+'\')" class="btn btn-sm btn-outline-danger py-0" title="Sil"><i class="fas fa-trash"></i></button>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+    return html;
+}
+
+function toggleSubs(parentId) {
+    var $el = $('#subs-' + parentId);
+    var $icon = $('#icon-' + parentId + ' i');
+    if ($el.is(':visible')) {
+        $el.slideUp(150);
+        $icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+    } else {
+        $el.slideDown(150);
+        $icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+    }
+}
+
+function toggleAll() {
+    allExpanded = !allExpanded;
+    if (allExpanded) {
+        $('.sub-tasks-container').slideDown(150);
+        $('.toggle-icon i').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+        $('#toggleAllBtn i').removeClass('fa-expand-alt').addClass('fa-compress-alt');
+    } else {
+        $('.sub-tasks-container').slideUp(150);
+        $('.toggle-icon i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+        $('#toggleAllBtn i').removeClass('fa-compress-alt').addClass('fa-expand-alt');
+    }
+}
+
+function confirmDelete(id, title) {
+    pendingDeleteId = id;
+    $('#deleteModalBody').text('"' + title + '" görevini silmek istediğinizden emin misiniz?');
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+$('#confirmDeleteBtn').on('click', function() {
+    if (!pendingDeleteId) return;
+    var id = pendingDeleteId;
+    pendingDeleteId = null;
+    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
     $.ajax({
         url: '/api/services/app/TaskItem/Delete',
         type: 'DELETE',
         data: { id: id },
-        success: function() {
-            abp.notify.success('Görev silindi.');
-            loadTasks();
-        }
+        success: function() { abp.notify.success('Görev silindi.'); loadTasks(); },
+        error: function() { abp.notify.error('Silinemedi.'); }
     });
+});
+
+function escHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function escJs(s) {
+    if (!s) return '';
+    return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+}
+
+// Enter key in filter
+$('#filterInput').on('keypress', function(e) { if (e.which===13) loadTasks(); });
 </script>
 }

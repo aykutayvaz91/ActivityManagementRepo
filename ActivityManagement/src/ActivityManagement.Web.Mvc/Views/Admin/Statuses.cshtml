@@ -1,0 +1,118 @@
+@model System.Collections.Generic.List<ActivityManagement.Workflow.WorkflowStatusDto>
+@{
+    ViewData["Title"] = "Durum Yönetimi";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var colors = new[] { "secondary", "primary", "success", "info", "warning", "danger", "dark" };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Admin">Admin Panel</a></li>
+            <li class="breadcrumb-item active">Durum Yönetimi</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent"><h6 class="mb-0"><i class="fas fa-columns me-2 text-primary"></i>Görev Durumları (Kanban Kolonları)</h6></div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Sıra</th><th>Ad</th><th>Renk</th><th>Durum Değeri</th><th>Aktif</th><th>Bitiş?</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model)
+                        {
+                            <tr>
+                                <td><span class="badge bg-light text-dark">@s.SortOrder</span></td>
+                                <td><span class="badge bg-@s.Color">@s.Name</span></td>
+                                <td><small class="text-muted">@s.Color</small></td>
+                                <td>@s.StatusValue</td>
+                                <td>@(s.IsActive ? "✓" : "—")</td>
+                                <td>@(s.IsCompletedState ? "✓" : "—")</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-warning"
+                                            onclick='editStatus(@Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(s)))'>
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <form asp-action="DeleteStatus" method="post" class="d-inline" onsubmit="return confirm('Silinsin mi?')">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@s.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="text-muted small mt-2">Not: "Durum Değeri" görevin saklanan durum kodudur (0 Beklemede, 1 Devam, 2 Tamamlandı, 3 İptal, 4 Ertelendi). Kolon adı/rengi/sırası/görünürlüğü buradan değiştirilebilir.</p>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white"><h6 class="mb-0" id="formTitle">Yeni Durum</h6></div>
+            <div class="card-body">
+                <form asp-action="SaveStatus" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" id="f_id" value="0" />
+                    <div class="mb-2">
+                        <label class="form-label small">Ad</label>
+                        <input name="Name" id="f_name" class="form-control" required />
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6 mb-2">
+                            <label class="form-label small">Renk</label>
+                            <select name="Color" id="f_color" class="form-select">
+                                @foreach (var c in colors) { <option value="@c">@c</option> }
+                            </select>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <label class="form-label small">Sıra</label>
+                            <input name="SortOrder" id="f_sort" type="number" class="form-control" value="1" />
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Durum Değeri (0-4)</label>
+                        <input name="StatusValue" id="f_val" type="number" min="0" max="4" class="form-control" value="0" />
+                    </div>
+                    <div class="form-check"><input type="checkbox" name="IsActive" value="true" id="f_active" class="form-check-input" checked /><label class="form-check-label" for="f_active">Aktif</label></div>
+                    <div class="form-check mb-3"><input type="checkbox" name="IsCompletedState" value="true" id="f_done" class="form-check-input" /><label class="form-check-label" for="f_done">Tamamlanma durumu</label></div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-fill"><i class="fas fa-save me-1"></i>Kaydet</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">Temizle</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function editStatus(s) {
+    document.getElementById('formTitle').innerText = 'Durum Düzenle: ' + s.name;
+    document.getElementById('f_id').value = s.id;
+    document.getElementById('f_name').value = s.name;
+    document.getElementById('f_color').value = s.color;
+    document.getElementById('f_sort').value = s.sortOrder;
+    document.getElementById('f_val').value = s.statusValue;
+    document.getElementById('f_active').checked = s.isActive;
+    document.getElementById('f_done').checked = s.isCompletedState;
+    window.scrollTo(0, 0);
+}
+function resetForm() {
+    document.getElementById('formTitle').innerText = 'Yeni Durum';
+    document.getElementById('f_id').value = 0;
+    document.getElementById('f_name').value = '';
+    document.getElementById('f_sort').value = 1;
+    document.getElementById('f_val').value = 0;
+    document.getElementById('f_active').checked = true;
+    document.getElementById('f_done').checked = false;
+}
+</script>
+}

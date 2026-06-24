@@ -6,3 +6,5 @@ appsettings.Production.json
 *.log
 *.err
 .vs/
+
+HANDOFF.md

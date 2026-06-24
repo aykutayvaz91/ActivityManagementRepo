@@ -10,5 +10,6 @@ namespace ActivityManagement.Tasks.Dto
         public long? AssignedEmployeeId { get; set; }
         public Entities.TaskStatus? Status { get; set; }
         public TaskPriority? Priority { get; set; }
+        public string GroupName { get; set; }
     }
 }

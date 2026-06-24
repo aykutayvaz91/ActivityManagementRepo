@@ -30,25 +30,30 @@ namespace ActivityManagement.Web.Controllers
             return View();
         }
 
+        // Kanban panosu
+        public IActionResult Board()
+        {
+            return View();
+        }
+
         public async Task<IActionResult> Detail(long id)
         {
             var task = await _taskAppService.GetAsync(id);
-            ViewBag.CanModify = (User.IsInRole("Admin") || User.IsInRole("TakımLideri"))
-                                || task.AssignedEmployeeId == CurrentEmployeeId();
             return View(task);
         }
 
         private bool IsManager() => User.IsInRole("Admin") || User.IsInRole("TakımLideri");
 
-        public async Task<IActionResult> Create(long? projectId, long? assignedEmployeeId)
+        public async Task<IActionResult> Create(long? projectId, long? assignedEmployeeId, long? parentTaskId)
         {
-            if (!IsManager()) return Redirect("/Account/Denied");
             ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
             ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
+            ViewBag.ParentTasks = (await _taskAppService.GetAllAsync(new GetTasksInput { MaxResultCount = 1000 })).Items;
             var dto = new CreateUpdateTaskItemDto
             {
                 ProjectId = projectId,
-                AssignedEmployeeId = assignedEmployeeId
+                AssignedEmployeeId = assignedEmployeeId,
+                ParentTaskId = parentTaskId
             };
             return View(dto);
         }
@@ -60,10 +65,22 @@ namespace ActivityManagement.Web.Controllers
             {
                 ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
                 ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
+                ViewBag.ParentTasks = (await _taskAppService.GetAllAsync(new GetTasksInput { MaxResultCount = 1000 })).Items;
                 return View(input);
             }
-            await _taskAppService.CreateAsync(input);
-            return RedirectToAction("Index");
+            try
+            {
+                await _taskAppService.CreateAsync(input);
+                return RedirectToAction("Index");
+            }
+            catch (Abp.UI.UserFriendlyException ex)
+            {
+                ModelState.AddModelError("", ex.Message);
+                ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
+                ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
+                ViewBag.ParentTasks = (await _taskAppService.GetAllAsync(new GetTasksInput { MaxResultCount = 1000 })).Items;
+                return View(input);
+            }
         }
 
         private long? CurrentEmployeeId()
@@ -75,11 +92,12 @@ namespace ActivityManagement.Web.Controllers
         public async Task<IActionResult> Edit(long id)
         {
             var task = await _taskAppService.GetAsync(id);
-            // Uzman yalnızca kendi görevini düzenleyebilir
-            if (!IsManager() && task.AssignedEmployeeId != CurrentEmployeeId())
+            var myEmpId = CurrentEmployeeId();
+            if (!IsManager() && !(task.AssignedEmployeeId.HasValue && myEmpId.HasValue && task.AssignedEmployeeId == myEmpId))
                 return Redirect("/Account/Denied");
             ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
             ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
+            ViewBag.ParentTasks = (await _taskAppService.GetAllAsync(new GetTasksInput { MaxResultCount = 1000 })).Items;
             return View(ObjectMapper.Map<CreateUpdateTaskItemDto>(task));
         }
 
@@ -90,10 +108,22 @@ namespace ActivityManagement.Web.Controllers
             {
                 ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
                 ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
+                ViewBag.ParentTasks = (await _taskAppService.GetAllAsync(new GetTasksInput { MaxResultCount = 1000 })).Items;
                 return View(input);
             }
-            await _taskAppService.UpdateAsync(input);
-            return RedirectToAction("Index");
+            try
+            {
+                await _taskAppService.UpdateAsync(input);
+                return RedirectToAction("Index");
+            }
+            catch (Abp.UI.UserFriendlyException ex)
+            {
+                ModelState.AddModelError("", ex.Message);
+                ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
+                ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
+                ViewBag.ParentTasks = (await _taskAppService.GetAllAsync(new GetTasksInput { MaxResultCount = 1000 })).Items;
+                return View(input);
+            }
         }
 
         [HttpPost]
@@ -107,6 +137,8 @@ namespace ActivityManagement.Web.Controllers
         public async Task<IActionResult> UpdateStatus(long id, Entities.TaskStatus status, int percentage)
         {
             await _taskAppService.UpdateStatusAsync(id, status, percentage);
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                return Ok(new { success = true });
             return RedirectToAction("Detail", new { id });
         }
 

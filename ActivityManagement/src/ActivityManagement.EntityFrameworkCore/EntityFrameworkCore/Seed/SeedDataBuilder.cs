@@ -18,9 +18,23 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
         public void Create()
         {
             SeedDefaultTenant();
+            SeedWorkflowStatuses();
             SeedEmployees();
             SeedWorkItems();   // xlsx: Genel İş Kalemleri + Uygulama VM bazlı iş kalemleri
             SeedActivities();
+            _context.SaveChanges();
+        }
+
+        private void SeedWorkflowStatuses()
+        {
+            if (_context.WorkflowStatuses.Any()) return;
+            _context.WorkflowStatuses.AddRange(
+                new WorkflowStatus { Name = "Beklemede",     Color = "secondary", SortOrder = 1, StatusValue = 0, IsActive = true },
+                new WorkflowStatus { Name = "Devam Ediyor",  Color = "primary",   SortOrder = 2, StatusValue = 1, IsActive = true },
+                new WorkflowStatus { Name = "Tamamlandı",    Color = "success",   SortOrder = 3, StatusValue = 2, IsActive = true, IsCompletedState = true },
+                new WorkflowStatus { Name = "Ertelendi",     Color = "warning",   SortOrder = 4, StatusValue = 4, IsActive = true },
+                new WorkflowStatus { Name = "İptal",         Color = "dark",      SortOrder = 5, StatusValue = 3, IsActive = true }
+            );
             _context.SaveChanges();
         }
 

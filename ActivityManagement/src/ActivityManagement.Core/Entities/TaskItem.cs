@@ -22,6 +22,20 @@ namespace ActivityManagement.Entities
         Kritik = 3
     }
 
+    public enum ActivityType
+    {
+        Bakim = 0,
+        Gelistirme = 1,
+        Kurulum = 2,
+        Destek = 3,
+        Test = 4,
+        Dokumantasyon = 5,
+        Egitim = 6,
+        Analiz = 7,
+        Proje = 8,
+        Diger = 9
+    }
+
     public class TaskItem : FullAuditedEntity<long>, IMustHaveTenant
     {
         public int TenantId { get; set; }
@@ -38,6 +52,10 @@ namespace ActivityManagement.Entities
         public long? AssignedEmployeeId { get; set; }
         public virtual Employee AssignedEmployee { get; set; }
 
+        // 2. Sorumlu (yedek)
+        public long? SecondaryEmployeeId { get; set; }
+        public virtual Employee SecondaryEmployee { get; set; }
+
         public long? AssignedByEmployeeId { get; set; }
         public virtual Employee AssignedByEmployee { get; set; }
 
@@ -52,6 +70,17 @@ namespace ActivityManagement.Entities
         public decimal ActualHours { get; set; }
 
         public int CompletionPercentage { get; set; }
+
+        // Görev grubu (üst görevler için: "Sistem Birimi", "Network Birimi", "Ortak")
+        public string GroupName { get; set; }
+
+        // Üst görev hiyerarşisi
+        public long? ParentTaskId { get; set; }
+        public virtual TaskItem ParentTask { get; set; }
+        public virtual ICollection<TaskItem> SubTasks { get; set; } = new List<TaskItem>();
+
+        // Alt görev aktivite tipi
+        public ActivityType? ActivityType { get; set; }
 
         public bool IsRoutine { get; set; }
         public long? RoutineTaskId { get; set; }

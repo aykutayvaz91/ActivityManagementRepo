@@ -17,6 +17,8 @@ namespace ActivityManagement.Tasks.Dto
         public string ProjectName { get; set; }
         public long? AssignedEmployeeId { get; set; }
         public string AssignedEmployeeName { get; set; }
+        public long? SecondaryEmployeeId { get; set; }
+        public string SecondaryEmployeeName { get; set; }
         public long? AssignedByEmployeeId { get; set; }
         public string AssignedByEmployeeName { get; set; }
         public DateTime? StartDate { get; set; }
@@ -30,6 +32,24 @@ namespace ActivityManagement.Tasks.Dto
         public decimal ActualHours { get; set; }
         public int CompletionPercentage { get; set; }
         public bool IsRoutine { get; set; }
+
+        // Grup
+        public string GroupName { get; set; }
+
+        // Hiyerarşi
+        public long? ParentTaskId { get; set; }
+        public string ParentTaskTitle { get; set; }
+        public bool IsParentTask => !ParentTaskId.HasValue;
+        public List<TaskItemDto> SubTasks { get; set; } = new List<TaskItemDto>();
+
+        // Aktivite tipi (alt görevler için)
+        public Entities.ActivityType? ActivityType { get; set; }
+        public string ActivityTypeText { get; set; }
+
+        // Sunucu tarafı yetki
+        public bool CanEdit { get; set; }
+        public bool CanDelete { get; set; }
+
         public List<TaskCommentDto> Comments { get; set; } = new List<TaskCommentDto>();
         public List<TaskAttachmentDto> Attachments { get; set; } = new List<TaskAttachmentDto>();
     }

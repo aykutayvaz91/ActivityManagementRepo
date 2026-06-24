@@ -1,9 +1,40 @@
 // ActivityManagement - Global JS
 
-// ABP bildirimlerini Türkçe yapılandır
-if (typeof abp !== 'undefined' && abp.notify) {
-    // ABP notify zaten tanımlı
-}
+// abp.js yüklü değil — hafif bir shim (toast bildirimleri + confirm)
+(function () {
+    if (typeof window.abp === 'undefined') window.abp = {};
+    if (!window.abp.notify) {
+        function toast(msg, type) {
+            var colors = { success: 'success', error: 'danger', warn: 'warning', info: 'info' };
+            var c = colors[type] || 'secondary';
+            var wrap = document.getElementById('amToastWrap');
+            if (!wrap) {
+                wrap = document.createElement('div');
+                wrap.id = 'amToastWrap';
+                wrap.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:1080;display:flex;flex-direction:column;gap:.5rem';
+                document.body.appendChild(wrap);
+            }
+            var el = document.createElement('div');
+            el.className = 'alert alert-' + c + ' shadow-sm mb-0 py-2 px-3';
+            el.style.cssText = 'min-width:240px;opacity:0;transition:opacity .2s';
+            el.innerHTML = msg;
+            wrap.appendChild(el);
+            requestAnimationFrame(function () { el.style.opacity = '1'; });
+            setTimeout(function () { el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 250); }, 3500);
+        }
+        window.abp.notify = {
+            success: function (m) { toast(m, 'success'); },
+            error: function (m) { toast(m, 'error'); },
+            warn: function (m) { toast(m, 'warn'); },
+            info: function (m) { toast(m, 'info'); }
+        };
+    }
+    if (!window.abp.message) {
+        window.abp.message = {
+            confirm: function (m, cb) { if (typeof cb === 'function') cb(window.confirm(m)); }
+        };
+    }
+})();
 
 // Tarih formatı - Türkçe
 function formatDate(dateStr) {
@@ -33,11 +64,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Form submit - loading göstergesi
     document.querySelectorAll('form').forEach(function (form) {
-        form.addEventListener('submit', function () {
+        form.addEventListener('submit', function (e) {
+            // HTML5 validasyon geçmediyse butona dokunma
+            if (!form.checkValidity()) return;
             var btn = form.querySelector('button[type=submit]');
             if (btn) {
+                var orig = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>İşleniyor...';
+                setTimeout(function () { btn.disabled = false; btn.innerHTML = orig; }, 10000);
             }
         });
     });

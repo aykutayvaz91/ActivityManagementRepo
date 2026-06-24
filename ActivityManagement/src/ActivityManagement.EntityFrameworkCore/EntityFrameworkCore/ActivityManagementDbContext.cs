@@ -17,6 +17,7 @@ namespace ActivityManagement.EntityFrameworkCore
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<RoutineTask> RoutineTasks { get; set; }
         public DbSet<Responsibility> Responsibilities { get; set; }
+        public DbSet<WorkflowStatus> WorkflowStatuses { get; set; }
 
         public ActivityManagementDbContext(DbContextOptions<ActivityManagementDbContext> options)
             : base(options)
@@ -69,6 +70,7 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.Property(t => t.Title).IsRequired().HasMaxLength(256);
                 b.Property(t => t.Description).HasMaxLength(2000);
                 b.Property(t => t.Category).HasMaxLength(256);
+                b.Property(t => t.GroupName).HasMaxLength(64);
                 b.Property(t => t.EstimatedHours).HasPrecision(18, 2);
                 b.Property(t => t.ActualHours).HasPrecision(18, 2);
                 b.HasOne(t => t.Project)
@@ -79,6 +81,11 @@ namespace ActivityManagement.EntityFrameworkCore
                  .WithMany(e => e.AssignedTasks)
                  .HasForeignKey(t => t.AssignedEmployeeId)
                  .OnDelete(DeleteBehavior.SetNull);
+                b.HasOne(t => t.SecondaryEmployee)
+                 .WithMany()
+                 .HasForeignKey(t => t.SecondaryEmployeeId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(t => t.AssignedByEmployee)
                  .WithMany()
                  .HasForeignKey(t => t.AssignedByEmployeeId)
@@ -87,6 +94,11 @@ namespace ActivityManagement.EntityFrameworkCore
                  .WithMany(r => r.GeneratedTasks)
                  .HasForeignKey(t => t.RoutineTaskId)
                  .OnDelete(DeleteBehavior.SetNull);
+                b.HasOne(t => t.ParentTask)
+                 .WithMany(t => t.SubTasks)
+                 .HasForeignKey(t => t.ParentTaskId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<TaskComment>(b =>
@@ -134,6 +146,13 @@ namespace ActivityManagement.EntityFrameworkCore
                  .WithMany(e => e.RoutineTasks)
                  .HasForeignKey(r => r.EmployeeId)
                  .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<WorkflowStatus>(b =>
+            {
+                b.ToTable("WorkflowStatuses");
+                b.Property(s => s.Name).IsRequired().HasMaxLength(64);
+                b.Property(s => s.Color).HasMaxLength(32);
             });
 
             modelBuilder.Entity<Responsibility>(b =>

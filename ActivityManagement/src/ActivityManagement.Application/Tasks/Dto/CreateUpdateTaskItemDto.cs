@@ -23,6 +23,7 @@ namespace ActivityManagement.Tasks.Dto
 
         public long? ProjectId { get; set; }
         public long? AssignedEmployeeId { get; set; }
+        public long? SecondaryEmployeeId { get; set; }
         public long? AssignedByEmployeeId { get; set; }
 
         public DateTime? StartDate { get; set; }
@@ -37,5 +38,14 @@ namespace ActivityManagement.Tasks.Dto
         public int CompletionPercentage { get; set; }
         public bool IsRoutine { get; set; }
         public long? RoutineTaskId { get; set; }
+
+        // Görev grubu
+        public string GroupName { get; set; }
+
+        // Üst görev hiyerarşisi
+        public long? ParentTaskId { get; set; }
+
+        // Aktivite tipi (alt görevler için)
+        public Entities.ActivityType? ActivityType { get; set; }
     }
 }

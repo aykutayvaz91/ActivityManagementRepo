@@ -1,0 +1,117 @@
+@{
+    ViewData["Title"] = "Görev Panosu";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-columns text-primary me-2"></i>Görev Panosu</h2>
+    <div class="d-flex gap-2">
+        <a href="/Tasks" class="btn btn-outline-secondary"><i class="fas fa-list me-1"></i>Liste</a>
+        @if (User?.IsInRole("Admin") == true || User?.IsInRole("TakımLideri") == true)
+        {
+            <a href="/Tasks/Create" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Yeni Görev</a>
+        }
+    </div>
+</div>
+
+<div class="mb-2">
+    <select id="projectFilter" class="form-select form-select-sm" style="max-width:320px" onchange="loadBoard()">
+        <option value="">Tüm Projeler</option>
+    </select>
+</div>
+
+@Html.AntiForgeryToken()
+<div id="board" class="d-flex gap-3 overflow-auto pb-3" style="min-height:60vh">
+    <div class="text-center w-100 py-5"><div class="spinner-border text-primary"></div></div>
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+var statuses = [], tasks = [];
+
+$(document).ready(function () {
+    // proje filtresi doldur
+    $.get('/api/services/app/Project/GetAll', { maxResultCount: 200 }, function (r) {
+        r.result.items.forEach(function (p) {
+            $('#projectFilter').append('<option value="' + p.id + '">[' + p.code + '] ' + p.name + '</option>');
+        });
+    });
+    loadBoard();
+});
+
+function loadBoard() {
+    $.when(
+        $.get('/api/services/app/WorkflowStatus/GetAll', { onlyActive: true }),
+        $.get('/api/services/app/TaskItem/GetAll', { projectId: $('#projectFilter').val() || null, maxResultCount: 1000 })
+    ).done(function (s, t) {
+        statuses = s[0].result;
+        tasks = t[0].result.items;
+        renderBoard();
+    });
+}
+
+function renderBoard() {
+    var html = '';
+    statuses.forEach(function (st) {
+        var colTasks = tasks.filter(function (t) { return t.status === st.statusValue; });
+        html += '<div class="flex-shrink-0" style="width:300px">';
+        html += '<div class="card shadow-sm h-100">';
+        html += '<div class="card-header bg-' + (st.color || 'secondary') + ' text-white d-flex justify-content-between">';
+        html += '<span>' + st.name + '</span><span class="badge bg-light text-dark">' + colTasks.length + '</span></div>';
+        html += '<div class="card-body p-2 board-col" data-status="' + st.statusValue + '" style="min-height:120px">';
+        colTasks.forEach(function (t) { html += card(t); });
+        html += '</div></div></div>';
+    });
+    $('#board').html(html);
+
+    // her kolona sortable
+    document.querySelectorAll('.board-col').forEach(function (col) {
+        new Sortable(col, {
+            group: 'tasks',
+            animation: 150,
+            draggable: '.task-card',
+            onAdd: function (evt) {
+                var id = parseInt(evt.item.getAttribute('data-id'));
+                var newStatus = parseInt(evt.to.getAttribute('data-status'));
+                var t = tasks.find(function (x) { return x.id === id; });
+                if (!t) return;
+                if (!t.canEdit) { abp.notify.warn('Bu görev üzerinde yetkiniz yok.'); loadBoard(); return; }
+                changeStatus(id, newStatus);
+            }
+        });
+    });
+}
+
+function card(t) {
+    var pr = { 0: 'secondary', 1: 'info', 2: 'warning', 3: 'danger' };
+    var overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 2;
+    var h = '<div class="card mb-2 task-card ' + (t.canEdit ? '' : 'opacity-75') + '" data-id="' + t.id + '" style="cursor:' + (t.canEdit ? 'grab' : 'not-allowed') + '">';
+    h += '<div class="card-body p-2">';
+    h += '<div class="small fw-semibold mb-1"><a href="/Tasks/Detail/' + t.id + '" class="text-decoration-none">' + t.title + '</a></div>';
+    h += '<div class="d-flex justify-content-between align-items-center">';
+    h += '<span class="badge bg-' + (pr[t.priority] || 'secondary') + '">' + t.priorityText + '</span>';
+    if (t.assignedEmployeeName) h += '<small class="text-muted">' + t.assignedEmployeeName + '</small>';
+    h += '</div>';
+    if (t.category) h += '<div class="small text-muted mt-1"><i class="fas fa-tag me-1"></i>' + t.category + '</div>';
+    if (t.dueDate) h += '<div class="small ' + (overdue ? 'text-danger' : 'text-muted') + '"><i class="far fa-calendar me-1"></i>' + new Date(t.dueDate).toLocaleDateString('tr-TR') + '</div>';
+    h += '<div class="progress mt-1" style="height:4px"><div class="progress-bar" style="width:' + t.completionPercentage + '%"></div></div>';
+    h += '</div></div>';
+    return h;
+}
+
+function changeStatus(id, status) {
+    var t = tasks.find(function (x) { return x.id === id; });
+    var pct = t ? t.completionPercentage : 0;
+    if (status === 2) pct = 100; // Tamamlandı
+    var token = $('input[name="__RequestVerificationToken"]').val();
+    $.ajax({
+        url: '/Tasks/UpdateStatus',
+        type: 'POST',
+        data: { id: id, status: status, percentage: pct, __RequestVerificationToken: token },
+        success: function () { abp.notify.success('Durum güncellendi.'); loadBoard(); },
+        error: function () { abp.notify.error('Güncellenemedi.'); loadBoard(); }
+    });
+}
+</script>
+}
