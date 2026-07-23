@@ -1,10 +1,32 @@
-.claude/
-appsettings.Production.json
-**/appsettings.Production.json
-**/bin/
-**/obj/
-*.log
-*.err
-.vs/
+# Build çıktıları
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+*.dll
+*.pdb
 
-HANDOFF.md
+# Visual Studio / IDE
+.vs/
+*.user
+*.suo
+
+# Claude / oturum & hesap klasörleri (uygulama dışı)
+.claude/
+acc1/
+acc2/
+
+# Gizli yapılandırma (DPAPI şifreli bağlantı dizesi + admin şifresi) — repoya girmez
+**/appsettings.Production.json
+
+# Loglar ve yayın çıktıları
+logs/
+publish/
+publish2/
+backup/
+backup2/
+*.log
+
+# Yerel geçici
+scratchpad/
+*.tmp

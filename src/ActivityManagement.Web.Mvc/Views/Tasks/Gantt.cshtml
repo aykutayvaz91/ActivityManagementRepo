@@ -1,0 +1,88 @@
+@{
+    ViewData["Title"] = "Gantt Şeması";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-stream text-primary me-2"></i>Gantt Şeması</h2>
+    <div class="d-flex gap-2 align-items-center">
+        <div class="btn-group btn-group-sm" role="group" id="viewModes">
+            <button type="button" class="btn btn-outline-secondary" data-mode="Day">Gün</button>
+            <button type="button" class="btn btn-outline-secondary active" data-mode="Week">Hafta</button>
+            <button type="button" class="btn btn-outline-secondary" data-mode="Month">Ay</button>
+        </div>
+        <a href="/Tasks/Board" class="btn btn-outline-primary btn-sm"><i class="fas fa-columns me-1"></i>Pano</a>
+        @if (User?.IsInRole("Admin") == true)
+        {
+            <a href="/Tasks" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>Liste</a>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div id="ganttWrap" style="overflow-x:auto">
+            <svg id="gantt"></svg>
+        </div>
+        <div id="ganttEmpty" class="text-center text-muted py-5" style="display:none">
+            <i class="fas fa-stream fa-2x mb-2 d-block"></i>Başlangıç ve son tarihi olan görev bulunamadı.
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.css">
+<script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+<script>
+var gantt = null;
+$(document).ready(function () {
+    $.ajax({
+        url: '/api/services/app/TaskItem/GetAll',
+        data: { maxResultCount: 1000 },
+        success: function (res) {
+            var items = res.result.items || [];
+            function fmt(d) { return new Date(d).toISOString().split('T')[0]; }
+            var tasks = items.filter(function (t) { return t.dueDate; }).map(function (t) {
+                var end = fmt(t.dueDate);
+                var start = t.startDate ? fmt(t.startDate) : end; // başlangıç yoksa son tarihe eşitle
+                if (new Date(start) > new Date(end)) start = end;
+                return {
+                    id: String(t.id),
+                    name: (t.title || '').substring(0, 60),
+                    start: start,
+                    end: end,
+                    progress: t.completionPercentage || 0,
+                    custom_class: t.priority === 3 ? 'bar-critical' : (t.status === 2 ? 'bar-done' : '')
+                };
+            });
+            if (!tasks.length) { document.getElementById('gantt').style.display = 'none'; document.getElementById('ganttEmpty').style.display = ''; return; }
+            gantt = new Gantt("#gantt", tasks, {
+                language: 'tr',
+                view_mode: 'Week',
+                date_format: 'YYYY-MM-DD',
+                on_click: function (task) { window.location.href = '/Tasks/Detail/' + task.id; },
+                custom_popup_html: function (task) {
+                    return '<div class="p-2 small"><strong>' + task.name + '</strong><br>' +
+                        new Date(task.start).toLocaleDateString('tr-TR') + ' → ' + new Date(task.end).toLocaleDateString('tr-TR') +
+                        '<br>%' + task.progress + ' tamamlandı</div>';
+                }
+            });
+        },
+        error: function () { document.getElementById('gantt').style.display = 'none'; document.getElementById('ganttEmpty').style.display = ''; }
+    });
+
+    document.querySelectorAll('#viewModes button').forEach(function (b) {
+        b.addEventListener('click', function () {
+            document.querySelectorAll('#viewModes button').forEach(function (x) { x.classList.remove('active'); });
+            this.classList.add('active');
+            if (gantt) gantt.change_view_mode(this.getAttribute('data-mode'));
+        });
+    });
+});
+</script>
+<style>
+    #gantt .bar-critical .bar { fill: #dc3545 !important; }
+    #gantt .bar-done .bar { fill: #198754 !important; }
+    .gantt .bar-progress { fill: rgba(13,110,253,.55); }
+</style>
+}

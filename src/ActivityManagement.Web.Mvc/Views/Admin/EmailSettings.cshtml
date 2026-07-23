@@ -1,0 +1,80 @@
+@model ActivityManagement.SystemSettings.Dto.EmailSettingsDto
+@{
+    ViewData["Title"] = "E-posta / SMTP Ayarları";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Admin">Admin Panel</a></li>
+            <li class="breadcrumb-item active">E-posta / SMTP Ayarları</li>
+        </ol>
+    </nav>
+</div>
+
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-primary text-white"><h6 class="mb-0"><i class="fas fa-envelope-open-text me-2"></i>SMTP Yapılandırması</h6></div>
+            <div class="card-body">
+                <form asp-action="SaveEmailSettings" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="SenderEmail" class="form-label">Gönderen Mail Adresi</label>
+                            <input asp-for="SenderEmail" class="form-control" placeholder="noreply@sirketiniz.com" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="SenderDisplayName" class="form-label">Gönderen Adı</label>
+                            <input asp-for="SenderDisplayName" class="form-control" placeholder="ActivityManagement Bildirim Sistemi" />
+                        </div>
+                        <div class="col-md-8">
+                            <label asp-for="SmtpHost" class="form-label">SMTP Sunucu Adresi (Host)</label>
+                            <input asp-for="SmtpHost" class="form-control" placeholder="smtp.office365.com" />
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="SmtpPort" class="form-label">SMTP Port</label>
+                            <input asp-for="SmtpPort" class="form-control" type="number" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="SmtpUserName" class="form-label">Kullanıcı Adı</label>
+                            <input asp-for="SmtpUserName" class="form-control" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                Parola
+                                @if (Model.HasPassword)
+                                {
+                                    <small class="text-success">(kayıtlı - boş bırakırsanız değişmez)</small>
+                                }
+                            </label>
+                            <input name="SmtpPassword" class="form-control" type="password" placeholder="••••••••" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input asp-for="EnableSsl" class="form-check-input" type="checkbox" />
+                                <label asp-for="EnableSsl" class="form-check-label">SSL/TLS Kullan</label>
+                            </div>
+                        </div>
+                    </div>
+                    <hr />
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Kaydet</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white"><h6 class="mb-0"><i class="fas fa-paper-plane me-2"></i>Test E-postası Gönder</h6></div>
+            <div class="card-body">
+                <form asp-action="SendTestEmail" method="post" class="d-flex gap-2">
+                    @Html.AntiForgeryToken()
+                    <input name="testEmail" type="email" class="form-control" placeholder="test@ornek.com" required />
+                    <button type="submit" class="btn btn-secondary text-nowrap"><i class="fas fa-paper-plane me-1"></i>Gönder</button>
+                </form>
+                <small class="text-muted d-block mt-2">Kaydedilmiş SMTP ayarları kullanılarak deneme e-postası gönderilir.</small>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,78 @@
+1	Sunucu & Sanallastirma
+1.1	Sunucu Donanim Seviyesi & iDRAC
+1.2	Sunucu OS Seviyesi
+1.3	HCI-S2D
+1.4	Azure Local Migration
+1.5	Kubernetes
+1.6	RDS (Remote Desktop Services)
+1.7	SCCM (VMM/SCOM)
+1.8	SCCM-ARC
+2	Depolama & Yedekleme
+2.1	Storage Donanim Yönetimi
+2.2	Veeam
+2.3	FM 800
+3	Ag & Baglanti
+3.1	Switch-Omurga
+3.2	Switch Yedekliligi
+3.3	Topoloji ve Monitoring
+3.4	Palo Alto Firewall
+3.5	ISE Cisco Identity Services Engine
+3.6	Sophos Firewall
+
+4	Siber Güvenlik & Tehdit Yönetimi
+4.1	Firewall Yetkilendirme
+4.2	Opensource Ürünler
+4.3	Microsoft Security Endpoint
+4.4	QRadar (SIEM)
+4.5	Pentest
+4.6	Güvenlik prosedürleri olusturma
+4.7	Otomasyon
+5	Kimlik & Dizin Hizmetleri
+5.1	Active Directory
+5.2	DNS-DHCP
+5.3	ADFS-WAP
+5.4	Azure AD Connect
+5.5	EntraID
+6	Varlik, Lisans & Sertifika
+6.1	CA (Certificate Authority)
+6.2	KMS
+6.3	Sertifika Takibi ve Yüklenmesi
+6.4	LMS & Otomasyon Projesi
+6.5	ITAM & Lifecycle
+
+7	Dosya, Bulut & Isbirligi
+7.1	File Serverlar
+7.2	Azure
+7.3	Google Workspace
+7.4	IFS (ERP)
+7.5	Google Migration
+8	Is Uygulamalari & Veritabani
+8.1	TDV Dynamics CRM
+8.2	TDV Sybase
+8.3	Matbaa Nebim (ERP)
+8.4	Teyas Mira (Eski ERP)
+8.5	TDV 3CX
+8.6	TDV Milestone Kamera
+9	Son Kullanici & Cihaz Yönetimi (Endpoint/MDM)
+9.1	Intune
+9.2	ScaleFusion
+10	 Izleme & Gözlemlenebilirlik
+10.1	PRTG
+10.2	GRAFANA
+10.3	ZABBIX
+
+11	 Egitim
+11.1	Kisisel Gelisim / Sertifikasyon
+11.2	Ekip Içi Egitim & Bilgi Paylasimi
+11.3	Ürün / Vendor Egitimi
+11.4	Dokümantasyon
+12	 Yenilik & Arastirma
+12.1	Teknoloji Arastirmasi (PoC / Kavram Kaniti)
+12.2	Çözüm Degerlendirme, Iyilestirme & Otomasyon
+12.3	Test çalismalari
+13	 Idari & Operasyonel
+13.1	Toplanti & Koordinasyon
+13.2	Raporlama & Planlama
+13.3	Tedarikçi / Vendor Yönetimi
+13.4	Satinalma
+

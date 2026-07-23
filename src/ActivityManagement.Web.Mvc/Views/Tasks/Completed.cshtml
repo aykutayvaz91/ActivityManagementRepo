@@ -1,0 +1,205 @@
+@model System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>
+@{
+    ViewData["Title"] = "Görev Sorgula";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var input = ViewBag.Input as ActivityManagement.Tasks.Dto.GetTasksInput ?? new ActivityManagement.Tasks.Dto.GetTasksInput();
+    var employees = ViewBag.Employees as System.Collections.Generic.IList<ActivityManagement.Employees.Dto.EmployeeDto> ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>();
+    var projects = ViewBag.Projects as System.Collections.Generic.IList<ActivityManagement.Projects.Dto.ProjectDto> ?? new System.Collections.Generic.List<ActivityManagement.Projects.Dto.ProjectDto>();
+    var categories = ViewBag.Categories as System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto> ?? new System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>();
+    var teams = ViewBag.Teams as System.Collections.Generic.List<ActivityManagement.Teams.Dto.TeamDto> ?? new System.Collections.Generic.List<ActivityManagement.Teams.Dto.TeamDto>();
+    bool isAdmin = ViewBag.IsAdmin == true;
+    bool isManager = ViewBag.IsManager == true;
+    long? lockedTeamId = ViewBag.LockedTeamId as long?;
+    var lockedTeamName = lockedTeamId.HasValue ? (teams.FirstOrDefault(t => t.Id == lockedTeamId.Value)?.Name ?? "Takımım") : null;
+    var statusText = new[] { "Beklemede", "Devam Ediyor", "Tamamlandı", "İptal", "Ertelendi" };
+    var statusColor = new[] { "secondary", "primary", "success", "dark", "warning" };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-magnifying-glass text-primary me-2"></i>Görev Sorgula</h2>
+    <a asp-action="ExportCompletedExcel" asp-all-route-data="@(new System.Collections.Generic.Dictionary<string,string>{
+            {"Status", ((int?)input.Status)?.ToString()},
+            {"CompletedFrom", input.CompletedFrom?.ToString("yyyy-MM-dd")},
+            {"CompletedTo", input.CompletedTo?.ToString("yyyy-MM-dd")},
+            {"CategoryId", input.CategoryId?.ToString()},
+            {"SubCategoryId", input.SubCategoryId?.ToString()},
+            {"AssignedEmployeeId", input.AssignedEmployeeId?.ToString()},
+            {"ProjectId", input.ProjectId?.ToString()},
+            {"TeamId", input.TeamId?.ToString()},
+            {"ActivityType", ((int?)input.ActivityType)?.ToString()},
+            {"IsLate", input.IsLate?.ToString()}
+        })" class="btn btn-success">
+        <i class="fas fa-file-excel me-1"></i>Excel'e Aktar
+    </a>
+</div>
+
+<div class="card mb-3 border-0 shadow-sm">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label small">Durum</label>
+                <select name="Status" class="form-select form-select-sm">
+                    <option value="">Tümü</option>
+                    @for (int s = 0; s < statusText.Length; s++)
+                    {
+                        <option value="@s" selected="@((int?)input.Status == s)">@statusText[s]</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Tamamlanma (Başlangıç)</label>
+                <input type="date" name="CompletedFrom" class="form-control form-control-sm" value="@input.CompletedFrom?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Tamamlanma (Bitiş)</label>
+                <input type="date" name="CompletedTo" class="form-control form-control-sm" value="@input.CompletedTo?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Ana Kategori</label>
+                <select name="CategoryId" class="form-select form-select-sm">
+                    <option value="">Tümü</option>
+                    @foreach (var c in categories)
+                    {
+                        <option value="@c.Id" selected="@(input.CategoryId == c.Id)">@c.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Personel@(isAdmin ? "" : " (takımım)")</label>
+                <select name="AssignedEmployeeId" class="form-select form-select-sm">
+                    <option value="">Tümü</option>
+                    @foreach (var e in employees)
+                    {
+                        <option value="@e.Id" selected="@(input.AssignedEmployeeId == e.Id)">@e.FullName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Proje</label>
+                <select name="ProjectId" class="form-select form-select-sm">
+                    <option value="">Tümü</option>
+                    @foreach (var p in projects)
+                    {
+                        <option value="@p.Id" selected="@(input.ProjectId == p.Id)">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Görev Tipi</label>
+                @{
+                    var taskTypeLabels = new[] { "Bakım","Geliştirme","Kurulum","Destek","Test","Dokümantasyon","Eğitim","Analiz","Proje","Diğer" };
+                }
+                <select name="ActivityType" class="form-select form-select-sm">
+                    <option value="">Tümü</option>
+                    @for (int i = 0; i < taskTypeLabels.Length; i++)
+                    {
+                        <option value="@i" selected="@((int?)input.ActivityType == i)">@taskTypeLabels[i]</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Takım</label>
+                @if (isAdmin)
+                {
+                    <select name="TeamId" class="form-select form-select-sm">
+                        <option value="">Tümü</option>
+                        @foreach (var t in teams)
+                        {
+                            <option value="@t.Id" selected="@(input.TeamId == t.Id)">@t.Name</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <input type="text" class="form-control form-control-sm" value="@lockedTeamName" disabled title="Yalnızca kendi takımınız" />
+                    <input type="hidden" name="TeamId" value="@lockedTeamId" />
+                }
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">SLA Durumu</label>
+                <select name="IsLate" class="form-select form-select-sm">
+                    <option value="">Tümü</option>
+                    <option value="false" selected="@(input.IsLate == false)">Zamanında</option>
+                    <option value="true" selected="@(input.IsLate == true)">Gecikmeli</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-outline-primary w-100"><i class="fas fa-search me-1"></i>Filtrele</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="text-center py-5 text-muted">
+        <i class="fas fa-inbox fa-3x mb-3 d-block"></i>Kriterlere uyan görev bulunamadı.
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Görev</th>
+                        <th>Durum</th>
+                        <th>Kategori</th>
+                        <th>Proje / Takım</th>
+                        <th>Sorumlu</th>
+                        <th>Son Tarih</th>
+                        <th>Tamamlanma</th>
+                        <th>SLA</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model)
+                    {
+                        <tr>
+                            <td>@t.Title</td>
+                            <td><span class="badge bg-@statusColor[(int)t.Status]">@statusText[(int)t.Status]</span></td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(t.CategoryName))
+                                {
+                                    <div class="small">@t.CategoryName</div>
+                                    <div class="small text-muted">@t.SubCategoryName</div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="small">@(t.ProjectName ?? "—")</div>
+                                <div class="small text-muted">@(t.TeamName ?? "—")</div>
+                            </td>
+                            <td>@(t.AssignedEmployeeName ?? "—")</td>
+                            <td>@(t.DueDate?.ToString("dd.MM.yyyy") ?? "—")</td>
+                            <td>@(t.CompletedDate?.ToString("dd.MM.yyyy") ?? "—")</td>
+                            <td>
+                                @if (t.CompletedOnTime == true)
+                                {
+                                    <span class="badge bg-success">Zamanında</span>
+                                }
+                                else if (t.CompletedOnTime == false)
+                                {
+                                    <span class="badge bg-danger">Gecikmeli</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a href="/Tasks/Detail/@t.Id" class="btn btn-sm btn-outline-secondary"><i class="fas fa-eye"></i></a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <p class="text-muted small mt-2">Toplam @Model.Count kayıt (en fazla 200 kayıt gösterilir; tümü için Excel'e Aktar kullanın).</p>
+}

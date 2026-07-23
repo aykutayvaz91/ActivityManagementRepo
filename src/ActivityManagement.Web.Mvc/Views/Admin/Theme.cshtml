@@ -1,0 +1,58 @@
+@{
+    ViewData["Title"] = "Tema Ayarları";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var theme = ViewBag.Theme as ActivityManagement.Theming.ThemeSettingsDto ?? new ActivityManagement.Theming.ThemeSettingsDto();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Admin">Admin Panel</a></li>
+            <li class="breadcrumb-item active">Tema Ayarları</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white"><h6 class="mb-0"><i class="fas fa-palette me-2"></i>Tema & Marka</h6></div>
+            <div class="card-body">
+                <form asp-action="SaveTheme" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label class="form-label">Ana Renk (RGB / Hex)</label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="color" name="primaryColor" id="primaryColor" value="@theme.PrimaryColor" class="form-control form-control-color" style="width:60px" />
+                            <input type="text" id="primaryColorHex" value="@theme.PrimaryColor" class="form-control" style="max-width:140px"
+                                   oninput="document.getElementById('primaryColor').value=this.value" />
+                            <span class="text-muted small">Üst menü ve tema bileşenleri bu renge göre güncellenir.</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Marka Adı</label>
+                        <input type="text" name="brandName" value="@theme.BrandName" class="form-control" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Şirket Logosu (cmit)</label>
+                        @if (!string.IsNullOrEmpty(theme.LogoUrl))
+                        {
+                            <div class="mb-2"><img src="@theme.LogoUrl" alt="logo" style="max-height:48px;background:#fff;border-radius:4px;padding:2px" /></div>
+                        }
+                        <input type="file" name="logoFile" accept="image/*" class="form-control" />
+                        <small class="text-muted">PNG/JPG. Üst başlıkta gösterilir.</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Kaydet</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.getElementById('primaryColor').addEventListener('input', function(){
+    document.getElementById('primaryColorHex').value = this.value;
+});
+</script>
+}

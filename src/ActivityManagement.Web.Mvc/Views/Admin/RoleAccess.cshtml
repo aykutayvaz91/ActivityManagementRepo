@@ -1,0 +1,119 @@
+@{
+    ViewData["Title"] = "Rol & Sayfa Erişimi";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var m = ViewBag.Matrix as ActivityManagement.Authorization.AccessMatrixDto ?? new ActivityManagement.Authorization.AccessMatrixDto();
+    bool IsAllowed(string role, string page) => m.Allowed.TryGetValue(role, out var l) && l.Contains(page);
+    bool IsAdminRole(string r) => string.Equals(r, "Admin", System.StringComparison.OrdinalIgnoreCase);
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Admin">Admin Panel</a></li>
+            <li class="breadcrumb-item active">Rol & Sayfa Erişimi</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="alert alert-info small">
+    <i class="fas fa-info-circle me-1"></i>
+    Her rolün hangi sayfaları görebileceğini işaretleyin. <strong>Admin</strong> her sayfaya erişir (değiştirilemez).
+    Yeni ara/özel rol ekleyip Personeller ekranından atayabilirsiniz. Değişiklik sonrası kullanıcıların menüsü ve sayfa erişimi güncellenir.
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-9">
+        <form asp-action="SaveRoleAccess" method="post">
+            @Html.AntiForgeryToken()
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fas fa-table me-2 text-primary"></i>Erişim Matrisi</h6>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-save me-1"></i>Kaydet</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Sayfa</th>
+                                @foreach (var r in m.Roles)
+                                {
+                                    <th class="text-center">@r.DisplayName @(r.IsSystem ? "" : "★")</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in m.Pages)
+                            {
+                                <tr>
+                                    <td class="small fw-semibold">@p.Title <span class="text-muted">(@p.Key)</span></td>
+                                    @foreach (var r in m.Roles)
+                                    {
+                                        <td class="text-center">
+                                            @if (IsAdminRole(r.Name))
+                                            {
+                                                <input type="checkbox" class="form-check-input" checked disabled title="Admin her zaman tüm sayfalara erişir" />
+                                            }
+                                            else
+                                            {
+                                                <input type="checkbox" class="form-check-input" name="allow" value="@(r.Name)|@(p.Key)" @(IsAllowed(r.Name, p.Key) ? "checked" : "") />
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer bg-transparent text-end">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Kaydet</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-lg-3">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-primary text-white"><h6 class="mb-0"><i class="fas fa-plus me-2"></i>Yeni Rol</h6></div>
+            <div class="card-body">
+                <form asp-action="CreateRole" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-2">
+                        <label class="form-label small">Rol Kodu <span class="text-danger">*</span></label>
+                        <input name="name" class="form-control form-control-sm" required placeholder="örn. Gozlemci" />
+                        <small class="text-muted">Boşluksuz, claim değeri.</small>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Görünen Ad</label>
+                        <input name="displayName" class="form-control form-control-sm" placeholder="örn. Gözlemci" />
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary w-100"><i class="fas fa-save me-1"></i>Rol Ekle</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent"><h6 class="mb-0"><i class="fas fa-user-tag me-2"></i>Roller</h6></div>
+            <ul class="list-group list-group-flush">
+                @foreach (var r in m.Roles)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center small">
+                        <span>@r.DisplayName @(r.IsSystem ? "" : "★")</span>
+                        @if (!r.IsSystem)
+                        {
+                            <form asp-action="DeleteRole" method="post" onsubmit="return confirm('Rol silinsin mi?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@r.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-0"><i class="fas fa-trash"></i></button>
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">sistem</span>
+                        }
+                    </li>
+                }
+            </ul>
+            <div class="card-footer bg-transparent small text-muted">★ özel rol</div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,118 @@
+@{
+    ViewData["Title"] = "Sorumluluk Matrisi";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var matrix = ViewBag.Matrix as System.Collections.Generic.List<ActivityManagement.Responsibilities.Dto.SubCategoryResponsibilityDto>
+                 ?? new System.Collections.Generic.List<ActivityManagement.Responsibilities.Dto.SubCategoryResponsibilityDto>();
+    var categories = ViewBag.Categories as System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>
+                     ?? new System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>();
+    var employees = ViewBag.Employees as System.Collections.Generic.IEnumerable<ActivityManagement.Employees.Dto.EmployeeDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Admin">Admin Panel</a></li>
+            <li class="breadcrumb-item active">Sorumluluk Matrisi</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white"><h6 class="mb-0"><i class="fas fa-user-shield me-2"></i>Sorumlu Ata</h6></div>
+            <div class="card-body">
+                <form asp-action="SetResponsibility" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-2">
+                        <label class="form-label small">Ana Kategori</label>
+                        <select id="categorySelect" class="form-select form-select-sm">
+                            <option value="">— Seçiniz —</option>
+                            @foreach (var c in categories)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Alt Kategori</label>
+                        <select name="SubCategoryId" id="subCategorySelect" class="form-select form-select-sm" required>
+                            <option value="">— Önce ana kategori —</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Personel</label>
+                        <select name="EmployeeId" class="form-select form-select-sm" required>
+                            <option value="">Seçiniz...</option>
+                            @foreach (var e in employees)
+                            {
+                                <option value="@e.Id">@e.FullName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Sorumluluk Tipi</label>
+                        <select name="ResponsibilityType" class="form-select form-select-sm">
+                            <option value="0">Asıl Sorumlu</option>
+                            <option value="1">Yedek Sorumlu</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-save me-1"></i>Ata / Güncelle</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent"><h6 class="mb-0"><i class="fas fa-table me-2 text-primary"></i>Mevcut Sorumluluklar (@matrix.Count)</h6></div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Ana Kategori</th><th>Alt Kategori</th><th>Personel</th><th>Tip</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @if (!matrix.Any())
+                        {
+                            <tr><td colspan="5" class="text-center text-muted py-4">Henüz sorumluluk ataması yok.</td></tr>
+                        }
+                        @foreach (var r in matrix)
+                        {
+                            <tr>
+                                <td class="small">@r.CategoryName</td>
+                                <td class="small fw-semibold">@r.SubCategoryName</td>
+                                <td class="small">@r.EmployeeName</td>
+                                <td><span class="badge bg-@(r.ResponsibilityType == ActivityManagement.Entities.ResponsibilityType.Primary ? "success" : "secondary")">@r.TypeText</span></td>
+                                <td class="text-end">
+                                    <form asp-action="RemoveResponsibility" method="post" class="d-inline" onsubmit="return confirm('Kaldırılsın mı?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@r.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0"><i class="fas fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var data = @Html.Raw(ActivityManagement.Web.Utils.JsonHelper.ToCamelCaseJson(categories));
+    var cat = document.getElementById('categorySelect');
+    var sub = document.getElementById('subCategorySelect');
+    function find(id){ for (var i=0;i<data.length;i++) if (String(data[i].id)===String(id)) return data[i]; return null; }
+    cat.addEventListener('change', function () {
+        var c = find(cat.value); sub.innerHTML = '';
+        if (!c) { sub.appendChild(new Option('— Önce ana kategori —','')); return; }
+        sub.appendChild(new Option('Seçiniz...',''));
+        (c.subCategories||[]).forEach(function(s){ sub.appendChild(new Option(s.name, s.id)); });
+    });
+})();
+</script>
+}

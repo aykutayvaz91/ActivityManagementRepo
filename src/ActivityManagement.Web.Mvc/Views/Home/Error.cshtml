@@ -1,0 +1,23 @@
+@{
+    ViewData["Title"] = "Bir hata oluştu";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="row justify-content-center py-5">
+    <div class="col-md-7 text-center">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-5">
+                <i class="fas fa-triangle-exclamation fa-3x text-warning mb-3"></i>
+                <h3 class="mb-2">Beklenmeyen bir hata oluştu</h3>
+                <p class="text-muted mb-4">
+                    İşleminiz sırasında bir sorun yaşandı. Hata kayıt altına alındı; teknik ekip inceleyecektir.
+                    Lütfen tekrar deneyin veya ana sayfaya dönün.
+                </p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <a href="/" class="btn btn-primary"><i class="fas fa-home me-1"></i>Ana Sayfa</a>
+                    <a href="javascript:history.back()" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Geri Dön</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

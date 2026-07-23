@@ -1,0 +1,249 @@
+@{
+    ViewData["Title"] = "Görev Yönetimi";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var categories = ViewBag.Categories as System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>
+                     ?? new System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-clipboard-list text-primary me-2"></i>Görevler</h2>
+    <div class="d-flex gap-2">
+        <a href="/Tasks/Board" class="btn btn-outline-primary">
+            <i class="fas fa-columns me-1"></i>Pano
+        </a>
+        <a href="/Tasks/Gantt" class="btn btn-outline-secondary">
+            <i class="fas fa-stream me-1"></i>Gantt
+        </a>
+        <a href="/Tasks/Create" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Yeni Görev
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Sol: Kategori / Alt kategori ağacı -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-sitemap me-2 text-primary"></i>Kategoriler</h6>
+                <button class="btn btn-sm btn-link p-0" onclick="clearSelection()">Temizle</button>
+            </div>
+            <div class="card-body p-2" style="max-height:75vh; overflow-y:auto">
+                @if (!categories.Any())
+                {
+                    <div class="text-center text-muted py-4"><i class="fas fa-folder-open fa-2x mb-2 d-block"></i>Kategori bulunamadı.</div>
+                }
+                @foreach (var c in categories)
+                {
+                    var hasSubs = c.SubCategories.Any();
+                    <div class="mb-1 tree-node">
+                        <div class="d-flex align-items-center gap-1 tree-cat" data-category-id="@c.Id">
+                            @if (hasSubs)
+                            {
+                                <i class="fas fa-caret-right tree-toggle" style="width:14px;cursor:pointer" onclick="toggleTreeNode(@c.Id); event.stopPropagation();" id="caret_@c.Id"></i>
+                            }
+                            else
+                            {
+                                <span style="width:14px"></span>
+                            }
+                            <span class="tree-label fw-semibold small flex-grow-1" style="cursor:pointer"
+                                  data-node-type="category" data-node-id="@c.Id" data-title="@c.Name"
+                                  onclick="selectNode(this)">@c.Name</span>
+                        </div>
+                        @if (hasSubs)
+                        {
+                            <div class="ms-4 tree-children" id="children_@c.Id" style="display:none">
+                                @foreach (var sc in c.SubCategories)
+                                {
+                                    <div class="tree-sub py-1">
+                                        <span class="tree-label small text-muted" style="cursor:pointer"
+                                              data-node-type="subcategory" data-node-id="@sc.Id" data-title="@(c.Name + " / " + sc.Name)"
+                                              onclick="selectNode(this)">@sc.Name</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Sağ: Seçilen (alt)kategorinin görevleri -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-tasks me-2 text-warning"></i><span id="rightPanelTitle">Görevler</span></h6>
+            </div>
+            <div class="card-body" style="max-height:78vh; overflow-y:auto">
+                <div id="tasksContainer">
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-hand-pointer fa-2x mb-3 d-block"></i>
+                        Görevleri görmek için soldan bir kategori/alt kategori seçin.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Silme onay modalı -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Görevi Sil</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="deleteModalBody">Bu görevi silmek istediğinizden emin misiniz?</div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>İptal
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash me-1"></i>Evet, Sil
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+var statusColors  = { 0:'secondary', 1:'primary', 2:'success', 3:'dark', 4:'warning' };
+var statusLabels  = { 0:'Beklemede', 1:'Devam Ediyor', 2:'Tamamlandı', 3:'İptal', 4:'Ertelendi' };
+var pendingDeleteId = null;
+var currentSelection = null; // { type, id }
+
+function toggleTreeNode(categoryId) {
+    var children = document.getElementById('children_' + categoryId);
+    var caret = document.getElementById('caret_' + categoryId);
+    if (!children) return;
+    var isOpen = children.style.display !== 'none';
+    children.style.display = isOpen ? 'none' : '';
+    if (caret) {
+        caret.classList.toggle('fa-caret-right', isOpen);
+        caret.classList.toggle('fa-caret-down', !isOpen);
+    }
+}
+
+function selectNode(el) {
+    // Aktif vurgulamayı güncelle
+    document.querySelectorAll('.tree-label.active').forEach(function(n) { n.classList.remove('active', 'text-primary', 'fw-bold'); });
+    el.classList.add('active', 'text-primary', 'fw-bold');
+    document.getElementById('rightPanelTitle').innerText = el.dataset.title;
+    currentSelection = { type: el.dataset.nodeType, id: parseInt(el.dataset.nodeId, 10) };
+    loadTasks();
+}
+
+function clearSelection() {
+    document.querySelectorAll('.tree-label.active').forEach(function(n) { n.classList.remove('active', 'text-primary', 'fw-bold'); });
+    currentSelection = null;
+    document.getElementById('rightPanelTitle').innerText = 'Görevler';
+    document.getElementById('tasksContainer').innerHTML =
+        '<div class="text-center py-5 text-muted"><i class="fas fa-hand-pointer fa-2x mb-3 d-block"></i>Görevleri görmek için soldan bir kategori/alt kategori seçin.</div>';
+}
+
+function loadTasks() {
+    if (!currentSelection) return;
+    $('#tasksContainer').html('<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>');
+    var data = { maxResultCount: 1000 };
+    if (currentSelection.type === 'category') data.categoryId = currentSelection.id;
+    else data.subCategoryId = currentSelection.id;
+    $.ajax({
+        url: '/api/services/app/TaskItem/GetAll',
+        data: data,
+        success: function(res) { renderTasks(res.result.items, res.result.totalCount); },
+        error: function() { $('#tasksContainer').html('<div class="text-center py-5 text-danger">Görevler yüklenemedi.</div>'); }
+    });
+}
+
+function renderTasks(tasks, total) {
+    if (!tasks.length) {
+        $('#tasksContainer').html('<div class="text-center py-5 text-muted"><i class="fas fa-inbox fa-3x mb-3 d-block"></i>Bu kategoride görev bulunamadı.</div>');
+        return;
+    }
+    var html = '';
+    tasks.forEach(function(t) { html += renderTaskCard(t); });
+    html += '<div class="text-muted small mt-2">Toplam ' + total + ' görev</div>';
+    $('#tasksContainer').html(html);
+}
+
+function statusDot(status) {
+    var colors = { 0:'#6c757d', 1:'#0d6efd', 2:'#198754', 3:'#212529', 4:'#ffc107' };
+    return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + (colors[status]||'#ccc') + ';margin-right:6px"></span>';
+}
+
+function renderTaskCard(t) {
+    var overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status != 2;
+    var completedClass = t.status == 2 ? 'opacity-75' : '';
+    var html = '<div class="card shadow-sm mb-2 ' + (overdue ? 'border-danger' : 'border-0') + ' ' + completedClass + '">';
+    html += '<div class="card-body py-2 px-3 d-flex align-items-center gap-3">';
+
+    // Sol: başlık + kategori + sorumlular
+    html += '<div class="flex-grow-1 min-width-0">';
+    html += '<div class="d-flex align-items-center gap-2 flex-wrap">';
+    html += statusDot(t.status);
+    html += '<a href="/Tasks/Detail/'+t.id+'" class="text-decoration-none fw-semibold text-dark">'+escHtml(t.title)+'</a>';
+    if (t.isRoutine) html += '<span class="badge bg-info ms-1 small" title="Rutin"><i class="fas fa-redo"></i></span>';
+    if (t.activityTypeText) html += '<span class="badge bg-light text-muted border small py-0 px-1">'+escHtml(t.activityTypeText)+'</span>';
+    html += '</div>';
+    var meta = '';
+    if (t.categoryName) meta += '<span class="me-2"><i class="fas fa-sitemap text-muted me-1" style="font-size:0.7rem"></i>'+escHtml(t.categoryName)+(t.subCategoryName ? ' / '+escHtml(t.subCategoryName) : '')+'</span>';
+    if (t.assignedEmployeeName) meta += '<span class="me-2"><i class="fas fa-user-tie text-primary me-1" style="font-size:0.7rem"></i>'+escHtml(t.assignedEmployeeName)+'</span>';
+    if (t.secondaryEmployeeName) meta += '<span><i class="fas fa-user text-secondary me-1" style="font-size:0.7rem"></i>'+escHtml(t.secondaryEmployeeName)+'</span>';
+    if (meta) html += '<div class="mt-1 small text-muted">'+meta+'</div>';
+    html += '</div>';
+
+    // Sağ: durum + öncelik + son tarih + aksiyonlar
+    html += '<div class="d-flex align-items-center gap-2 flex-shrink-0 ms-auto">';
+    html += '<span class="badge bg-'+statusColors[t.status]+' d-none d-md-inline">' + (statusLabels[t.status]||'') + '</span>';
+    if (t.approvalStatus === 0) html += '<span class="badge bg-warning text-dark small" title="Onay bekliyor"><i class="fas fa-clock"></i></span>';
+    else if (t.approvalStatus === 2) html += '<span class="badge bg-danger small" title="Reddedildi"><i class="fas fa-ban"></i></span>';
+    var priBadge = { 0:'<span class="badge bg-light text-dark border small">Düşük</span>', 1:'<span class="badge bg-info small">Normal</span>', 2:'<span class="badge bg-warning small">Yüksek</span>', 3:'<span class="badge bg-danger small">Kritik</span>' };
+    html += (priBadge[t.priority]||'');
+    if (t.dueDate) {
+        var due = new Date(t.dueDate);
+        html += '<small class="'+(overdue?'text-danger fw-semibold':'text-muted')+' d-none d-lg-inline"><i class="fas fa-calendar me-1"></i>'+due.toLocaleDateString("tr-TR")+'</small>';
+    }
+    html += '<div class="d-flex gap-1">';
+    html += '<a href="/Tasks/Detail/'+t.id+'" class="btn btn-sm btn-outline-secondary" title="Detay"><i class="fas fa-eye"></i></a>';
+    if (t.canEdit) html += '<a href="/Tasks/Edit/'+t.id+'" class="btn btn-sm btn-outline-warning" title="Düzenle"><i class="fas fa-edit"></i></a>';
+    if (t.canDelete) html += '<button onclick="confirmDelete('+t.id+',\''+escJs(t.title)+'\')" class="btn btn-sm btn-outline-danger" title="Sil"><i class="fas fa-trash"></i></button>';
+    html += '</div>';
+    html += '</div>'; // right side
+
+    html += '</div></div>'; // card-body + card
+    return html;
+}
+
+function confirmDelete(id, title) {
+    pendingDeleteId = id;
+    $('#deleteModalBody').text('"' + title + '" görevini silmek istediğinizden emin misiniz?');
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+$('#confirmDeleteBtn').on('click', function() {
+    if (!pendingDeleteId) return;
+    var id = pendingDeleteId;
+    pendingDeleteId = null;
+    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+    $.ajax({
+        url: '/api/services/app/TaskItem/Delete',
+        type: 'DELETE',
+        data: { id: id },
+        success: function() { abp.notify.success('Görev silindi.'); loadTasks(); },
+        error: function() { abp.notify.error('Silinemedi.'); }
+    });
+});
+
+function escHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escJs(s) {
+    if (!s) return '';
+    return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+}
+</script>
+}

@@ -1,0 +1,79 @@
+@model ActivityManagement.Employees.Dto.EmployeeDto
+@{
+    ViewData["Title"] = Model.FullName + " - Takvim";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Employees">Personeller</a></li>
+            <li class="breadcrumb-item"><a href="/Employees/Card/@Model.Id">@Model.FullName</a></li>
+            <li class="breadcrumb-item active">Takvim</li>
+        </ol>
+    </nav>
+    <div class="small text-muted">
+        <span class="badge" style="background:#0d6efd">Görev (son tarih)</span>
+        <span class="badge" style="background:#198754">Faaliyet</span>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h5 class="mb-3"><i class="fas fa-calendar-alt text-info me-2"></i>@Model.FullName — Kişisel Takvim</h5>
+        <div id="fullCalendar"></div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function calHasTime(iso) {
+    if (!iso) return false;
+    var d = new Date(iso);
+    return d.getHours() !== 0 || d.getMinutes() !== 0;
+}
+$(document).ready(function () {
+    var el = document.getElementById('fullCalendar');
+    var calendar = new FullCalendar.Calendar(el, {
+        initialView: 'dayGridMonth',
+        locale: 'tr',
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listMonth' },
+        height: 'auto',
+        events: function (info, successCallback, failureCallback) {
+            var start = info.startStr.split('T')[0];
+            var end = info.endStr.split('T')[0];
+            var events = [];
+            // Görevler (son tarihe göre)
+            var p1 = $.ajax({ url: '/api/services/app/TaskItem/GetAll', data: { assignedEmployeeId: @Model.Id, maxResultCount: 1000 } })
+                .then(function (res) {
+                    (res.result.items || []).forEach(function (t) {
+                        var s = t.startDate || t.dueDate;
+                        if (!s) return;
+                        var timed = calHasTime(s);
+                        events.push({
+                            title: '📋 ' + t.title,
+                            start: timed ? s : s.split('T')[0],
+                            allDay: !timed,
+                            color: t.priority === 3 ? '#dc3545' : t.priority === 2 ? '#fd7e14' : '#0d6efd',
+                            url: '/Tasks/Detail/' + t.id
+                        });
+                    });
+                });
+            // Faaliyetler (efor tarihi)
+            var p2 = $.ajax({ url: '/api/services/app/ActivityLog/GetAll', data: { employeeId: @Model.Id, startDate: start, endDate: end, maxResultCount: 500 } })
+                .then(function (res) {
+                    (res.result.items || []).forEach(function (a) {
+                        events.push({
+                            title: '⏱ ' + (a.hoursSpent || 0) + 's ' + (a.description ? a.description.substring(0, 30) : ''),
+                            start: a.activityDate,
+                            color: '#198754'
+                        });
+                    });
+                });
+            $.when(p1, p2).always(function () { successCallback(events); });
+        }
+    });
+    calendar.render();
+});
+</script>
+}

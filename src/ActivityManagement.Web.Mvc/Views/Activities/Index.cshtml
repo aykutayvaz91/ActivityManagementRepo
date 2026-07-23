@@ -1,0 +1,210 @@
+@model System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivitySubjectDto>
+@{
+    ViewData["Title"] = "Faaliyetler";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    bool isManager = ViewBag.IsManager == true;
+    long? preselectProjectId = ViewBag.PreselectProjectId as long?;
+    var categories = ViewBag.Categories as System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>
+                     ?? new System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>();
+    var employees = ViewBag.Employees as System.Collections.Generic.IList<ActivityManagement.Employees.Dto.EmployeeDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>();
+    var projects = ViewBag.Projects as System.Collections.Generic.IList<ActivityManagement.Projects.Dto.ProjectDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Projects.Dto.ProjectDto>();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-clipboard-check text-primary me-2"></i>Faaliyetler</h2>
+    <div class="d-flex gap-2">
+        <a href="/Activities/Today" class="btn btn-outline-success">
+            <i class="fas fa-business-time me-1"></i>Günlük Efor
+        </a>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createSubjectModal">
+            <i class="fas fa-plus me-1"></i>Yeni Faaliyet Konusu
+        </button>
+    </div>
+</div>
+
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Faaliyet Konusu</th>
+                    <th>Kategori</th>
+                    <th>Atanan Uzman</th>
+                    <th class="text-center">Kayıt</th>
+                    <th class="text-center">Toplam Süre</th>
+                    <th class="text-center">Durum</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4"><i class="fas fa-inbox fa-2x mb-2 d-block"></i>Faaliyet konusu bulunamadı.</td></tr>
+                }
+                @foreach (var s in Model)
+                {
+                    <tr>
+                        <td><a href="/Activities/Detail/@s.Id" class="fw-semibold text-decoration-none">@s.Title</a></td>
+                        <td class="small">@s.CategoryName @(string.IsNullOrEmpty(s.SubCategoryName) ? "" : " / " + s.SubCategoryName)</td>
+                        <td class="small">@(s.AssignedEmployeeName ?? "-")</td>
+                        <td class="text-center"><span class="badge bg-secondary">@s.LogCount</span></td>
+                        <td class="text-center small">@s.TotalHours.ToString("0.##") saat</td>
+                        <td class="text-center">
+                            @if (s.IsActive)
+                            { <span class="badge bg-success">Aktif</span> }
+                            else
+                            { <span class="badge bg-secondary">Pasif</span> }
+                        </td>
+                        <td class="text-end">
+                            <a href="/Activities/Detail/@s.Id" class="btn btn-sm btn-outline-secondary" title="Detay / Efor"><i class="fas fa-eye"></i></a>
+                            @if (s.CanManage)
+                            {
+                                <form asp-action="DeleteSubject" method="post" class="d-inline" onsubmit="return confirm('Bu faaliyet konusunu silmek istediğinize emin misiniz?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@s.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Sil"><i class="fas fa-trash"></i></button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Yeni Faaliyet Konusu Modal -->
+<div class="modal fade" id="createSubjectModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form asp-action="CreateSubject" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Yeni Faaliyet Konusu</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Proje <small class="text-muted">(seçilirse kategori projeden dolar)</small></label>
+                                <select id="projectSelect" name="ProjectId" class="form-select">
+                                    <option value="">— Proje yok —</option>
+                                    @foreach (var p in projects)
+                                    {
+                                        <option value="@p.Id" data-cat="@p.CategoryId" data-sub="@p.SubCategoryId" selected="@(p.Id == preselectProjectId)">[@p.Code] @p.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Ana Kategori <span class="text-danger">*</span></label>
+                                <select id="categorySelect" name="CategoryId" class="form-select" required>
+                                    <option value="">— Seçiniz —</option>
+                                    @foreach (var c in categories)
+                                    {
+                                        <option value="@c.Id">@c.Name</option>
+                                    }
+                                </select>
+                                <small class="text-muted">Proje seçilirse otomatik dolar.</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Alt Kategori</label>
+                                <select id="subCategorySelect" name="SubCategoryId" class="form-select">
+                                    <option value="">— Önce ana kategori —</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Faaliyet Konusu Başlığı <span class="text-danger">*</span></label>
+                                <input name="Title" class="form-control" required placeholder="Örn: iDRAC Sağlık Kontrolleri ve Versiyon Güncellemeleri" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Açıklama</label>
+                                <textarea name="Description" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Atanan Uzman</label>
+                                @if (isManager)
+                                {
+                                    <select name="AssignedEmployeeId" class="form-select">
+                                        <option value="">— Seçiniz —</option>
+                                        @foreach (var e in employees)
+                                        {
+                                            <option value="@e.Id">@e.FullName - @e.Title</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input class="form-control" value="Kendinize atanacak" disabled />
+                                    <small class="text-muted">Açtığınız konu size atanır; altına efor girebilirsiniz.</small>
+                                }
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="IsActive" value="true" checked />
+                                    <label class="form-check-label">Aktif</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">İptal</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Oluştur</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+@section Scripts {
+    <script>
+    (function () {
+        var categoriesData = @Html.Raw(ActivityManagement.Web.Utils.JsonHelper.ToCamelCaseJson(categories));
+        var categorySelect = document.getElementById('categorySelect');
+        var subCategorySelect = document.getElementById('subCategorySelect');
+        function findCategory(id) {
+            for (var i = 0; i < categoriesData.length; i++) {
+                if (String(categoriesData[i].id) === String(id)) return categoriesData[i];
+            }
+            return null;
+        }
+        function populateSubCategories(selSub) {
+            var cat = findCategory(categorySelect.value);
+            subCategorySelect.innerHTML = '';
+            if (!cat) { subCategorySelect.appendChild(new Option('— Önce ana kategori —', '')); return; }
+            subCategorySelect.appendChild(new Option('Seçiniz...', ''));
+            (cat.subCategories || []).forEach(function (sc) {
+                var o = new Option(sc.name, sc.id);
+                if (selSub && String(sc.id) === String(selSub)) o.selected = true;
+                subCategorySelect.appendChild(o);
+            });
+        }
+        categorySelect.addEventListener('change', function(){ populateSubCategories(null); });
+
+        // Proje seçilince kategori/alt kategori projeden dolar ve kilitlenir
+        var projectSelect = document.getElementById('projectSelect');
+        if (projectSelect) {
+            projectSelect.addEventListener('change', function () {
+                var opt = this.options[this.selectedIndex];
+                var cat = opt ? opt.getAttribute('data-cat') : '';
+                var sub = opt ? opt.getAttribute('data-sub') : '';
+                var locked = !!this.value && (cat || sub);
+                if (cat) { categorySelect.value = cat; populateSubCategories(sub); }
+                categorySelect.disabled = locked;
+                subCategorySelect.disabled = locked;
+            });
+        }
+
+        // Proje detayından "Faaliyet Ekle" ile gelindiyse: modalı aç + projeyi uygula
+        var preselect = '@(preselectProjectId?.ToString() ?? "")';
+        if (preselect && projectSelect) {
+            projectSelect.value = preselect;
+            projectSelect.dispatchEvent(new Event('change'));
+            var modalEl = document.getElementById('createSubjectModal');
+            if (modalEl && window.bootstrap) { new bootstrap.Modal(modalEl).show(); }
+        }
+    })();
+    </script>
+}

@@ -1,0 +1,315 @@
+﻿@model ActivityManagement.Tasks.Dto.TaskItemDto
+@{
+    ViewData["Title"] = Model.Title;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var statusColor = Model.Status == ActivityManagement.Entities.TaskStatus.Tamamlandi ? "success" :
+                      Model.Status == ActivityManagement.Entities.TaskStatus.DevamEdiyor ? "primary" :
+                      Model.Status == ActivityManagement.Entities.TaskStatus.Iptal ? "dark" :
+                      Model.Status == ActivityManagement.Entities.TaskStatus.Ertelendi ? "warning" : "secondary";
+    var priorityColor = Model.Priority == ActivityManagement.Entities.TaskPriority.Kritik ? "danger" :
+                        Model.Priority == ActivityManagement.Entities.TaskPriority.Yuksek ? "warning" :
+                        Model.Priority == ActivityManagement.Entities.TaskPriority.Normal ? "info" : "secondary";
+    var approvalColor = Model.ApprovalStatus == ActivityManagement.Entities.TaskApprovalStatus.Onaylandi ? "success" :
+                        Model.ApprovalStatus == ActivityManagement.Entities.TaskApprovalStatus.Reddedildi ? "danger" : "warning";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Tasks">Görevler</a></li>
+            <li class="breadcrumb-item active">@Model.Title</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        @if (Model.CanApprove)
+        {
+            <form asp-action="Approve" method="post" class="d-inline">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i>Onayla</button>
+            </form>
+            <form asp-action="Reject" method="post" class="d-inline">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-times me-1"></i>Reddet</button>
+            </form>
+        }
+        @if (Model.CanEdit)
+        {
+            <a href="/Tasks/Edit/@Model.Id" class="btn btn-outline-warning btn-sm">
+                <i class="fas fa-edit me-1"></i>Düzenle
+            </a>
+        }
+    </div>
+</div>
+
+@if (Model.ApprovalStatus != ActivityManagement.Entities.TaskApprovalStatus.Onaylandi)
+{
+    <div class="alert alert-@approvalColor py-2 d-flex align-items-center">
+        <i class="fas fa-@(Model.ApprovalStatus == ActivityManagement.Entities.TaskApprovalStatus.Reddedildi ? "ban" : "clock") me-2"></i>
+        Bu görev <strong class="mx-1">@Model.ApprovalStatusText</strong> durumundadır.
+        @if (Model.ApprovalStatus == ActivityManagement.Entities.TaskApprovalStatus.Beklemede)
+        {
+            <span>— Takım Lideri onayı bekleniyor.</span>
+        }
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <!-- Görev Bilgileri -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-@statusColor text-white">
+                <h6 class="mb-0 text-truncate">@Model.Title</h6>
+            </div>
+            <div class="card-body small">
+                <table class="table table-borderless table-sm mb-0">
+                    <tr><td class="text-muted">Durum:</td><td><span class="badge bg-@statusColor">@Model.StatusText</span></td></tr>
+                    <tr><td class="text-muted">Onay:</td><td><span class="badge bg-@approvalColor">@Model.ApprovalStatusText</span></td></tr>
+                    <tr><td class="text-muted">Öncelik:</td><td><span class="badge bg-@priorityColor">@Model.PriorityText</span></td></tr>
+                    <tr><td class="text-muted">Proje:</td><td>@(Model.ProjectName ?? "-")</td></tr>
+                    @if (!string.IsNullOrEmpty(Model.CategoryName))
+                    {
+                        <tr><td class="text-muted">Kategori:</td><td>@Model.CategoryName @(!string.IsNullOrEmpty(Model.SubCategoryName) ? " / " + Model.SubCategoryName : "")</td></tr>
+                    }
+                    @if (!string.IsNullOrEmpty(Model.TeamName))
+                    {
+                        <tr><td class="text-muted">Takım:</td><td>@Model.TeamName</td></tr>
+                    }
+                    <tr><td class="text-muted"><i class="fas fa-user-tie text-primary me-1"></i>Ana Sorumlu:</td><td>@(Model.AssignedEmployeeName ?? "-")</td></tr>
+                    @if (!string.IsNullOrEmpty(Model.SecondaryEmployeeName))
+                    {
+                        <tr><td class="text-muted"><i class="fas fa-user text-secondary me-1"></i>2. Sorumlu:</td><td>@Model.SecondaryEmployeeName</td></tr>
+                    }
+                    <tr><td class="text-muted">Atayan:</td><td>@(Model.AssignedByEmployeeName ?? "-")</td></tr>
+                    @if (Model.StartDate.HasValue)
+                    {
+                        <tr><td class="text-muted">Başlangıç:</td><td>@Model.StartDate.Value.ToString("dd.MM.yyyy")</td></tr>
+                    }
+                    @if (Model.DueDate.HasValue)
+                    {
+                        <tr><td class="text-muted">Son Tarih:</td><td>@Model.DueDate.Value.ToString("dd.MM.yyyy")</td></tr>
+                    }
+                    @if (Model.CompletedDate.HasValue)
+                    {
+                        <tr><td class="text-muted">Tamamlandı:</td><td>@Model.CompletedDate.Value.ToString("dd.MM.yyyy")</td></tr>
+                    }
+                    <tr><td class="text-muted">Tahmini:</td><td>@Model.EstimatedHours saat</td></tr>
+                    <tr><td class="text-muted">Gerçek:</td><td>@Model.ActualHours saat</td></tr>
+                    @if (!string.IsNullOrEmpty(Model.ActivityTypeText))
+                    {
+                        <tr><td class="text-muted">Aktivite Tipi:</td><td><span class="badge bg-info">@Model.ActivityTypeText</span></td></tr>
+                    }
+                </table>
+
+                @if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    <hr /><p>@Model.Description</p>
+                }
+            </div>
+        </div>
+
+        @if (Model.CanEdit)
+        {
+        <!-- Durum Güncelle -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent"><h6 class="mb-0">Durum Güncelle</h6></div>
+            <div class="card-body">
+                <form asp-action="UpdateStatus" method="post">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <div class="mb-2">
+                        <label class="form-label small">Durum</label>
+                        @{
+                            var st = Model.Status;
+                            string Sel(ActivityManagement.Entities.TaskStatus v) => st == v ? "selected" : "";
+                        }
+                        <select name="status" class="form-select form-select-sm">
+                            @Html.Raw($"<option value=\"0\" {Sel(ActivityManagement.Entities.TaskStatus.Beklemede)}>Beklemede</option>")
+                            @Html.Raw($"<option value=\"1\" {Sel(ActivityManagement.Entities.TaskStatus.DevamEdiyor)}>Devam Ediyor</option>")
+                            @Html.Raw($"<option value=\"2\" {Sel(ActivityManagement.Entities.TaskStatus.Tamamlandi)}>Tamamlandı</option>")
+                            @Html.Raw($"<option value=\"3\" {Sel(ActivityManagement.Entities.TaskStatus.Iptal)}>İptal</option>")
+                            @Html.Raw($"<option value=\"4\" {Sel(ActivityManagement.Entities.TaskStatus.Ertelendi)}>Ertelendi</option>")
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Tamamlanma % (@Model.CompletionPercentage)</label>
+                        <input type="range" name="percentage" class="form-range" min="0" max="100" step="5"
+                               value="@Model.CompletionPercentage" id="completionRange" />
+                        <div class="progress mb-1" style="height:6px">
+                            <div class="progress-bar" id="completionBar" style="width:@(Model.CompletionPercentage)%"></div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary w-100">Güncelle</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Faaliyet Kaydet -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent"><h6 class="mb-0">Faaliyet Kaydet</h6></div>
+            <div class="card-body">
+                <div id="activityForm">
+                    <div class="mb-2">
+                        <input type="number" step="0.5" class="form-control form-control-sm" id="actHours" placeholder="Süre (saat)" min="0.5" max="24" />
+                    </div>
+                    <div class="mb-2">
+                        <textarea class="form-control form-control-sm" id="actDesc" rows="2" placeholder="Yapılan işler..."></textarea>
+                    </div>
+                    <button class="btn btn-sm btn-success w-100" onclick="logActivity()">
+                        <i class="fas fa-clock me-1"></i>Kaydet
+                    </button>
+                </div>
+            </div>
+        </div>
+        }
+    </div>
+
+    <div class="col-md-8">
+        <!-- Yorumlar -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="fas fa-comments me-2 text-info"></i>Yorumlar (@Model.Comments.Count)</h6>
+            </div>
+            <div class="card-body">
+                @foreach (var c in Model.Comments.OrderByDescending(x => x.CreationTime))
+                {
+                    <div class="d-flex gap-2 mb-3">
+                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white flex-shrink-0"
+                             style="width:36px;height:36px;font-size:0.875rem">
+                            @(c.AuthorName?.Length > 0 ? c.AuthorName[0].ToString().ToUpper() : "?")
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between">
+                                <strong class="small">@c.AuthorName
+                                    @if (c.IsInternal)
+                                    { <span class="badge bg-warning text-dark ms-1"><i class="fas fa-lock me-1"></i>Dahili</span> }
+                                </strong>
+                                <small class="text-muted">@c.CreationTime.ToString("dd.MM.yyyy HH:mm")</small>
+                            </div>
+                            <div class="mb-0 small task-comment-body">@Html.Raw(c.Comment)</div>
+                            @if (c.Attachments != null && c.Attachments.Any())
+                            {
+                                <div class="mt-1">
+                                    @foreach (var a in c.Attachments)
+                                    {
+                                        <a href="@a.FilePath" download class="badge bg-light text-dark border text-decoration-none me-1"><i class="fas fa-paperclip me-1"></i>@a.FileName</a>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (Model.CanEdit)
+                {
+                    <hr />
+                    <form asp-action="AddComment" method="post" enctype="multipart/form-data" id="commentForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="taskId" value="@Model.Id" />
+                        <input type="hidden" name="comment" id="commentHtml" />
+                        <div id="commentEditor" style="height:120px; background:#fff"></div>
+                        <div class="d-flex align-items-center justify-content-between mt-2 flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-3">
+                                <label class="btn btn-sm btn-outline-secondary mb-0">
+                                    <i class="fas fa-paperclip me-1"></i>Dosya <input type="file" name="files" multiple hidden id="commentFiles" />
+                                </label>
+                                <small class="text-muted" id="fileNames"></small>
+                                @if (User.IsInRole("Admin") || User.IsInRole("TakımLideri"))
+                                {
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" name="isInternal" value="true" id="isInternal" />
+                                        <label class="form-check-label small" for="isInternal">Dahili not (yalnızca liderler)</label>
+                                    </div>
+                                }
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i>Gönder</button>
+                        </div>
+                    </form>
+                }
+            </div>
+        </div>
+
+        <!-- Dosyalar -->
+        @if (Model.Attachments.Any())
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent">
+                    <h6 class="mb-0"><i class="fas fa-paperclip me-2 text-warning"></i>Dosyalar (@Model.Attachments.Count)</h6>
+                </div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var a in Model.Attachments)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center small">
+                            <span><i class="fas fa-file me-2 text-muted"></i>@a.FileName</span>
+                            <a href="@a.FilePath" class="btn btn-sm btn-outline-primary" download>
+                                <i class="fas fa-download"></i>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<style>.task-comment-body img{max-width:100%;height:auto;border-radius:4px} .ql-editor{min-height:100px}</style>
+<script>
+// Completion range
+document.getElementById('completionRange')?.addEventListener('input', function() {
+    document.getElementById('completionBar').style.width = this.value + '%';
+});
+
+// Yorum için Rich Text editör (Quill) — Ctrl+V ile görsel yapıştırma desteklenir
+(function () {
+    var editorEl = document.getElementById('commentEditor');
+    if (!editorEl || typeof Quill === 'undefined') return;
+    var quill = new Quill('#commentEditor', {
+        theme: 'snow',
+        placeholder: 'Yorum yazın... (Ctrl+V ile ekran görüntüsü yapıştırabilirsiniz)',
+        modules: { toolbar: [['bold','italic','underline'],['link','image'],[{ 'list':'ordered' },{ 'list':'bullet' }],['clean']] }
+    });
+    var form = document.getElementById('commentForm');
+    var filesInput = document.getElementById('commentFiles');
+    form.addEventListener('submit', function () {
+        var isEmpty = quill.getText().trim() === '';
+        document.getElementById('commentHtml').value = isEmpty ? '' : quill.root.innerHTML;
+    });
+    if (filesInput) {
+        filesInput.addEventListener('change', function () {
+            document.getElementById('fileNames').innerText = Array.from(this.files).map(function (f) { return f.name; }).join(', ');
+        });
+    }
+})();
+
+function logActivity() {
+    var hours = parseFloat($('#actHours').val());
+    var desc = $('#actDesc').val().trim();
+    if (!hours || hours <= 0) { alert('Süre giriniz.'); return; }
+    if (!desc) { alert('Açıklama giriniz.'); return; }
+
+    $.ajax({
+        url: '/api/services/app/ActivityLog/Create',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            employeeId: 0,  // mevcut kullanıcı
+            taskItemId: @Model.Id,
+            projectId: @(Model.ProjectId.HasValue ? Model.ProjectId.Value.ToString() : "null"),
+            description: desc,
+            activityDate: new Date().toISOString(),
+            hoursSpent: hours,
+            activityType: 'Görev'
+        }),
+        success: function() {
+            abp.notify.success('Faaliyet kaydedildi.');
+            $('#actHours').val('');
+            $('#actDesc').val('');
+        },
+        error: function() {
+            abp.notify.error('Kayıt sırasında hata oluştu.');
+        }
+    });
+}
+</script>
+}

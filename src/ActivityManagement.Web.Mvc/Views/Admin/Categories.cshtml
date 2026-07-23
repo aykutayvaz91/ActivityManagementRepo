@@ -1,0 +1,268 @@
+@model System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>
+@{
+    ViewData["Title"] = "Kategori Yönetimi";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var employees = ViewBag.Employees as System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>();
+    var teams = ViewBag.Teams as System.Collections.Generic.List<ActivityManagement.Teams.Dto.TeamDto>
+                ?? new System.Collections.Generic.List<ActivityManagement.Teams.Dto.TeamDto>();
+    bool isAdmin = User.IsInRole("Admin");
+    long? myTeamId = ViewBag.MyTeamId;
+
+    bool CanManage(ActivityManagement.Categories.Dto.CategoryDto c) =>
+        isAdmin || (c.TeamId.HasValue && c.TeamId == myTeamId);
+
+    // TakımLideri için "Yeni Alt Kategori" dropdown'unda sadece kendi takımının kategorileri listelenir
+    var manageableCategories = isAdmin ? Model : Model.Where(CanManage).ToList();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Admin">Admin Panel</a></li>
+            <li class="breadcrumb-item active">Kategori Yönetimi</li>
+        </ol>
+    </nav>
+</div>
+
+
+<div class="alert alert-info small">
+    <i class="fas fa-info-circle me-1"></i>
+    <strong>Admin</strong> ana kategori ekleyebilir, düzenleyebilir, pasife alabilir ve silebilir (alt kategorisi olmayan).
+    Alt kategorileri Admin (tüm takımlar) ve Takım Lideri (yalnızca kendi takımına ait ana kategorinin altındakiler) yönetebilir.
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-sitemap me-2 text-primary"></i>Ana Kategoriler</h6>
+                @if (isAdmin)
+                {
+                    <button type="button" class="btn btn-sm btn-primary" onclick="newCategory()"><i class="fas fa-plus me-1"></i>Yeni Ana Kategori</button>
+                }
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Ad</th><th>Takım</th><th>1. Sorumlu</th><th>2. Sorumlu</th><th>Aktif</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in Model)
+                        {
+                            var canManage = CanManage(c);
+                            <tr class="@(canManage ? "" : "bg-light-subtle")">
+                                <td><strong>@c.Name</strong></td>
+                                <td><span class="small text-muted">@(c.TeamName ?? "—")</span></td>
+                                <td>@(c.ResponsibleEmployee1Name ?? "—")</td>
+                                <td>@(c.ResponsibleEmployee2Name ?? "—")</td>
+                                <td>@(c.IsActive ? "✓" : "—")</td>
+                                <td class="text-end">
+                                    @if (isAdmin)
+                                    {
+                                        <button class="btn btn-sm btn-outline-warning"
+                                                onclick='editCategory(@Html.Raw(ActivityManagement.Web.Utils.JsonHelper.ToCamelCaseJson(c)))'>
+                                            <i class="fas fa-edit me-1"></i>Düzenle
+                                        </button>
+                                        <form asp-action="DeleteCategory" method="post" class="d-inline" onsubmit="return confirm('Ana kategori silinsin mi? (Alt kategorisi olmamalı)')">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@c.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="6" class="bg-light-subtle ps-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small text-muted">Alt Kategoriler</span>
+                                        @if (canManage)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                                    onclick="newSubCategoryFor(@c.Id, '@c.Name')">
+                                                <i class="fas fa-plus me-1"></i>Alt Kategori Ekle
+                                            </button>
+                                        }
+                                    </div>
+                                    @if (c.SubCategories.Any())
+                                    {
+                                        <ul class="list-group list-group-flush">
+                                            @foreach (var sc in c.SubCategories)
+                                            {
+                                                <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-1">
+                                                    <span>@sc.Name @(sc.IsActive ? "" : "(pasif)")</span>
+                                                    @if (canManage)
+                                                    {
+                                                        <span>
+                                                            <button class="btn btn-sm btn-outline-warning"
+                                                                    onclick='editSubCategory(@Html.Raw(ActivityManagement.Web.Utils.JsonHelper.ToCamelCaseJson(sc)))'>
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                            <form asp-action="DeleteSubCategory" method="post" class="d-inline" onsubmit="return confirm('Silinsin mi?')">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@sc.Id" />
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                                            </form>
+                                                        </span>
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                    else
+                                    {
+                                        <div class="small text-muted fst-italic">Alt kategori yok.</div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="text-muted small mt-2">Ana kategorinin 1. ve 2. sorumlusu, alt kategori seçilerek görev eklendiğinde varsayılan atanan kişi olarak önerilir.</p>
+    </div>
+
+    <div class="col-lg-5">
+        @if (isAdmin)
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-primary text-white"><h6 class="mb-0" id="catFormTitle">Yeni Ana Kategori</h6></div>
+                <div class="card-body">
+                    <form asp-action="SaveCategory" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Id" id="c_id" value="0" />
+                        <div class="mb-2">
+                            <label class="form-label small">Ana Kategori Adı <span class="text-danger">*</span></label>
+                            <input class="form-control" name="Name" id="c_name" required />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Takım</label>
+                            <select name="TeamId" id="c_team" class="form-select">
+                                <option value="">— Takımsız —</option>
+                                @foreach (var t in teams)
+                                {
+                                    <option value="@t.Id">@t.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">1. Sorumlu</label>
+                            <select name="ResponsibleEmployee1Id" id="c_resp1" class="form-select">
+                                <option value="">— Seçiniz —</option>
+                                @foreach (var e in employees)
+                                {
+                                    <option value="@e.Id">@e.FullName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">2. Sorumlu</label>
+                            <select name="ResponsibleEmployee2Id" id="c_resp2" class="form-select">
+                                <option value="">— Seçiniz —</option>
+                                @foreach (var e in employees)
+                                {
+                                    <option value="@e.Id">@e.FullName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-check mb-3"><input type="checkbox" name="IsActive" value="true" id="c_active" class="form-check-input" checked /><label class="form-check-label" for="c_active">Aktif</label></div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary flex-fill" id="c_save_btn"><i class="fas fa-save me-1"></i>Kaydet</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="newCategory()">Temizle</button>
+                        </div>
+                        <small class="text-muted d-block mt-1">Yeni ana kategori ekleyin veya listeden "Düzenle"ye tıklayın.</small>
+                    </form>
+                </div>
+            </div>
+        }
+
+        @if (manageableCategories.Any())
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white"><h6 class="mb-0" id="subFormTitle">Yeni Alt Kategori</h6></div>
+                <div class="card-body">
+                    <form asp-action="SaveSubCategory" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Id" id="sc_id" value="0" />
+                        <div class="mb-2">
+                            <label class="form-label small">Ana Kategori</label>
+                            <select name="CategoryId" id="sc_category" class="form-select" required>
+                                @foreach (var c in manageableCategories)
+                                {
+                                    <option value="@c.Id">@c.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Ad</label>
+                            <input name="Name" id="sc_name" class="form-control" required />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Açıklama</label>
+                            <textarea name="Description" id="sc_desc" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-check mb-3"><input type="checkbox" name="IsActive" value="true" id="sc_active" class="form-check-input" checked /><label class="form-check-label" for="sc_active">Aktif</label></div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-secondary flex-fill"><i class="fas fa-save me-1"></i>Kaydet</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetSubCategoryForm()">Temizle</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning small">Yönetebileceğiniz (kendi takımınıza ait) bir ana kategori bulunmuyor.</div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function editCategory(c) {
+    document.getElementById('catFormTitle').innerText = 'Ana Kategori Düzenle: ' + c.name;
+    document.getElementById('c_id').value = c.id;
+    document.getElementById('c_name').value = c.name;
+    document.getElementById('c_team').value = c.teamId || '';
+    document.getElementById('c_resp1').value = c.responsibleEmployee1Id || '';
+    document.getElementById('c_resp2').value = c.responsibleEmployee2Id || '';
+    document.getElementById('c_active').checked = c.isActive;
+    window.scrollTo(0, 0);
+}
+function newCategory() {
+    document.getElementById('catFormTitle').innerText = 'Yeni Ana Kategori';
+    document.getElementById('c_id').value = 0;
+    document.getElementById('c_name').value = '';
+    document.getElementById('c_team').value = '';
+    document.getElementById('c_resp1').value = '';
+    document.getElementById('c_resp2').value = '';
+    document.getElementById('c_active').checked = true;
+    window.scrollTo(0, 0);
+}
+
+function editSubCategory(sc) {
+    document.getElementById('subFormTitle').innerText = 'Alt Kategori Düzenle: ' + sc.name;
+    document.getElementById('sc_id').value = sc.id;
+    document.getElementById('sc_category').value = sc.categoryId;
+    document.getElementById('sc_name').value = sc.name;
+    document.getElementById('sc_desc').value = sc.description || '';
+    document.getElementById('sc_active').checked = sc.isActive;
+    window.scrollTo(0, document.body.scrollHeight);
+}
+function newSubCategoryFor(categoryId, categoryName) {
+    resetSubCategoryForm();
+    var sel = document.getElementById('sc_category');
+    if (sel) sel.value = categoryId;
+    document.getElementById('subFormTitle').innerText = 'Yeni Alt Kategori: ' + categoryName;
+    window.scrollTo(0, document.body.scrollHeight);
+}
+function resetSubCategoryForm() {
+    document.getElementById('subFormTitle').innerText = 'Yeni Alt Kategori';
+    document.getElementById('sc_id').value = 0;
+    document.getElementById('sc_name').value = '';
+    document.getElementById('sc_desc').value = '';
+    document.getElementById('sc_active').checked = true;
+}
+</script>
+}

@@ -1,0 +1,138 @@
+@model ActivityManagement.Activities.Dto.ActivitySubjectDto
+@{
+    ViewData["Title"] = Model.Title;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    bool isManager = ViewBag.IsManager == true;
+    var efforts = ViewBag.Efforts as System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityLogDto>
+                  ?? new System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityLogDto>();
+    var employees = ViewBag.Employees as System.Collections.Generic.IList<ActivityManagement.Employees.Dto.EmployeeDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Activities">Faaliyetler</a></li>
+            <li class="breadcrumb-item active">@Model.Title</li>
+        </ol>
+    </nav>
+</div>
+
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-primary text-white"><h6 class="mb-0 text-truncate">@Model.Title</h6></div>
+            <div class="card-body small">
+                <table class="table table-borderless table-sm mb-0">
+                    <tr><td class="text-muted">Kategori:</td><td>@Model.CategoryName @(string.IsNullOrEmpty(Model.SubCategoryName) ? "" : " / " + Model.SubCategoryName)</td></tr>
+                    <tr><td class="text-muted">Atanan Uzman:</td><td>@(Model.AssignedEmployeeName ?? "-")</td></tr>
+                    <tr><td class="text-muted">Tanımlayan:</td><td>@(Model.CreatedByLeaderName ?? "-")</td></tr>
+                    <tr><td class="text-muted">Takım:</td><td>@(Model.TeamName ?? "-")</td></tr>
+                    <tr><td class="text-muted">Durum:</td><td>@(Model.IsActive ? "Aktif" : "Pasif")</td></tr>
+                    <tr><td class="text-muted">Toplam:</td><td>@Model.LogCount kayıt · @Model.TotalHours.ToString("0.##") saat</td></tr>
+                </table>
+                @if (!string.IsNullOrWhiteSpace(Model.Description))
+                {
+                    <hr /><p class="mb-0">@Model.Description</p>
+                }
+            </div>
+        </div>
+
+        @if (Model.CanLogEffort)
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white"><h6 class="mb-0"><i class="fas fa-plus me-2"></i>Efor Girişi</h6></div>
+                <div class="card-body">
+                    <form asp-action="LogEffort" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="ActivitySubjectId" value="@Model.Id" />
+                        <div class="mb-2">
+                            <label class="form-label small">Tarih</label>
+                            <input type="date" name="ActivityDate" class="form-control form-control-sm" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Harcanan Süre (saat)</label>
+                            <input type="number" name="HoursSpent" class="form-control form-control-sm" step="0.25" min="0" required />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Faaliyet Tipi</label>
+                            @{
+                                var actTypes = ViewBag.ActivityTypes as System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>
+                                               ?? new System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>();
+                            }
+                            <select name="ActivityType" class="form-select form-select-sm">
+                                @foreach (var t in actTypes)
+                                {
+                                    <option value="@t.Name">@t.Name</option>
+                                }
+                            </select>
+                        </div>
+                        @if (isManager)
+                        {
+                            <div class="mb-2">
+                                <label class="form-label small">Personel <small class="text-muted">(boş = atanan uzman)</small></label>
+                                <select name="EmployeeId" class="form-select form-select-sm">
+                                    <option value="">Atanan uzman</option>
+                                    @foreach (var e in employees)
+                                    {
+                                        <option value="@e.Id">@e.FullName</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                        <div class="mb-2">
+                            <label class="form-label small">Açıklama</label>
+                            <textarea name="Description" class="form-control form-control-sm" rows="3" placeholder="Yapılan işin açıklaması..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success btn-sm w-100"><i class="fas fa-save me-1"></i>Efor Kaydet</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent"><h6 class="mb-0"><i class="fas fa-history me-2 text-info"></i>Efor Kayıtları (@efforts.Count)</h6></div>
+            <div class="table-responsive">
+                @{
+                    var myEmpIdClaim = User.FindFirst("EmployeeId")?.Value;
+                    long.TryParse(myEmpIdClaim, out var myEmpId);
+                }
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Tarih</th><th>Personel</th><th>Tip</th><th class="text-center">Süre</th><th>Açıklama</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @if (!efforts.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted py-4">Henüz efor kaydı yok.</td></tr>
+                        }
+                        @foreach (var e in efforts)
+                        {
+                            <tr>
+                                <td class="small text-nowrap">@e.ActivityDate.ToString("dd.MM.yyyy")</td>
+                                <td class="small">@(e.EmployeeName ?? "-")</td>
+                                <td class="small">@(string.IsNullOrEmpty(e.ActivityType) ? "-" : e.ActivityType)</td>
+                                <td class="text-center small">@e.HoursSpent.ToString("0.##") s</td>
+                                <td class="small">@e.Description</td>
+                                <td class="text-end">
+                                    @if (isManager || (myEmpId != 0 && e.EmployeeId == myEmpId))
+                                    {
+                                        <form asp-action="DeleteEffort" method="post" class="d-inline" onsubmit="return confirm('Efor kaydı silinsin mi?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@e.Id" />
+                                            <input type="hidden" name="activitySubjectId" value="@Model.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger py-0"><i class="fas fa-trash"></i></button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,259 @@
+@model System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>
+@{
+    ViewData["Title"] = "Görevlerim";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var categories = ViewBag.Categories as System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>
+                     ?? new System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>();
+    var statusLabels = new[] { "Beklemede", "Devam Ediyor", "Tamamlandı", "İptal", "Ertelendi" };
+    var statusColors = new[] { "secondary", "primary", "success", "dark", "warning" };
+    var priorityBadges = new[]
+    {
+        "<span class=\"badge bg-light text-dark border\">Düşük</span>",
+        "<span class=\"badge bg-info\">Normal</span>",
+        "<span class=\"badge bg-warning\">Yüksek</span>",
+        "<span class=\"badge bg-danger\">Kritik</span>"
+    };
+    var activeTasks = Model
+        .Where(t => t.Status != ActivityManagement.Entities.TaskStatus.Tamamlandi && t.Status != ActivityManagement.Entities.TaskStatus.Iptal)
+        .ToList();
+    var timelineTasks = activeTasks.Where(t => t.DueDate.HasValue).OrderBy(t => t.DueDate).ToList();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-user-check text-primary me-2"></i>Görevlerim</h2>
+    <div class="d-flex align-items-center gap-3">
+        <div class="form-check form-switch mb-0" title="Açıkken sayfa periyodik yenilenir">
+            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+            <label class="form-check-label small" for="autoRefreshToggle"><i class="fas fa-sync-alt me-1"></i>Otomatik Yenile</label>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="newTask()"><i class="fas fa-plus me-1"></i>Yeni Görev</button>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Sol: Kategori TreeView filtresi -->
+    <div class="col-lg-3">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-sitemap me-2 text-primary"></i>Kategoriler</h6>
+                <button class="btn btn-sm btn-link p-0" onclick="clearFilter()">Temizle</button>
+            </div>
+            <div class="card-body p-2" style="max-height:70vh; overflow-y:auto">
+                @foreach (var c in categories)
+                {
+                    var hasSubs = c.SubCategories.Any();
+                    <div class="mb-1 tree-node">
+                        <div class="d-flex align-items-center gap-1">
+                            @if (hasSubs)
+                            {
+                                <i class="fas fa-caret-right tree-toggle" style="width:14px;cursor:pointer" onclick="toggleTreeNode(@c.Id)" id="caret_@c.Id"></i>
+                            }
+                            else
+                            {
+                                <span style="width:14px"></span>
+                            }
+                            <span class="tree-label fw-semibold small flex-grow-1" style="cursor:pointer"
+                                  data-type="category" data-id="@c.Id" onclick="selectNode(this)">@c.Name</span>
+                        </div>
+                        @if (hasSubs)
+                        {
+                            <div class="ms-4 tree-children" id="children_@c.Id" style="display:none">
+                                @foreach (var sc in c.SubCategories)
+                                {
+                                    <div class="tree-sub py-1">
+                                        <span class="tree-label small text-muted" style="cursor:pointer"
+                                              data-type="subcategory" data-id="@sc.Id" data-category-id="@c.Id" onclick="selectNode(this)">@sc.Name</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Orta: Atanmış aktif görev kartları -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent"><h6 class="mb-0"><i class="fas fa-clipboard-list me-2 text-warning"></i>Aktif Görevlerim (<span id="cardCount">@activeTasks.Count</span>)</h6></div>
+            <div class="card-body p-2" style="max-height:75vh; overflow-y:auto" id="cardsContainer">
+                @if (!activeTasks.Any())
+                {
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-inbox fa-2x mb-2 d-block"></i>Aktif göreviniz yok.
+                    </div>
+                }
+                @foreach (var t in activeTasks)
+                {
+                    var isOverdue = t.DueDate.HasValue && t.DueDate.Value < DateTime.Today;
+                    <div class="card mb-2 task-card @(isOverdue ? "border-danger" : "")"
+                         data-category-id="@t.CategoryId" data-subcategory-id="@t.SubCategoryId">
+                        <div class="card-body p-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <a href="/Tasks/Detail/@t.Id" class="fw-semibold text-decoration-none text-dark small">@t.Title</a>
+                                @Html.Raw(priorityBadges[(int)t.Priority])
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(t.CategoryName))
+                            {
+                                <div class="small text-muted">@t.CategoryName @(!string.IsNullOrWhiteSpace(t.SubCategoryName) ? " / " + t.SubCategoryName : "")</div>
+                            }
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <span class="badge bg-@statusColors[(int)t.Status] small">@statusLabels[(int)t.Status]</span>
+                                @if (t.ApprovalStatus == ActivityManagement.Entities.TaskApprovalStatus.Beklemede)
+                                {
+                                    <span class="badge bg-warning text-dark small" title="Onay bekliyor"><i class="fas fa-clock"></i></span>
+                                }
+                                else if (t.ApprovalStatus == ActivityManagement.Entities.TaskApprovalStatus.Reddedildi)
+                                {
+                                    <span class="badge bg-danger small" title="Reddedildi"><i class="fas fa-ban"></i></span>
+                                }
+                                @if (t.DueDate.HasValue)
+                                {
+                                    <small class="@(isOverdue ? "text-danger fw-semibold" : "text-muted")"><i class="fas fa-calendar me-1"></i>@t.DueDate.Value.ToString("dd.MM.yyyy")</small>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Sağ: Bugünden başlayan dikey zaman çizelgesi -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent"><h6 class="mb-0"><i class="fas fa-stream me-2 text-info"></i>Zaman Çizelgesi</h6></div>
+            <div class="card-body p-2" style="max-height:75vh; overflow-y:auto" id="timelineContainer">
+                @if (!timelineTasks.Any())
+                {
+                    <div class="text-center text-muted py-4">Son tarihi olan aktif görev yok.</div>
+                }
+                @{
+                    string lastDate = null;
+                }
+                @foreach (var t in timelineTasks)
+                {
+                    var dateKey = t.DueDate.Value.ToString("yyyy-MM-dd");
+                    var isOverdue = t.DueDate.Value < DateTime.Today;
+                    if (dateKey != lastDate)
+                    {
+                        lastDate = dateKey;
+                        <div class="timeline-date-header small fw-semibold text-muted mt-2 mb-1 border-bottom pb-1">
+                            @(t.DueDate.Value.Date == DateTime.Today ? "Bugün" : t.DueDate.Value.ToString("dd MMMM yyyy, dddd"))
+                        </div>
+                    }
+                    <div class="timeline-item d-flex align-items-start gap-2 mb-2"
+                         data-category-id="@t.CategoryId" data-subcategory-id="@t.SubCategoryId">
+                        <span class="mt-1" style="width:8px;height:8px;border-radius:50%;background:@(isOverdue ? "#dc3545" : "#0d6efd");flex-shrink:0;display:inline-block"></span>
+                        <a href="/Tasks/Detail/@t.Id" class="text-decoration-none text-dark small">@t.Title</a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// Tek seçim: soldaki ağaçtan tıklanan (alt)kategori. null = filtre yok (tümü).
+var currentFilter = null; // { type: 'category'|'subcategory', id: '..' }
+
+function selectNode(el) {
+    var type = el.dataset.type;
+    var id = el.dataset.id;
+    // Aynı düğüme tekrar tıklanırsa filtreyi kaldır
+    if (currentFilter && currentFilter.type === type && currentFilter.id === id) {
+        clearFilter();
+        return;
+    }
+    document.querySelectorAll('.tree-label.active').forEach(function(n) { n.classList.remove('active', 'text-primary', 'fw-bold'); });
+    el.classList.add('active', 'text-primary', 'fw-bold');
+    currentFilter = { type: type, id: id };
+    applyFilter();
+}
+
+function applyFilter() {
+    var anySelected = currentFilter !== null;
+    var visibleCount = 0;
+
+    document.querySelectorAll('.task-card, .timeline-item').forEach(function(el) {
+        var catId = el.dataset.categoryId;
+        var subId = el.dataset.subcategoryId;
+        var match = !anySelected ||
+            (currentFilter.type === 'category' && catId === currentFilter.id) ||
+            (currentFilter.type === 'subcategory' && subId === currentFilter.id);
+        el.style.display = match ? '' : 'none';
+        if (match && el.classList.contains('task-card')) visibleCount++;
+    });
+    document.getElementById('cardCount').innerText = anySelected ? visibleCount : document.querySelectorAll('.task-card').length;
+
+    // Zaman çizelgesinde tarih başlıklarını, altında görünür öğe yoksa gizle
+    document.querySelectorAll('#timelineContainer').forEach(function(container) {
+        var currentHeader = null, hasVisible = false;
+        Array.from(container.children).forEach(function(child) {
+            if (child.classList.contains('timeline-date-header')) {
+                if (currentHeader) currentHeader.style.display = hasVisible ? '' : 'none';
+                currentHeader = child;
+                hasVisible = false;
+            } else if (child.classList.contains('timeline-item')) {
+                if (child.style.display !== 'none') hasVisible = true;
+            }
+        });
+        if (currentHeader) currentHeader.style.display = hasVisible ? '' : 'none';
+    });
+}
+
+function clearFilter() {
+    document.querySelectorAll('.tree-label.active').forEach(function(n) { n.classList.remove('active', 'text-primary', 'fw-bold'); });
+    currentFilter = null;
+    applyFilter();
+}
+
+function toggleTreeNode(categoryId) {
+    var children = document.getElementById('children_' + categoryId);
+    var caret = document.getElementById('caret_' + categoryId);
+    if (!children) return;
+    var isOpen = children.style.display !== 'none';
+    children.style.display = isOpen ? 'none' : '';
+    if (caret) {
+        caret.classList.toggle('fa-caret-right', isOpen);
+        caret.classList.toggle('fa-caret-down', !isOpen);
+    }
+}
+
+// "Yeni Görev": soldaki ağaçta seçili kategori/alt kategoriyi forma taşı
+function newTask() {
+    var params = [];
+    var active = document.querySelector('.tree-label.active');
+    if (active) {
+        if (active.dataset.type === 'subcategory') {
+            params.push('subCategoryId=' + active.dataset.id);
+            if (active.dataset.categoryId) params.push('categoryId=' + active.dataset.categoryId);
+        } else if (active.dataset.type === 'category') {
+            params.push('categoryId=' + active.dataset.id);
+        }
+    }
+    window.location.href = '/Tasks/Create' + (params.length ? '?' + params.join('&') : '');
+}
+
+// Otomatik Yenile (default AÇIK, localStorage'da hatırlanır)
+(function () {
+    var key = 'myTasksAutoRefresh';
+    var toggle = document.getElementById('autoRefreshToggle');
+    if (!toggle) return;
+    var saved = localStorage.getItem(key);
+    if (saved !== null) toggle.checked = (saved === '1');
+    var timer = null;
+    function apply() {
+        if (timer) { clearInterval(timer); timer = null; }
+        if (toggle.checked) timer = setInterval(function () { location.reload(); }, 30000);
+    }
+    toggle.addEventListener('change', function () {
+        localStorage.setItem(key, toggle.checked ? '1' : '0');
+        apply();
+    });
+    apply();
+})();
+</script>
+}

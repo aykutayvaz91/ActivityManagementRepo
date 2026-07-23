@@ -1,0 +1,257 @@
+@model ActivityManagement.Tasks.Dto.CreateUpdateTaskItemDto
+@{
+    ViewData["Title"] = "Görev Düzenle";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var employees = ViewBag.Employees as IList<ActivityManagement.Employees.Dto.EmployeeDto>;
+    var projects = ViewBag.Projects as IList<ActivityManagement.Projects.Dto.ProjectDto>;
+    var categories = ViewBag.Categories as System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>
+                     ?? new System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>();
+    bool isManager = User.IsInRole("Admin") || User.IsInRole("TakımLideri");
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Tasks">Görevler</a></li>
+            <li class="breadcrumb-item active">Düzenle</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-9">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="fas fa-edit me-2"></i>Görev Düzenle</h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="Edit" method="post">
+                    @Html.AntiForgeryToken()
+                    <input asp-for="Id" type="hidden" />
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                    <div class="row g-3">
+                        @if (isManager)
+                        {
+                            <div class="col-md-6">
+                                <label asp-for="GroupName" class="form-label">Görev Grubu</label>
+                                <select asp-for="GroupName" class="form-select">
+                                    <option value="">Seçiniz...</option>
+                                    <option value="Sistem Birimi">Sistem Birimi</option>
+                                    <option value="Network Birimi">Network Birimi</option>
+                                    <option value="Ortak">Ortak (Sistem & Network)</option>
+                                </select>
+                            </div>
+                        }
+
+                        <div class="col-12">
+                            <label asp-for="Title" class="form-label">Görev Başlığı <span class="text-danger">*</span></label>
+                            <input asp-for="Title" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Description" class="form-label">Açıklama</label>
+                            <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="ActivityType" class="form-label">Aktivite Tipi</label>
+                            <select asp-for="ActivityType" class="form-select">
+                                <option value="">Seçiniz...</option>
+                                <option value="0">Bakım</option>
+                                <option value="1">Geliştirme</option>
+                                <option value="2">Kurulum</option>
+                                <option value="3">Destek</option>
+                                <option value="4">Test</option>
+                                <option value="5">Dokümantasyon</option>
+                                <option value="6">Eğitim</option>
+                                <option value="7">Analiz</option>
+                                <option value="8">Proje</option>
+                                <option value="9">Diğer</option>
+                            </select>
+                        </div>
+
+                        @if (isManager)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label">Ana Kategori</label>
+                                <select id="categorySelect" class="form-select">
+                                    <option value="">— Seçiniz —</option>
+                                    @foreach (var c in categories)
+                                    {
+                                        <option value="@c.Id">@c.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="SubCategoryId" class="form-label">Alt Kategori</label>
+                                <select asp-for="SubCategoryId" id="subCategorySelect" class="form-select">
+                                    <option value="">— Önce ana kategori seçiniz —</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="ProjectId" class="form-label">Proje</label>
+                                <select asp-for="ProjectId" class="form-select">
+                                    <option value="">Seçiniz...</option>
+                                    @if (projects != null)
+                                    {
+                                        foreach (var p in projects)
+                                        {
+                                            <option value="@p.Id">[@p.Code] @p.Name</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="AssignedEmployeeId" class="form-label">
+                                    <i class="fas fa-user-tie text-primary me-1"></i>Ana Sorumlu
+                                </label>
+                                <select asp-for="AssignedEmployeeId" class="form-select">
+                                    <option value="">Seçiniz...</option>
+                                    @if (employees != null)
+                                    {
+                                        foreach (var e in employees)
+                                        {
+                                            <option value="@e.Id">@e.FullName - @e.Title</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="SecondaryEmployeeId" class="form-label">
+                                    <i class="fas fa-user text-secondary me-1"></i>2. Sorumlu <small class="text-muted">(yedek)</small>
+                                </label>
+                                <select asp-for="SecondaryEmployeeId" class="form-select">
+                                    <option value="">Seçiniz...</option>
+                                    @if (employees != null)
+                                    {
+                                        foreach (var e in employees)
+                                        {
+                                            <option value="@e.Id">@e.FullName - @e.Title</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                        }
+                        else
+                        {
+                            <input type="hidden" asp-for="SubCategoryId" />
+                        }
+
+                        <div class="col-md-3">
+                            <label asp-for="Status" class="form-label">Durum</label>
+                            <select asp-for="Status" class="form-select">
+                                <option value="0">Beklemede</option>
+                                <option value="1">Devam Ediyor</option>
+                                <option value="2">Tamamlandı</option>
+                                <option value="3">İptal</option>
+                                <option value="4">Ertelendi</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="PriorityScore" class="form-label">Önem Derecesi <small class="text-muted">(1–10)</small></label>
+                            <select asp-for="PriorityScore" class="form-select">
+                                @for (int i = 10; i >= 1; i--)
+                                {
+                                    <option value="@i">@i @(i == 10 ? "(En Yüksek)" : i == 1 ? "(En Düşük)" : "")</option>
+                                }
+                            </select>
+                        </div>
+                        @{
+                            var _esd = Model.StartDate ?? DateTime.Today;
+                            var _esdDate = _esd.ToString("yyyy-MM-dd");
+                            var _esdTime = (Model.StartDate.HasValue && (Model.StartDate.Value.Hour != 0 || Model.StartDate.Value.Minute != 0))
+                                           ? Model.StartDate.Value.ToString("HH:mm") : "";
+                        }
+                        <div class="col-md-2">
+                            <label class="form-label">Başlangıç</label>
+                            <input type="date" name="startDatePart" value="@_esdDate" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Saat</label>
+                            <input type="time" name="startTimePart" value="@_esdTime" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="DueDate" class="form-label">Son Tarih</label>
+                            <input asp-for="DueDate" class="form-control" type="date" />
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="EstimatedHours" class="form-label">Tahmini Süre (s)</label>
+                            <input asp-for="EstimatedHours" class="form-control" type="number" step="any" min="0" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="ActualHours" class="form-label">Gerçek Süre (s)</label>
+                            <input asp-for="ActualHours" class="form-control" type="number" step="any" min="0" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CompletionPercentage" class="form-label">Tamamlanma %</label>
+                            <input asp-for="CompletionPercentage" class="form-control" type="number" min="0" max="100" />
+                        </div>
+                    </div>
+
+                    <hr />
+                    <div class="d-flex gap-2 justify-content-end">
+                        <a href="/Tasks" class="btn btn-outline-secondary">İptal</a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save me-1"></i>Güncelle
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    @if (isManager)
+    {
+        <script>
+        (function() {
+            var categoriesData = @Html.Raw(ActivityManagement.Web.Utils.JsonHelper.ToCamelCaseJson(categories));
+            var currentSubCategoryId = @(Model.SubCategoryId.HasValue ? Model.SubCategoryId.Value.ToString() : "null");
+            var categorySelect = document.getElementById('categorySelect');
+            var subCategorySelect = document.getElementById('subCategorySelect');
+
+            function findCategory(id) {
+                for (var i = 0; i < categoriesData.length; i++) {
+                    if (String(categoriesData[i].id) === String(id)) return categoriesData[i];
+                }
+                return null;
+            }
+            function findOwnerCategory(subCategoryId) {
+                for (var i = 0; i < categoriesData.length; i++) {
+                    var subs = categoriesData[i].subCategories || [];
+                    for (var j = 0; j < subs.length; j++) {
+                        if (String(subs[j].id) === String(subCategoryId)) return categoriesData[i];
+                    }
+                }
+                return null;
+            }
+            function populateSubCategories(selectedSubCategoryId) {
+                var cat = findCategory(categorySelect.value);
+                subCategorySelect.innerHTML = '';
+                if (!cat) {
+                    subCategorySelect.appendChild(new Option('— Önce ana kategori seçiniz —', ''));
+                    return;
+                }
+                subCategorySelect.appendChild(new Option('Seçiniz...', ''));
+                (cat.subCategories || []).forEach(function(sc) {
+                    var opt = new Option(sc.name, sc.id);
+                    if (selectedSubCategoryId && String(sc.id) === String(selectedSubCategoryId)) opt.selected = true;
+                    subCategorySelect.appendChild(opt);
+                });
+            }
+
+            if (currentSubCategoryId) {
+                var ownerCat = findOwnerCategory(currentSubCategoryId);
+                if (ownerCat) {
+                    categorySelect.value = ownerCat.id;
+                    populateSubCategories(currentSubCategoryId);
+                }
+            }
+
+            categorySelect.addEventListener('change', function() { populateSubCategories(null); });
+        })();
+        </script>
+    }
+}
