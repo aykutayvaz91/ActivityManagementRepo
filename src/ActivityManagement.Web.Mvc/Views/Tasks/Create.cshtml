@@ -189,8 +189,8 @@
                                           ? Model.StartDate.Value.ToString("HH:mm") : "";
                         }
                         <div class="col-md-3">
-                            <label class="form-label">Başlangıç Tarihi</label>
-                            <input type="date" name="startDatePart" value="@_sdDate" class="form-control" />
+                            <label class="form-label">Başlangıç Tarihi <span class="text-danger">*</span></label>
+                            <input type="date" name="startDatePart" value="@_sdDate" class="form-control" required />
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Saat <small class="text-muted">(hh:mm)</small></label>
@@ -209,8 +209,8 @@
                         else
                         {
                             <div class="col-md-4">
-                                <label asp-for="DueDate" class="form-label">Son Tarih</label>
-                                <input asp-for="DueDate" class="form-control" type="date" />
+                                <label asp-for="DueDate" class="form-label">Son Tarih <span class="text-danger">*</span></label>
+                                <input asp-for="DueDate" class="form-control" type="date" required />
                             </div>
                         }
                         <div class="col-md-4">

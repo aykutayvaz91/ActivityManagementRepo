@@ -163,16 +163,16 @@
                                            ? Model.StartDate.Value.ToString("HH:mm") : "";
                         }
                         <div class="col-md-2">
-                            <label class="form-label">Başlangıç</label>
-                            <input type="date" name="startDatePart" value="@_esdDate" class="form-control" />
+                            <label class="form-label">Başlangıç <span class="text-danger">*</span></label>
+                            <input type="date" name="startDatePart" value="@_esdDate" class="form-control" required />
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Saat</label>
                             <input type="time" name="startTimePart" value="@_esdTime" class="form-control" />
                         </div>
                         <div class="col-md-2">
-                            <label asp-for="DueDate" class="form-label">Son Tarih</label>
-                            <input asp-for="DueDate" class="form-control" type="date" />
+                            <label asp-for="DueDate" class="form-label">Son Tarih <span class="text-danger">*</span></label>
+                            <input asp-for="DueDate" class="form-control" type="date" required />
                         </div>
                         <div class="col-md-3">
                             <label asp-for="EstimatedHours" class="form-label">Tahmini Süre (s)</label>

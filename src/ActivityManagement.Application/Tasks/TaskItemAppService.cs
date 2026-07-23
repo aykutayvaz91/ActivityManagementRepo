@@ -225,6 +225,12 @@ namespace ActivityManagement.Tasks
                     throw new UserFriendlyException("Seçilen alt kategori bulunamadı.");
             }
 
+            // Zaman çizelgesi SLA'ya göre listelendiğinden başlangıç ve bitiş tarihleri ZORUNLU.
+            if (!input.StartDate.HasValue)
+                throw new UserFriendlyException("Görev başlangıç tarihi zorunludur.");
+            if (!input.DueDate.HasValue)
+                throw new UserFriendlyException("Görev bitiş (son teslim) tarihi zorunludur. Proje görevlerinde proje SLA tarihi girilmelidir.");
+
             var task = ObjectMapper.Map<TaskItem>(input);
             task.TenantId = AbpSession.TenantId ?? 1;
             task.TeamId = await ResolveTeamIdForNewTaskAsync(input, ctx);
@@ -269,6 +275,12 @@ namespace ActivityManagement.Tasks
             if (input.PriorityScore < 1) input.PriorityScore = 5;
             if (input.PriorityScore > 10) input.PriorityScore = 10;
             input.Priority = PriorityFromScore(input.PriorityScore);
+
+            // Başlangıç ve bitiş tarihleri zorunlu (zaman çizelgesi/SLA için)
+            if (!input.StartDate.HasValue)
+                throw new UserFriendlyException("Görev başlangıç tarihi zorunludur.");
+            if (!input.DueDate.HasValue)
+                throw new UserFriendlyException("Görev bitiş (son teslim) tarihi zorunludur.");
 
             // Uzman; atama, proje ve atayan bilgilerini değiştiremesin (sadece yönetici)
             var ctx = CurrentContext();
