@@ -1,8 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using ClosedXML.Excel;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ActivityManagement.Categories;
@@ -197,9 +201,23 @@ namespace ActivityManagement.Web.Controllers
             return RedirectToAction("ActivityTypes");
         }
 
+        private long? CurrentEmployeeIdClaim()
+        {
+            var c = User.FindFirst("EmployeeId")?.Value;
+            return long.TryParse(c, out var id) ? id : (long?)null;
+        }
+
         public async Task<IActionResult> Index()
         {
             var g = EnsurePageAccess("Admin"); if (g != null) return g;
+
+            // "Login as" — admin hangi kişi olarak işlem yapıyor + geçiş için personel listesi
+            var allEmployees = (await _employeeAppService.GetAllListAsync()).Items;
+            ViewBag.ActAsEmployees = allEmployees;
+            var actId = CurrentEmployeeIdClaim();
+            ViewBag.ActingAsId = actId;
+            ViewBag.ActingAsName = actId.HasValue ? allEmployees.FirstOrDefault(e => e.Id == actId.Value)?.FullName : null;
+
             var emps = await _employeeAppService.GetAllAsync(new GetEmployeesInput { MaxResultCount = 1000 });
             var prjs = await _projectAppService.GetAllAsync(new GetProjectsInput { MaxResultCount = 1000 });
             var tasks = await _taskAppService.GetAllAsync(new GetTasksInput { MaxResultCount = 1000 });
@@ -212,6 +230,37 @@ namespace ActivityManagement.Web.Controllers
         }
 
         private bool IsAdmin() => User.IsInRole("Admin");
+
+        // "Login as" — admin, seçtiği personel olarak işlem yapmak üzere oturum cookie'sini yeniden imzalar
+        // (rol Admin kalır; EmployeeId claim'i seçilen kişiye ayarlanır). Kişisel akışlar (efor, günlük efor,
+        // görevlerim, kişi kartı) bu kişi üzerinden yürür.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ActAs(long employeeId)
+        {
+            if (!IsAdmin()) return AccessDeniedRedirect();
+            var emp = (await _employeeAppService.GetAllListAsync()).Items.FirstOrDefault(e => e.Id == employeeId);
+            if (emp == null)
+            {
+                TempData["Uyari"] = "Personel bulunamadı.";
+                return RedirectToAction("Index");
+            }
+            var adminEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name ?? "admin";
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, adminEmail),
+                new Claim(ClaimTypes.Email, adminEmail),
+                new Claim(ClaimTypes.Role, "Admin"),
+                new Claim("IsAdmin", "true"),
+                new Claim("EmployeeId", employeeId.ToString())
+            };
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(identity),
+                new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
+            TempData["Success"] = $"Artık '{emp.FullName}' olarak işlem yapıyorsunuz. (Görev/efor bu kişi adına kaydedilir.)";
+            return RedirectToAction("Index");
+        }
 
         // Rol yönetimi - sadece Admin
         public async Task<IActionResult> Roles()
