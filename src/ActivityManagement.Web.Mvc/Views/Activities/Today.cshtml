@@ -7,6 +7,8 @@
                 ?? new System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>();
     var projects = ViewBag.Projects as System.Collections.Generic.IList<ActivityManagement.Projects.Dto.ProjectDto>
                    ?? new System.Collections.Generic.List<ActivityManagement.Projects.Dto.ProjectDto>();
+    var myTasks = ViewBag.MyTasks as System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>
+                  ?? new System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>();
     var dayTasks = ViewBag.DayTasks as System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>
                    ?? new System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>();
     var dstr = day.ToString("yyyy-MM-dd");
@@ -144,6 +146,17 @@
                             }
                         </select>
                         <small class="text-muted">Seçilirse efor projeye sayılır.</small>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Görev <small class="text-muted">(opsiyonel)</small></label>
+                        <select name="taskItemId" id="ef_task" class="form-select form-select-sm">
+                            <option value="">— Görev yok —</option>
+                            @foreach (var t in myTasks)
+                            {
+                                <option value="@t.Id">@t.Title</option>
+                            }
+                        </select>
+                        <small class="text-muted">Seçilirse efor bu göreve bağlanır.</small>
                     </div>
                     <div class="mb-2">
                         <label class="form-label small">Faaliyet Tipi</label>

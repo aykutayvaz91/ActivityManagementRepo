@@ -168,11 +168,46 @@ namespace ActivityManagement.Employees
         public async Task<EmployeeDto> CreateAsync(CreateUpdateEmployeeDto input)
         {
             EnsureManager();
+            // E-posta girilmemişse isim.soyisim@cmit.com.tr olarak otomatik üret (Türkçe karakter → ASCII, benzersiz)
+            if (string.IsNullOrWhiteSpace(input.Email))
+                input.Email = await GenerateUniqueEmailAsync(input.FirstName, input.LastName);
             var employee = ObjectMapper.Map<Employee>(input);
             employee.TenantId = AbpSession.TenantId ?? 1;
             await _employeeRepository.InsertAsync(employee);
             await CurrentUnitOfWork.SaveChangesAsync();
             return ObjectMapper.Map<EmployeeDto>(employee);
+        }
+
+        private const string DefaultEmailDomain = "cmit.com.tr";
+
+        // Türkçe karakterleri ASCII'ye çevirip küçük harfe indirger, harf/rakam dışını atar.
+        private static string EmailSlug(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return "";
+            const string tr = "çÇğĞıİöÖşŞüÜâÂîÎûÛ";
+            const string en = "ccggiioossuuaaiiuu";
+            var sb = new System.Text.StringBuilder();
+            foreach (var ch in s.Trim())
+            {
+                var idx = tr.IndexOf(ch);
+                var c = idx >= 0 ? en[idx] : ch;
+                if (c < 128 && char.IsLetterOrDigit(c)) sb.Append(char.ToLowerInvariant(c));
+            }
+            return sb.ToString();
+        }
+
+        private async Task<string> GenerateUniqueEmailAsync(string firstName, string lastName)
+        {
+            var local = $"{EmailSlug(firstName)}.{EmailSlug(lastName)}".Trim('.');
+            if (string.IsNullOrEmpty(local)) local = "personel";
+            var email = $"{local}@{DefaultEmailDomain}";
+            int n = 1;
+            while (await _employeeRepository.GetAll().IgnoreQueryFilters().AnyAsync(e => e.Email == email))
+            {
+                n++;
+                email = $"{local}{n}@{DefaultEmailDomain}";
+            }
+            return email;
         }
 
         // Admin/Takım Lideri herkesi düzenleyebilir; diğerleri sadece kendi kaydını,

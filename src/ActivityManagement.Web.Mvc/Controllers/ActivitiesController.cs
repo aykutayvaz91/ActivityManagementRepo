@@ -55,17 +55,21 @@ namespace ActivityManagement.Web.Controllers
             ViewBag.ActivityTypes = await _activityTypeAppService.GetAllAsync(onlyActive: true);
             ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
 
-            // O güne ait görevler (başlangıç veya son tarih o gün) — bilgi amaçlı
+            // O güne ait görevler (bilgi) + efor girişinde seçilebilecek aktif görevlerim (görev'e efor)
             var myId = CurrentEmployeeId();
             var dayTasks = new System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>();
+            var myActiveTasks = new System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>();
             if (myId.HasValue)
             {
                 var mine = (await _taskAppService.GetEmployeeTasksAsync(myId.Value)).Items;
                 dayTasks = mine.Where(t =>
                     (t.StartDate.HasValue && t.StartDate.Value.Date == day) ||
                     (t.DueDate.HasValue && t.DueDate.Value.Date == day)).ToList();
+                myActiveTasks = mine.Where(t => t.Status != ActivityManagement.Entities.TaskStatus.Tamamlandi
+                                             && t.Status != ActivityManagement.Entities.TaskStatus.Iptal).ToList();
             }
             ViewBag.DayTasks = dayTasks;
+            ViewBag.MyTasks = myActiveTasks;
             return View();
         }
 

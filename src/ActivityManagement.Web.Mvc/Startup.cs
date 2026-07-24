@@ -62,6 +62,9 @@ namespace ActivityManagement.Web
             services.AddSession();
             services.AddHttpContextAccessor();
 
+            // Günlük SLA hatırlatma servisi (SMTP yapılandırılmamışsa no-op)
+            services.AddHostedService<ActivityManagement.Web.BackgroundJobs.SlaReminderHostedService>();
+
             var authBuilder = services.AddAuthentication(options =>
             {
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;

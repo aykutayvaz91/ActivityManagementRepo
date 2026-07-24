@@ -24,6 +24,8 @@ namespace ActivityManagement.Tasks
         private readonly IRepository<Employee, long> _employeeRepository;
         private readonly IRepository<SubCategory, long> _subCategoryRepository;
         private readonly IRepository<Project, long> _projectRepository;
+        private readonly IRepository<Team, long> _teamRepository;
+        private readonly ActivityManagement.Notifications.IAppEmailSender _emailSender;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public TaskItemAppService(
@@ -33,6 +35,8 @@ namespace ActivityManagement.Tasks
             IRepository<Employee, long> employeeRepository,
             IRepository<SubCategory, long> subCategoryRepository,
             IRepository<Project, long> projectRepository,
+            IRepository<Team, long> teamRepository,
+            ActivityManagement.Notifications.IAppEmailSender emailSender,
             IHttpContextAccessor httpContextAccessor)
         {
             _taskRepository = taskRepository;
@@ -41,8 +45,14 @@ namespace ActivityManagement.Tasks
             _employeeRepository = employeeRepository;
             _subCategoryRepository = subCategoryRepository;
             _projectRepository = projectRepository;
+            _teamRepository = teamRepository;
+            _emailSender = emailSender;
             _httpContextAccessor = httpContextAccessor;
         }
+
+        // İzin durumu (tarih-duyarlı): IsOnLeave işaretli VE (bitiş yok veya bugüne/ileriye) ise izinli sayılır.
+        private static bool IsOnLeaveNow(Employee e) =>
+            e != null && e.IsOnLeave && (!e.LeaveEndDate.HasValue || e.LeaveEndDate.Value.Date >= DateTime.Today);
 
         // Mevcut kullanıcının rolü ve çalışan kimliği (cookie claim'lerinden - DB sorgusu yok)
         private (string Role, string Email, long? EmployeeId) CurrentContext()
@@ -237,7 +247,7 @@ namespace ActivityManagement.Tasks
             {
                 var primaryEmp = await _employeeRepository.GetAll().AsNoTracking()
                     .FirstOrDefaultAsync(e => e.Id == input.AssignedEmployeeId.Value);
-                if (primaryEmp != null && primaryEmp.IsOnLeave)
+                if (IsOnLeaveNow(primaryEmp))
                 {
                     if (input.SecondaryEmployeeId.HasValue && input.SecondaryEmployeeId.Value != input.AssignedEmployeeId.Value)
                     {
@@ -264,9 +274,45 @@ namespace ActivityManagement.Tasks
                 : Entities.TaskApprovalStatus.Beklemede;
             await _taskRepository.InsertAsync(task);
             await CurrentUnitOfWork.SaveChangesAsync();
+            await NotifyTaskCreatedAsync(task);   // e-posta bildirimi (SMTP yoksa no-op)
             var createdDto = MapToDto(task);
             createdDto.AssignmentNote = assignmentNote; // izin nedeniyle yeniden atama bilgisi (varsa)
             return createdDto;
+        }
+
+        // Görev oluşunca: atanan kişiye "görev atandı"; onay bekliyorsa takım liderine "onay bekliyor".
+        private async Task NotifyTaskCreatedAsync(TaskItem task)
+        {
+            try
+            {
+                if (task.AssignedEmployeeId.HasValue)
+                {
+                    var emp = await _employeeRepository.GetAll().AsNoTracking()
+                        .FirstOrDefaultAsync(e => e.Id == task.AssignedEmployeeId.Value);
+                    if (emp != null && !string.IsNullOrWhiteSpace(emp.Email))
+                    {
+                        var due = task.DueDate?.ToString("dd.MM.yyyy") ?? "-";
+                        await _emailSender.SendAsync(emp.Email,
+                            $"Yeni görev atandı: {task.Title}",
+                            $"<p>Merhaba {emp.FullName},</p><p><b>{System.Net.WebUtility.HtmlEncode(task.Title)}</b> görevi size atandı.</p><p>Son tarih: <b>{due}</b> · Önem: <b>{task.PriorityScore}/10</b></p>");
+                    }
+                }
+                if (task.ApprovalStatus == Entities.TaskApprovalStatus.Beklemede && task.TeamId.HasValue)
+                {
+                    var leaderId = await _teamRepository.GetAll().AsNoTracking()
+                        .Where(t => t.Id == task.TeamId.Value).Select(t => t.LeaderId).FirstOrDefaultAsync();
+                    if (leaderId.HasValue)
+                    {
+                        var leader = await _employeeRepository.GetAll().AsNoTracking()
+                            .FirstOrDefaultAsync(e => e.Id == leaderId.Value);
+                        if (leader != null && !string.IsNullOrWhiteSpace(leader.Email))
+                            await _emailSender.SendAsync(leader.Email,
+                                $"Onay bekleyen görev: {task.Title}",
+                                $"<p>Merhaba {leader.FullName},</p><p><b>{System.Net.WebUtility.HtmlEncode(task.Title)}</b> görevi onayınızı bekliyor.</p>");
+                    }
+                }
+            }
+            catch { /* bildirim ana akışı bozmaz */ }
         }
 
         // Yeni görevin takımı: projeden, o da yoksa oluşturan kişinin takımından miras alınır.
