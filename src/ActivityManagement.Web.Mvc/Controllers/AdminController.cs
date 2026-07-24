@@ -252,7 +252,8 @@ namespace ActivityManagement.Web.Controllers
                 new Claim(ClaimTypes.Email, adminEmail),
                 new Claim(ClaimTypes.Role, "Admin"),
                 new Claim("IsAdmin", "true"),
-                new Claim("EmployeeId", employeeId.ToString())
+                new Claim("EmployeeId", employeeId.ToString()),
+                new Claim("ActingAsName", emp.FullName ?? "")
             };
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,

@@ -31,7 +31,7 @@ namespace ActivityManagement.Web.Controllers
         // Config-admin'i bir Employee kaydına bağlar (yoksa "Sistem Yöneticisi" oluşturur).
         // Böylece admin de EmployeeId sahibi olur; efor/görev/kişi kartı gibi kişi-kimliği gerektiren
         // akışlar admin için de çalışır ve admin-oluşturan kayıtlarda Atayan/Oluşturan alanı dolar.
-        private async Task<long?> EnsureAdminEmployeeIdAsync(string adminEmail)
+        private async Task<(long? Id, string Name)> EnsureAdminEmployeeIdAsync(string adminEmail)
         {
             try
             {
@@ -41,7 +41,7 @@ namespace ActivityManagement.Web.Controllers
                         .FirstOrDefaultAsync(e => e.Email == adminEmail);
                     if (emp == null)
                     {
-                        var id = await _employeeRepository.InsertAndGetIdAsync(new Employee
+                        var newEmp = new Employee
                         {
                             TenantId = 1,
                             FirstName = "Sistem",
@@ -52,15 +52,16 @@ namespace ActivityManagement.Web.Controllers
                             AppRole = "Admin",
                             IsActive = true,
                             HireDate = DateTime.Today
-                        });
+                        };
+                        var id = await _employeeRepository.InsertAndGetIdAsync(newEmp);
                         await uow.CompleteAsync();
-                        return id;
+                        return (id, newEmp.FullName);
                     }
                     await uow.CompleteAsync();
-                    return emp.Id;
+                    return (emp.Id, emp.FullName);
                 }
             }
-            catch { return null; } // employee bağlanamazsa admin yine de giriş yapar (null-safe akışlar devrede)
+            catch { return (null, null); } // employee bağlanamazsa admin yine de giriş yapar (null-safe akışlar devrede)
         }
 
         // Giriş ekranı (Google + Admin)
@@ -97,9 +98,13 @@ namespace ActivityManagement.Web.Controllers
                     new Claim("IsAdmin", "true")
                 };
                 // Admin'i bir Employee kaydına bağla → EmployeeId claim'i (kişi-kimliği gerektiren akışlar çalışsın)
-                var adminEmpId = await EnsureAdminEmployeeIdAsync(adminEmail);
-                if (adminEmpId.HasValue)
-                    claims.Add(new Claim("EmployeeId", adminEmpId.Value.ToString()));
+                var adminEmp = await EnsureAdminEmployeeIdAsync(adminEmail);
+                if (adminEmp.Id.HasValue)
+                {
+                    claims.Add(new Claim("EmployeeId", adminEmp.Id.Value.ToString()));
+                    if (!string.IsNullOrEmpty(adminEmp.Name))
+                        claims.Add(new Claim("ActingAsName", adminEmp.Name));
+                }
 
                 var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                 await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,

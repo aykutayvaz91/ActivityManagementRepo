@@ -105,6 +105,15 @@
                     }
                 </ul>
                 <ul class="navbar-nav">
+                    @if (__isAdmin)
+                    {
+                        var actingName = User.FindFirst("ActingAsName")?.Value;
+                        <li class="nav-item">
+                            <a class="nav-link" href="/Admin" title="Kişi olarak işlem yap (değiştir)">
+                                <span class="badge bg-warning text-dark"><i class="fas fa-user-secret me-1"></i>@(string.IsNullOrEmpty(actingName) ? "kişi seç" : actingName) olarak</span>
+                            </a>
+                        </li>
+                    }
                     @if (User?.Identity?.IsAuthenticated == true)
                     {
                         <li class="nav-item dropdown">
