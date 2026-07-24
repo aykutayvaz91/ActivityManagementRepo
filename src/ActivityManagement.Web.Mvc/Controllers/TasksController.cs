@@ -263,6 +263,9 @@ namespace ActivityManagement.Web.Controllers
                     TempData["Success"] = "Görev oluşturuldu ve onaya gönderildi. Takım lideriniz onayladığında aktifleşecek.";
                 else
                     TempData["Success"] = "Görev oluşturuldu.";
+                // İzin nedeniyle yeniden atama olduysa kullanıcıyı bilgilendir
+                if (created != null && !string.IsNullOrEmpty(created.AssignmentNote))
+                    TempData["Uyari"] = created.AssignmentNote;
                 // Admin admin listesine, diğerleri kendi görevlerine döner (erişebildikleri sayfa)
                 return User.IsInRole("Admin") ? RedirectToAction("Index") : RedirectToAction("MyTasks");
             }

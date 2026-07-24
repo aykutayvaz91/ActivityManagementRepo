@@ -231,6 +231,30 @@ namespace ActivityManagement.Tasks
             if (!input.DueDate.HasValue)
                 throw new UserFriendlyException("Görev bitiş (son teslim) tarihi zorunludur. Proje görevlerinde proje SLA tarihi girilmelidir.");
 
+            // İZİN kontrolü: atanacak 1. sorumlu izinliyse görev 2. sorumluya (yedek) atanır, izinli kişi yedeğe geçer.
+            string assignmentNote = null;
+            if (input.AssignedEmployeeId.HasValue)
+            {
+                var primaryEmp = await _employeeRepository.GetAll().AsNoTracking()
+                    .FirstOrDefaultAsync(e => e.Id == input.AssignedEmployeeId.Value);
+                if (primaryEmp != null && primaryEmp.IsOnLeave)
+                {
+                    if (input.SecondaryEmployeeId.HasValue && input.SecondaryEmployeeId.Value != input.AssignedEmployeeId.Value)
+                    {
+                        var secEmp = await _employeeRepository.GetAll().AsNoTracking()
+                            .FirstOrDefaultAsync(e => e.Id == input.SecondaryEmployeeId.Value);
+                        var onLeaveId = input.AssignedEmployeeId.Value;
+                        input.AssignedEmployeeId = input.SecondaryEmployeeId;   // 2. sorumluya ata
+                        input.SecondaryEmployeeId = onLeaveId;                  // izinli kişi yedeğe geçer
+                        assignmentNote = $"1. sorumlu {primaryEmp.FullName} izinli olduğu için görev 2. sorumlu {secEmp?.FullName} kişisine atandı.";
+                    }
+                    else
+                    {
+                        assignmentNote = $"Uyarı: 1. sorumlu {primaryEmp.FullName} izinli ancak tanımlı bir 2. sorumlu (yedek) yok; görev yine de bu kişiye atandı.";
+                    }
+                }
+            }
+
             var task = ObjectMapper.Map<TaskItem>(input);
             task.TenantId = AbpSession.TenantId ?? 1;
             task.TeamId = await ResolveTeamIdForNewTaskAsync(input, ctx);
@@ -240,7 +264,9 @@ namespace ActivityManagement.Tasks
                 : Entities.TaskApprovalStatus.Beklemede;
             await _taskRepository.InsertAsync(task);
             await CurrentUnitOfWork.SaveChangesAsync();
-            return MapToDto(task);
+            var createdDto = MapToDto(task);
+            createdDto.AssignmentNote = assignmentNote; // izin nedeniyle yeniden atama bilgisi (varsa)
+            return createdDto;
         }
 
         // Yeni görevin takımı: projeden, o da yoksa oluşturan kişinin takımından miras alınır.

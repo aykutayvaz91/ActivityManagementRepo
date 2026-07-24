@@ -106,12 +106,21 @@
                                     <input asp-for="IsActive" class="form-check-input" type="checkbox" />
                                     <label asp-for="IsActive" class="form-check-label">Aktif</label>
                                 </div>
+                                <div class="form-check form-switch mt-2">
+                                    <input asp-for="IsOnLeave" class="form-check-input" type="checkbox" />
+                                    <label asp-for="IsOnLeave" class="form-check-label">İzinli <small class="text-muted">(görevler 2. sorumluya atanır)</small></label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="LeaveEndDate" class="form-label">İzin Bitiş <small class="text-muted">(opsiyonel)</small></label>
+                                <input asp-for="LeaveEndDate" class="form-control" type="date" />
                             </div>
                         }
                         else
                         {
                             <input asp-for="AppRole" type="hidden" />
                             <input asp-for="IsActive" type="hidden" />
+                            <input asp-for="IsOnLeave" type="hidden" />
                             <input asp-for="TeamId" type="hidden" />
                         }
                     </div>

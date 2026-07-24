@@ -48,6 +48,10 @@ namespace ActivityManagement.Employees.Dto
 
         public bool IsActive { get; set; } = true;
 
+        // İzin durumu (görev atamasında 1. sorumlu izinliyse 2. sorumluya atanır)
+        public bool IsOnLeave { get; set; }
+        public DateTime? LeaveEndDate { get; set; }
+
         public long? UserId { get; set; }
 
         public long? TeamId { get; set; }

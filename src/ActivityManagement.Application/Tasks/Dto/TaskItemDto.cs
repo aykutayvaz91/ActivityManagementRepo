@@ -54,6 +54,9 @@ namespace ActivityManagement.Tasks.Dto
         public bool CanEdit { get; set; }
         public bool CanDelete { get; set; }
 
+        // Atama sırasında oluşan bilgilendirme (ör. 1. sorumlu izinli → 2. sorumluya atandı). Kalıcı değil.
+        public string AssignmentNote { get; set; }
+
         // Tamamlanma SLA durumu: null = henüz tamamlanmamış/son tarih yok
         public bool? CompletedOnTime { get; set; }
 

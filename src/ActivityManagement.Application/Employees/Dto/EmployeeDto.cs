@@ -28,6 +28,8 @@ namespace ActivityManagement.Employees.Dto
         public DateTime? BirthDate { get; set; }
         public DateTime HireDate { get; set; }
         public bool IsActive { get; set; }
+        public bool IsOnLeave { get; set; }
+        public DateTime? LeaveEndDate { get; set; }
 
         public List<ResponsibilityDto> Responsibilities { get; set; } = new List<ResponsibilityDto>();
         public List<AssignedProjectDto> AssignedProjects { get; set; } = new List<AssignedProjectDto>();

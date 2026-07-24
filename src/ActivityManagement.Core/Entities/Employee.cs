@@ -34,6 +34,10 @@ namespace ActivityManagement.Entities
 
         public bool IsActive { get; set; } = true;
 
+        // İzin durumu: izinliyse görev atamalarında 1. sorumlu atlanır, 2. sorumluya atanır.
+        public bool IsOnLeave { get; set; }
+        public DateTime? LeaveEndDate { get; set; } // opsiyonel bilgi: "... tarihine kadar izinli"
+
         public virtual ICollection<ProjectEmployee> ProjectEmployees { get; set; } = new List<ProjectEmployee>();
         public virtual ICollection<TaskItem> AssignedTasks { get; set; } = new List<TaskItem>();
         public virtual ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
