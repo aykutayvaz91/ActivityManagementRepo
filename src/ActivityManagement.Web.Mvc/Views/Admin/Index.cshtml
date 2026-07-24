@@ -8,6 +8,26 @@
     <span class="badge bg-danger">Yönetici</span>
 </div>
 
+@{
+    var __adminEmpId = User.FindFirst("EmployeeId")?.Value;
+}
+@if (!string.IsNullOrEmpty(__adminEmpId))
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-id-badge me-2"></i>Bu admin hesabı bir <strong>personel kaydına bağlı</strong> — efor, günlük efor ve kişisel işlemler bu personel üzerinden yürür.</span>
+        <span class="d-flex gap-2">
+            <a href="/Employees/Card/@__adminEmpId" class="btn btn-sm btn-outline-primary">Personel Kartım</a>
+            <a href="/Employees/Edit/@__adminEmpId" class="btn btn-sm btn-outline-secondary">Düzenle (takım/foto)</a>
+        </span>
+    </div>
+}
+else
+{
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle me-2"></i>Bu admin hesabına bağlı personel kaydı yok; kişisel işlemler (efor/günlük efor) kullanılamaz. Bir sonraki girişte otomatik oluşturulur.
+    </div>
+}
+
 <div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card bg-primary text-white shadow-sm"><div class="card-body text-center">

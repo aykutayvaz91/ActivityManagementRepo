@@ -102,6 +102,12 @@ namespace ActivityManagement.Web.Controllers
         public async Task<IActionResult> ExportPersonalExcel(long employeeId, DateTime? startDate, DateTime? endDate)
         {
             if (!IsManager()) employeeId = CurrentEmployeeId() ?? employeeId;
+            // Personel seçilmeden export → 500 yerine formu geri göster (admin employeeId=0 edge'i)
+            if (employeeId <= 0)
+            {
+                TempData["Uyari"] = "Lütfen önce bir personel seçin.";
+                return RedirectToAction("Personal");
+            }
             if (!IsAdmin())
             {
                 var scoped = await ScopedEmployeesAsync();

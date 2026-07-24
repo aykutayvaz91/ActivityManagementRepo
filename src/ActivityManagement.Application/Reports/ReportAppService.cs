@@ -35,7 +35,11 @@ namespace ActivityManagement.Reports
 
         public async Task<PersonalReportDto> GetPersonalReportAsync(GetReportInput input)
         {
-            var employee = await _employeeRepository.GetAsync(input.EmployeeId.Value);
+            if (!input.EmployeeId.HasValue || input.EmployeeId.Value <= 0)
+                throw new Abp.UI.UserFriendlyException("Rapor için personel seçilmedi.");
+            var employee = await _employeeRepository.GetAll().FirstOrDefaultAsync(e => e.Id == input.EmployeeId.Value);
+            if (employee == null)
+                throw new Abp.UI.UserFriendlyException("Seçilen personel bulunamadı.");
 
             var activities = await _activityRepository.GetAll()
                 .Include(a => a.Project)

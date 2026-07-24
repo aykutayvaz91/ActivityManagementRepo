@@ -74,7 +74,12 @@ namespace ActivityManagement.Web.Controllers
         {
             var g = EnsurePageAccess("MyTasks"); if (g != null) return g;
             var myEmpId = CurrentEmployeeId();
-            if (!myEmpId.HasValue) return AccessDeniedRedirect();
+            if (!myEmpId.HasValue)
+            {
+                // Personel kaydı olmayan hesap (ör. bağlanmamış admin) → dostça yönlendirme (patlamaz)
+                TempData["Uyari"] = "Bu hesabın personel kaydı yok; kişisel görev listesi görüntülenemiyor.";
+                return Redirect(User.IsInRole("Admin") ? "/Tasks" : "/");
+            }
             ViewBag.CurrentEmployeeId = myEmpId.Value;
             ViewBag.Categories = await _categoryAppService.GetAllAsync(onlyActive: true);
             var tasks = await _taskAppService.GetEmployeeTasksAsync(myEmpId.Value);

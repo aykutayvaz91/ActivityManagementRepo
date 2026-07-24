@@ -1,13 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Abp.Domain.Repositories;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using ActivityManagement.Entities;
 using ActivityManagement.Security;
 
 namespace ActivityManagement.Web.Controllers
@@ -16,10 +20,47 @@ namespace ActivityManagement.Web.Controllers
     public class AccountController : ActivityManagementControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly IRepository<Employee, long> _employeeRepository;
 
-        public AccountController(IConfiguration configuration)
+        public AccountController(IConfiguration configuration, IRepository<Employee, long> employeeRepository)
         {
             _configuration = configuration;
+            _employeeRepository = employeeRepository;
+        }
+
+        // Config-admin'i bir Employee kaydına bağlar (yoksa "Sistem Yöneticisi" oluşturur).
+        // Böylece admin de EmployeeId sahibi olur; efor/görev/kişi kartı gibi kişi-kimliği gerektiren
+        // akışlar admin için de çalışır ve admin-oluşturan kayıtlarda Atayan/Oluşturan alanı dolar.
+        private async Task<long?> EnsureAdminEmployeeIdAsync(string adminEmail)
+        {
+            try
+            {
+                using (var uow = UnitOfWorkManager.Begin())
+                {
+                    var emp = await _employeeRepository.GetAll().IgnoreQueryFilters()
+                        .FirstOrDefaultAsync(e => e.Email == adminEmail);
+                    if (emp == null)
+                    {
+                        var id = await _employeeRepository.InsertAndGetIdAsync(new Employee
+                        {
+                            TenantId = 1,
+                            FirstName = "Sistem",
+                            LastName = "Yöneticisi",
+                            Title = "Sistem Yöneticisi",
+                            Department = "Yönetim",
+                            Email = adminEmail,
+                            AppRole = "Admin",
+                            IsActive = true,
+                            HireDate = DateTime.Today
+                        });
+                        await uow.CompleteAsync();
+                        return id;
+                    }
+                    await uow.CompleteAsync();
+                    return emp.Id;
+                }
+            }
+            catch { return null; } // employee bağlanamazsa admin yine de giriş yapar (null-safe akışlar devrede)
         }
 
         // Giriş ekranı (Google + Admin)
@@ -55,6 +96,11 @@ namespace ActivityManagement.Web.Controllers
                     new Claim(ClaimTypes.Role, "Admin"),
                     new Claim("IsAdmin", "true")
                 };
+                // Admin'i bir Employee kaydına bağla → EmployeeId claim'i (kişi-kimliği gerektiren akışlar çalışsın)
+                var adminEmpId = await EnsureAdminEmployeeIdAsync(adminEmail);
+                if (adminEmpId.HasValue)
+                    claims.Add(new Claim("EmployeeId", adminEmpId.Value.ToString()));
+
                 var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                 await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
                     new ClaimsPrincipal(identity),
