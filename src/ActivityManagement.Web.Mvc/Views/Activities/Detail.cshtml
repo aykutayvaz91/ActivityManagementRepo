@@ -68,19 +68,6 @@
                                 }
                             </select>
                         </div>
-                        @if (isManager)
-                        {
-                            <div class="mb-2">
-                                <label class="form-label small">Personel <small class="text-muted">(boş = atanan uzman)</small></label>
-                                <select name="EmployeeId" class="form-select form-select-sm">
-                                    <option value="">Atanan uzman</option>
-                                    @foreach (var e in employees)
-                                    {
-                                        <option value="@e.Id">@e.FullName</option>
-                                    }
-                                </select>
-                            </div>
-                        }
                         <div class="mb-2">
                             <label class="form-label small">Açıklama</label>
                             <textarea name="Description" class="form-control form-control-sm" rows="3" placeholder="Yapılan işin açıklaması..."></textarea>

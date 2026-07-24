@@ -230,19 +230,14 @@ namespace ActivityManagement.Activities
                 .FirstOrDefaultAsync(s => s.Id == input.ActivitySubjectId.Value);
             if (subject == null) throw new UserFriendlyException("Faaliyet konusu bulunamadı.");
 
-            bool canLog = IsManagerForSubject(subject, ctx) ||
-                (subject.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue && subject.AssignedEmployeeId == ctx.EmployeeId);
-            if (!canLog)
-                throw new UserFriendlyException("Bu faaliyet konusuna efor girme yetkiniz yok.");
+            // Efor yalnızca faaliyet konusunun ATANAN kişisi tarafından, kendi adına girilir.
+            // (Yönetici/admin efor girmez; konuyu yalnızca düzenler.)
+            if (!(subject.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue && subject.AssignedEmployeeId == ctx.EmployeeId))
+                throw new UserFriendlyException("Efor yalnızca faaliyet konusunun atanan kişisi tarafından girilebilir.");
 
-            // Uzman yalnızca kendi adına efor girer; yönetici belirtmezse atanan uzman adına girer
-            long employeeId;
-            if (IsManager(ctx.Role))
-                employeeId = input.EmployeeId > 0 ? input.EmployeeId : (subject.AssignedEmployeeId ?? ctx.EmployeeId ?? 0);
-            else
-                employeeId = ctx.EmployeeId ?? 0;
-            if (employeeId == 0)
-                throw new UserFriendlyException("Efor girecek personel belirlenemedi.");
+            long employeeId = ctx.EmployeeId.Value; // kendi adına
+            if (input.HoursSpent <= 0)
+                throw new UserFriendlyException("Harcanan süre 0'dan büyük olmalıdır.");
 
             if (input.HoursSpent <= 0)
                 throw new UserFriendlyException("Harcanan süre 0'dan büyük olmalıdır.");
@@ -490,8 +485,8 @@ namespace ActivityManagement.Activities
             dto.TotalHours = s.Logs?.Sum(l => l.HoursSpent) ?? 0m;
             dto.CanManage = IsManagerForSubject(s, ctx) ||
                 (s.CreatedByLeaderId.HasValue && ctx.EmployeeId.HasValue && s.CreatedByLeaderId == ctx.EmployeeId);
-            dto.CanLogEffort = IsManagerForSubject(s, ctx) ||
-                (s.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue && s.AssignedEmployeeId == ctx.EmployeeId);
+            // Efor yalnızca atanan kişi tarafından girilir (yönetici/admin efor girmez, sadece yönetir)
+            dto.CanLogEffort = s.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue && s.AssignedEmployeeId == ctx.EmployeeId;
             return dto;
         }
 
