@@ -58,9 +58,18 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
             team.IsActive = true;
             if (leader != null) team.LeaderId = leader.Id;
 
-            // Takımı olmayan tüm çalışanları bu takıma bağla
+            // Takımı olmayan tüm çalışanları bu takıma bağla.
+            // İSTİSNA: config-admin yardımcı kaydı ("Sistem Yöneticisi") hiçbir takıma bağlanmaz —
+            // aksi halde takım-izolasyonlu personel listelerinde görünür. Yanlışlıkla bağlanmışsa onarılır.
             foreach (var e in _context.Employees.ToList())
             {
+                bool isSystemAdmin = e.Title == "Sistem Yöneticisi"
+                    && e.FirstName == "Sistem" && e.LastName == "Yöneticisi";
+                if (isSystemAdmin)
+                {
+                    if (e.TeamId.HasValue) e.TeamId = null; // onar
+                    continue;
+                }
                 if (!e.TeamId.HasValue) e.TeamId = team.Id;
             }
             _context.SaveChanges();

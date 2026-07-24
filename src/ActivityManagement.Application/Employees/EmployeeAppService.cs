@@ -64,6 +64,23 @@ namespace ActivityManagement.Employees
             return long.TryParse(c, out var id) ? id : (long?)null;
         }
 
+        // Takım izolasyonu: Admin-self (Sistem Yöneticisi) TÜMÜNÜ görür; non-admin VEYA login-as ile
+        // başka kişi olarak işlem yapan admin → o kişinin TAKIMINA kısıtlanır (başka takım/kişi görünmez).
+        private async Task<(bool scope, long? teamId)> TeamScopeAsync()
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
+            long? ownId = long.TryParse(user?.FindFirst("AdminOwnEmployeeId")?.Value, out var o) ? o : (long?)null;
+            bool isAdmin = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+            // Admin-self: config-admin kendi kimliğinde VEYA AdminOwnEmployeeId claim'i olmayan (Google) admin → tümünü görür.
+            bool adminSelf = isAdmin && (!empId.HasValue || !ownId.HasValue || empId == ownId);
+            if (adminSelf || !empId.HasValue) return (false, null);
+            var teamId = await _employeeRepository.GetAll()
+                .Where(x => x.Id == empId.Value).Select(x => x.TeamId).FirstOrDefaultAsync();
+            return (true, teamId);
+        }
+
         public async Task<PagedResultDto<EmployeeDto>> GetAllAsync(GetEmployeesInput input)
         {
             var query = _employeeRepository.GetAll()
@@ -74,6 +91,9 @@ namespace ActivityManagement.Employees
                 .WhereIf(!string.IsNullOrWhiteSpace(input.Department),
                     e => e.Department == input.Department)
                 .WhereIf(input.IsActive.HasValue, e => e.IsActive == input.IsActive.Value);
+
+            var (scope, teamId) = await TeamScopeAsync();
+            if (scope) query = query.Where(e => e.TeamId == teamId); // yalnız kendi takımının personeli
 
             var count = await query.CountAsync();
             var items = await query

@@ -72,6 +72,18 @@ namespace ActivityManagement.Tasks
 
         private bool IsAdmin(string role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
 
+        // Admin-self mi (Sistem Yöneticisi kendi kimliği)? Login-as ile başka kişiye geçmişse false → kapsam uygulanır.
+        private bool IsAdminSelfContext()
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            if (!string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)) return false;
+            long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
+            long? ownId = long.TryParse(user?.FindFirst("AdminOwnEmployeeId")?.Value, out var o) ? o : (long?)null;
+            // config-admin kendi kimliğinde VEYA AdminOwnEmployeeId olmayan (Google) admin → self (tümünü görür)
+            return !empId.HasValue || !ownId.HasValue || empId == ownId;
+        }
+
         // Mevcut kullanıcının takımı - istek başına bir kez sorgulanır (cache'lenir)
         private bool _teamIdLoaded;
         private long? _currentTeamId;
@@ -148,11 +160,10 @@ namespace ActivityManagement.Tasks
                 .WhereIf(input.ActivityType.HasValue, t => t.ActivityType == input.ActivityType.Value)
                 .WhereIf(!string.IsNullOrWhiteSpace(input.GroupName), t => t.GroupName == input.GroupName);
 
-            // GÖRÜNÜRLÜK (satır bazında): Admin tümünü görür; Admin olmayan yalnız kendi TAKIMININ
-            // (takımsız/kendine atanan dahil) görevlerini görür. Pano/liste dahil tüm çağrılar için
-            // sunucu tarafında zorlanır (controller filtresine güvenmez) — çok-takım sızmasını engeller.
+            // GÖRÜNÜRLÜK (satır bazında): Admin-self (Sistem Yöneticisi) tümünü görür; non-admin VEYA login-as ile
+            // başka kişi olarak işlem yapan admin → yalnız o kişinin TAKIMININ (takımsız/kendine atanan dahil) görevleri.
             var scopeCtx = CurrentContext();
-            if (!IsAdmin(scopeCtx.Role) && scopeCtx.EmployeeId.HasValue)
+            if (!IsAdminSelfContext() && scopeCtx.EmployeeId.HasValue)
             {
                 var myTeamId = CurrentEmployeeTeamId(scopeCtx.EmployeeId);
                 query = query.Where(t =>
@@ -272,6 +283,10 @@ namespace ActivityManagement.Tasks
             task.ApprovalStatus = IsManager(ctx.Role)
                 ? Entities.TaskApprovalStatus.Onaylandi
                 : Entities.TaskApprovalStatus.Beklemede;
+            // İlerleme yüzdesi duruma göre (Planlandı %0, Devam %25, Tamamlandı %100...)
+            task.CompletionPercentage = ProgressForStatus(task.Status, input.CompletionPercentage);
+            if (task.Status == Entities.TaskStatus.Tamamlandi && !task.CompletedDate.HasValue)
+                task.CompletedDate = DateTime.Now;
             await _taskRepository.InsertAsync(task);
             await CurrentUnitOfWork.SaveChangesAsync();
             await NotifyTaskCreatedAsync(task);   // e-posta bildirimi (SMTP yoksa no-op)
@@ -365,6 +380,11 @@ namespace ActivityManagement.Tasks
             }
 
             ObjectMapper.Map(input, task);
+            // İlerleme yüzdesi duruma göre kurgulanır (Tamamlandı %100, Planlandı %0, Devam taban %25 / elle değer korunur)
+            task.CompletionPercentage = ProgressForStatus(task.Status, input.CompletionPercentage);
+            task.CompletedDate = task.Status == Entities.TaskStatus.Tamamlandi
+                ? (task.CompletedDate ?? DateTime.Now)
+                : (DateTime?)null;
             await CurrentUnitOfWork.SaveChangesAsync();
             return MapToDto(task);
         }
@@ -375,14 +395,30 @@ namespace ActivityManagement.Tasks
             await _taskRepository.DeleteAsync(id);
         }
 
+        // Duruma göre ilerleme yüzdesi kurgusu:
+        //  Beklemede/Planlandı → %0, DevamEdiyor → taban %25 (kullanıcı 30/40.. yapabilir; girilmişse korunur),
+        //  Ertelendi → mevcut korunur, İptal → mevcut korunur, Tamamlandı → %100.
+        private static int ProgressForStatus(Entities.TaskStatus status, int currentPct)
+        {
+            switch (status)
+            {
+                case Entities.TaskStatus.Tamamlandi: return 100;
+                case Entities.TaskStatus.Beklemede: return 0;
+                case Entities.TaskStatus.DevamEdiyor:
+                    return (currentPct <= 0 || currentPct >= 100) ? 25 : currentPct; // taban 25, elle girilen ara değer korunur
+                default: // Ertelendi / İptal
+                    return currentPct < 0 ? 0 : (currentPct > 100 ? 100 : currentPct);
+            }
+        }
+
         public async Task UpdateStatusAsync(long id, Entities.TaskStatus status, int percentage)
         {
             var task = await _taskRepository.GetAsync(id);
             EnsureCanModify(task);
             task.Status = status;
-            task.CompletionPercentage = percentage;
-            if (status == Entities.TaskStatus.Tamamlandi)
-                task.CompletedDate = DateTime.Now;
+            // Panodan/istemciden gelen yüzde varsa onu baz al, yoksa mevcut; duruma göre kurgu uygula
+            task.CompletionPercentage = ProgressForStatus(status, percentage > 0 ? percentage : task.CompletionPercentage);
+            task.CompletedDate = status == Entities.TaskStatus.Tamamlandi ? DateTime.Now : (DateTime?)null;
         }
 
         public async Task<long> AddCommentAsync(long taskId, string comment, bool isInternal = false)

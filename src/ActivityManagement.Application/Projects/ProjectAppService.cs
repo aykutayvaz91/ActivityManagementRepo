@@ -65,6 +65,23 @@ namespace ActivityManagement.Projects
             return _employeeRepository.GetAll().Where(e => e.Id == empId.Value).Select(e => e.TeamId).FirstOrDefault();
         }
 
+        // Takım izolasyonu: Admin-self (Sistem Yöneticisi) TÜM projeleri görür; non-admin VEYA login-as başka kişi
+        // → yalnız o kişinin TAKIMININ projeleri (başka takım görünmez).
+        private async Task<(bool scope, long? teamId)> TeamScopeAsync()
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
+            long? ownId = long.TryParse(user?.FindFirst("AdminOwnEmployeeId")?.Value, out var o) ? o : (long?)null;
+            bool isAdmin = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+            // Admin-self: config-admin kendi kimliğinde VEYA AdminOwnEmployeeId claim'i olmayan (Google) admin → tümünü görür.
+            bool adminSelf = isAdmin && (!empId.HasValue || !ownId.HasValue || empId == ownId);
+            if (adminSelf || !empId.HasValue) return (false, null);
+            var teamId = await _employeeRepository.GetAll()
+                .Where(x => x.Id == empId.Value).Select(x => x.TeamId).FirstOrDefaultAsync();
+            return (true, teamId);
+        }
+
         // Admin her projeyi düzenleyebilir/silebilir; TakımLideri sadece kendi takımının projesini.
         private void EnsureManager(Project project = null)
         {
@@ -109,6 +126,9 @@ namespace ActivityManagement.Projects
                     p => p.Name.Contains(input.Filter) || p.Code.Contains(input.Filter))
                 .WhereIf(input.Status.HasValue, p => p.Status == input.Status.Value)
                 .WhereIf(input.ManagerId.HasValue, p => p.ManagerId == input.ManagerId.Value);
+
+            var (scope, teamId) = await TeamScopeAsync();
+            if (scope) query = query.Where(p => p.TeamId == teamId); // yalnız kendi takımının projeleri
 
             var count = await query.CountAsync();
             var items = await query.OrderByDescending(p => p.CreationTime).PageBy(input).ToListAsync();
@@ -292,11 +312,12 @@ namespace ActivityManagement.Projects
 
         public async Task<ListResultDto<ProjectDto>> GetAllListAsync()
         {
-            var projects = await _projectRepository.GetAll()
+            System.Linq.IQueryable<Project> q = _projectRepository.GetAll()
                 .Include(p => p.Manager)
-                .Include(p => p.Team)
-                .OrderBy(p => p.Name)
-                .ToListAsync();
+                .Include(p => p.Team);
+            var (scope, teamId) = await TeamScopeAsync();
+            if (scope) q = q.Where(p => p.TeamId == teamId); // dropdown'larda da yalnız kendi takımı
+            var projects = await q.OrderBy(p => p.Name).ToListAsync();
             return new ListResultDto<ProjectDto>(projects.Select(MapToProjectDto).ToList());
         }
 

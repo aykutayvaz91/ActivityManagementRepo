@@ -75,6 +75,18 @@ namespace ActivityManagement.Activities
         private static bool IsAdmin(string role) =>
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
 
+        // Admin-self mi (Sistem Yöneticisi)? Login-as ile başka kişiye geçmişse false → takım kapsamı uygulanır.
+        private bool IsAdminSelfContext()
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            if (!string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)) return false;
+            long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
+            long? ownId = long.TryParse(user?.FindFirst("AdminOwnEmployeeId")?.Value, out var o) ? o : (long?)null;
+            // config-admin kendi kimliğinde VEYA AdminOwnEmployeeId olmayan (Google) admin → self (tümünü görür)
+            return !empId.HasValue || !ownId.HasValue || empId == ownId;
+        }
+
         // Mevcut kullanıcının takımı — istek başına bir kez sorgulanır (cache'lenir)
         private bool _teamIdLoaded;
         private long? _currentTeamId;
@@ -120,7 +132,7 @@ namespace ActivityManagement.Activities
             // Görünürlük kuralı: Admin tüm konuları görür; TakımLideri ve Uzman kendi TAKIMININ
             // konularını görür (takımdaki kişilere atanan/oluşturulan faaliyetler dahil). İşlem yetkisi
             // (efor/düzenle/sil) ayrıca "kendine ait" kuralıyla sınırlıdır (CanManage/CanLogEffort).
-            if (!IsAdmin(ctx.Role) && ctx.EmployeeId.HasValue)
+            if (!IsAdminSelfContext() && ctx.EmployeeId.HasValue)
             {
                 var myTeamId = await _employeeRepository.GetAll().AsNoTracking()
                     .Where(e => e.Id == ctx.EmployeeId.Value).Select(e => e.TeamId).FirstOrDefaultAsync();
