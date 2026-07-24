@@ -102,6 +102,8 @@ namespace ActivityManagement.Web.Controllers
                 if (adminEmp.Id.HasValue)
                 {
                     claims.Add(new Claim("EmployeeId", adminEmp.Id.Value.ToString()));
+                    // Admin'in KENDİ (Sistem Yöneticisi) personel id'si — login-as'te "kendisi mi başkası mı" ayrımı için sabit tutulur
+                    claims.Add(new Claim("AdminOwnEmployeeId", adminEmp.Id.Value.ToString()));
                     if (!string.IsNullOrEmpty(adminEmp.Name))
                         claims.Add(new Claim("ActingAsName", adminEmp.Name));
                 }

@@ -45,11 +45,20 @@ namespace ActivityManagement.Web.Controllers
         }
 
         // Görevler: sadece Admin. Sol kategori/alt kategori ağacı, sağda seçilen (alt)kategorinin görevleri.
+        // Admin "kendi" (Sistem Yöneticisi) modunda mı? (login-as ile başkasına geçmemiş)
+        private bool IsAdminSelfMode()
+        {
+            if (!User.IsInRole("Admin")) return false;
+            var own = User.FindFirst("AdminOwnEmployeeId")?.Value;
+            var emp = User.FindFirst("EmployeeId")?.Value;
+            return string.IsNullOrEmpty(emp) || string.IsNullOrEmpty(own) || emp == own;
+        }
+
         public async Task<IActionResult> Index()
         {
-            // Kişi kimliği olan herkes (normal kullanıcı VEYA login-as ile bir kişi olarak işlem yapan admin)
-            // kendi "Görevlerim" ekranını görür. Yalnız kişi kaydı olmayan saf admin bu yönetim listesini görür.
-            if (CurrentEmployeeId().HasValue || !User.IsInRole("Admin"))
+            // Sistem Yöneticisi (admin kendi kimliği) → kategorilerdeki görevler listesi.
+            // Login-as ile başka kişiye geçilmişse veya normal kullanıcı → kendi "Görevlerim" ekranı.
+            if (!IsAdminSelfMode())
                 return RedirectToAction("MyTasks");
             var g = EnsurePageAccess("Tasks"); if (g != null) return g;
             ViewBag.Categories = await _categoryAppService.GetAllAsync(onlyActive: true);

@@ -239,13 +239,17 @@ namespace ActivityManagement.Web.Controllers
         public async Task<IActionResult> ActAs(long employeeId)
         {
             if (!IsAdmin()) return AccessDeniedRedirect();
-            var emp = (await _employeeAppService.GetAllListAsync()).Items.FirstOrDefault(e => e.Id == employeeId);
+            var allEmps = (await _employeeAppService.GetAllListAsync()).Items;
+            var emp = allEmps.FirstOrDefault(e => e.Id == employeeId);
             if (emp == null)
             {
                 TempData["Uyari"] = "Personel bulunamadı.";
                 return RedirectToAction("Index");
             }
             var adminEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name ?? "admin";
+            // Admin'in kendi (Sistem Yöneticisi) personel id'si — mevcut claim'den; yoksa admin e-postasından bul
+            var ownId = User.FindFirst("AdminOwnEmployeeId")?.Value
+                        ?? allEmps.FirstOrDefault(e => e.Email == adminEmail)?.Id.ToString();
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, adminEmail),
@@ -255,6 +259,8 @@ namespace ActivityManagement.Web.Controllers
                 new Claim("EmployeeId", employeeId.ToString()),
                 new Claim("ActingAsName", emp.FullName ?? "")
             };
+            if (!string.IsNullOrEmpty(ownId))
+                claims.Add(new Claim("AdminOwnEmployeeId", ownId));
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
                 new ClaimsPrincipal(identity),
