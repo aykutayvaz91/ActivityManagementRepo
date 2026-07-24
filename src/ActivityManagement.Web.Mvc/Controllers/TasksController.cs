@@ -47,8 +47,9 @@ namespace ActivityManagement.Web.Controllers
         // Görevler: sadece Admin. Sol kategori/alt kategori ağacı, sağda seçilen (alt)kategorinin görevleri.
         public async Task<IActionResult> Index()
         {
-            // Admin olmayan bu (admin) listeyi görmez → kendi görevlerine gider (erişim reddi değil).
-            if (!User.IsInRole("Admin"))
+            // Kişi kimliği olan herkes (normal kullanıcı VEYA login-as ile bir kişi olarak işlem yapan admin)
+            // kendi "Görevlerim" ekranını görür. Yalnız kişi kaydı olmayan saf admin bu yönetim listesini görür.
+            if (CurrentEmployeeId().HasValue || !User.IsInRole("Admin"))
                 return RedirectToAction("MyTasks");
             var g = EnsurePageAccess("Tasks"); if (g != null) return g;
             ViewBag.Categories = await _categoryAppService.GetAllAsync(onlyActive: true);

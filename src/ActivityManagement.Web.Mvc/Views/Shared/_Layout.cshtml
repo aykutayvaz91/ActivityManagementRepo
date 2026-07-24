@@ -9,6 +9,8 @@
     // Rol × Sayfa erişimi (base controller ViewData'ya koyar). Admin veya set yoksa: izinli (fail-open).
     var __allowed = ViewData["AllowedPages"] as System.Collections.Generic.HashSet<string>;
     bool __isAdmin = User?.IsInRole("Admin") == true;
+    // Kişiye bağlı mı (normal kullanıcı VEYA login-as ile bir kişi olarak işlem yapan admin)?
+    bool __hasEmp = User?.FindFirst("EmployeeId") != null;
     System.Func<string, bool> Can = key => __isAdmin || __allowed == null || __allowed.Contains(key);
 }
 <!DOCTYPE html>
@@ -61,7 +63,8 @@
                     {
                         <li class="nav-item"><a class="nav-link" href="/Projects"><i class="fas fa-project-diagram me-1"></i>Projeler</a></li>
                     }
-                    @if (__isAdmin && Can("Tasks"))
+                    @* Saf admin (kişiye bağlı değil) yönetim listesini görür; kişiye bağlı herkes (login-as admin dahil) "Görevlerim" görür *@
+                    @if (__isAdmin && !__hasEmp && Can("Tasks"))
                     {
                         <li class="nav-item"><a class="nav-link" href="/Tasks"><i class="fas fa-clipboard-list me-1"></i>Görevler</a></li>
                     }
@@ -69,7 +72,7 @@
                     {
                         <li class="nav-item"><a class="nav-link" href="/Tasks/Board"><i class="fas fa-columns me-1"></i>Pano</a></li>
                     }
-                    @if (!__isAdmin && Can("MyTasks"))
+                    @if (__hasEmp && Can("MyTasks"))
                     {
                         <li class="nav-item"><a class="nav-link" href="/Tasks/MyTasks"><i class="fas fa-user-check me-1"></i>Görevlerim</a></li>
                     }
