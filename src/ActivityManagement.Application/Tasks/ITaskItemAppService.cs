@@ -14,6 +14,8 @@ namespace ActivityManagement.Tasks
         Task DeleteAsync(long id);
         Task UpdateStatusAsync(long id, Entities.TaskStatus status, int percentage);
         Task<long> AddCommentAsync(long taskId, string comment, bool isInternal = false);
+        // Göreve efor (harcanan süre) girer — giriş yapan kişi adına; ActualHours senkronlanır.
+        Task<long> LogEffortAsync(ActivityManagement.Activities.Dto.CreateActivityLogDto input);
         Task SetApprovalAsync(long id, Entities.TaskApprovalStatus status);
         Task<long> AddAttachmentAsync(long taskId, long? taskCommentId, string fileName, string filePath, long fileSize, string contentType);
         Task<ListResultDto<TaskItemDto>> GetEmployeeTasksAsync(long employeeId);

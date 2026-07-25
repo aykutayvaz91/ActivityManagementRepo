@@ -289,25 +289,26 @@ function logActivity() {
     if (!desc) { alert('Açıklama giriniz.'); return; }
 
     $.ajax({
-        url: '/api/services/app/ActivityLog/Create',
+        url: '/api/services/app/TaskItem/LogEffort',
         type: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({
-            employeeId: 0,  // mevcut kullanıcı
             taskItemId: @Model.Id,
-            projectId: @(Model.ProjectId.HasValue ? Model.ProjectId.Value.ToString() : "null"),
             description: desc,
             activityDate: new Date().toISOString(),
             hoursSpent: hours,
             activityType: 'Görev'
         }),
         success: function() {
-            abp.notify.success('Faaliyet kaydedildi.');
+            abp.notify.success('Efor kaydedildi.');
             $('#actHours').val('');
             $('#actDesc').val('');
+            setTimeout(function(){ location.reload(); }, 700);
         },
-        error: function() {
-            abp.notify.error('Kayıt sırasında hata oluştu.');
+        error: function(xhr) {
+            var m = 'Kayıt sırasında hata oluştu.';
+            try { var j = xhr.responseJSON; if (j && j.error && j.error.message) m = j.error.message; } catch(e){}
+            abp.notify.error(m);
         }
     });
 }

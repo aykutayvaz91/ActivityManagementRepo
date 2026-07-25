@@ -436,6 +436,47 @@ namespace ActivityManagement.Tasks
             await _taskRepository.DeleteAsync(id);
         }
 
+        // Göreve efor girişi (Görev Detay ekranı). Giriş yapan kişi adına; ActualHours senkronlanır.
+        public async Task<long> LogEffortAsync(ActivityManagement.Activities.Dto.CreateActivityLogDto input)
+        {
+            var ctx = CurrentContext();
+            if (!ctx.EmployeeId.HasValue)
+                throw new UserFriendlyException("Efor girişi için personel kaydınız bulunmuyor.");
+            if (input == null || !input.TaskItemId.HasValue)
+                throw new UserFriendlyException("Efor girişi için görev gereklidir.");
+            if (input.HoursSpent <= 0)
+                throw new UserFriendlyException("Harcanan süre 0'dan büyük olmalıdır.");
+
+            var task = await _taskRepository.GetAll().AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == input.TaskItemId.Value);
+            if (task == null) throw new UserFriendlyException("Görev bulunamadı.");
+
+            // Efor yalnız görevin atananı / 2. sorumlusu VEYA görevi yönetebilen (Admin/Lider) tarafından girilir.
+            bool can = (task.AssignedEmployeeId.HasValue && task.AssignedEmployeeId == ctx.EmployeeId)
+                       || (task.SecondaryEmployeeId.HasValue && task.SecondaryEmployeeId == ctx.EmployeeId)
+                       || IsManagerForTask(task, ctx);
+            if (!can) throw new UserFriendlyException("Bu göreve efor girme yetkiniz yok.");
+
+            await _activityLogRepository.InsertAsync(new ActivityLog
+            {
+                TenantId = AbpSession.TenantId ?? 1,
+                EmployeeId = ctx.EmployeeId.Value,      // 0/istemci değeri yok sayılır; her zaman giriş yapan kişi
+                TaskItemId = task.Id,
+                ProjectId = task.ProjectId,             // görev projeye bağlıysa efor projeye de sayılır (raporlama)
+                Description = input.Description,
+                ActivityDate = input.ActivityDate == default ? DateTime.Today : input.ActivityDate,
+                HoursSpent = input.HoursSpent,
+                ActivityType = string.IsNullOrWhiteSpace(input.ActivityType) ? "Görev" : input.ActivityType
+            });
+            await CurrentUnitOfWork.SaveChangesAsync();
+
+            var sum = await _activityLogRepository.GetAll()
+                .Where(l => l.TaskItemId == task.Id).Select(l => (decimal?)l.HoursSpent).SumAsync() ?? 0m;
+            var trk = await _taskRepository.GetAsync(task.Id);
+            if (trk.ActualHours != sum) { trk.ActualHours = sum; await CurrentUnitOfWork.SaveChangesAsync(); }
+            return task.Id;
+        }
+
         // Duruma göre ilerleme yüzdesi kurgusu:
         //  Beklemede/Planlandı → %0, DevamEdiyor → taban %25 (kullanıcı 30/40.. yapabilir; girilmişse korunur),
         //  Ertelendi → mevcut korunur, İptal → mevcut korunur, Tamamlandı → %100.
