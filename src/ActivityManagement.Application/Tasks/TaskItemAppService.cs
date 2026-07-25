@@ -25,6 +25,7 @@ namespace ActivityManagement.Tasks
         private readonly IRepository<SubCategory, long> _subCategoryRepository;
         private readonly IRepository<Project, long> _projectRepository;
         private readonly IRepository<Team, long> _teamRepository;
+        private readonly IRepository<ActivityLog, long> _activityLogRepository;
         private readonly ActivityManagement.Notifications.IAppEmailSender _emailSender;
         private readonly ActivityManagement.Notifications.INotificationManager _notificationManager;
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -37,6 +38,7 @@ namespace ActivityManagement.Tasks
             IRepository<SubCategory, long> subCategoryRepository,
             IRepository<Project, long> projectRepository,
             IRepository<Team, long> teamRepository,
+            IRepository<ActivityLog, long> activityLogRepository,
             ActivityManagement.Notifications.IAppEmailSender emailSender,
             ActivityManagement.Notifications.INotificationManager notificationManager,
             IHttpContextAccessor httpContextAccessor)
@@ -48,9 +50,21 @@ namespace ActivityManagement.Tasks
             _subCategoryRepository = subCategoryRepository;
             _projectRepository = projectRepository;
             _teamRepository = teamRepository;
+            _activityLogRepository = activityLogRepository;
             _emailSender = emailSender;
             _notificationManager = notificationManager;
             _httpContextAccessor = httpContextAccessor;
+        }
+
+        // Görev "Tamamlandı" yapılmadan önce en az bir efor (harcanan süre) girilmiş olmalı.
+        // Boş görev tamamlanamaz — kullanıcıdan efor girmesi istenir.
+        private async Task EnsureHasEffortForCompletionAsync(long taskId)
+        {
+            var hours = await _activityLogRepository.GetAll()
+                .Where(l => l.TaskItemId == taskId)
+                .Select(l => (decimal?)l.HoursSpent).SumAsync() ?? 0m;
+            if (hours <= 0m)
+                throw new UserFriendlyException("Görevi 'Tamamlandı' yapmadan önce efor (harcanan süre) girmelisiniz. Lütfen görev üzerinden efor ekleyin.");
         }
 
         // İzin durumu (tarih-duyarlı): IsOnLeave işaretli VE (bitiş yok veya bugüne/ileriye) ise izinli sayılır.
@@ -387,6 +401,10 @@ namespace ActivityManagement.Tasks
                 input.ProjectId = task.ProjectId;
             }
 
+            // Boş görev "Tamamlandı" yapılamaz — Tamamlandı'ya GEÇERKEN efor zorunlu.
+            if (input.Status == Entities.TaskStatus.Tamamlandi && task.Status != Entities.TaskStatus.Tamamlandi)
+                await EnsureHasEffortForCompletionAsync(task.Id);
+
             var prevAssignee = task.AssignedEmployeeId;
             ObjectMapper.Map(input, task);
             // İlerleme yüzdesi duruma göre kurgulanır (Tamamlandı %100, Planlandı %0, Devam taban %25 / elle değer korunur)
@@ -430,6 +448,9 @@ namespace ActivityManagement.Tasks
         {
             var task = await _taskRepository.GetAsync(id);
             EnsureCanModify(task);
+            // Boş görev "Tamamlandı" yapılamaz — Tamamlandı'ya GEÇERKEN efor zorunlu.
+            if (status == Entities.TaskStatus.Tamamlandi && task.Status != Entities.TaskStatus.Tamamlandi)
+                await EnsureHasEffortForCompletionAsync(id);
             task.Status = status;
             // Panodan/istemciden gelen yüzde varsa onu baz al, yoksa mevcut; duruma göre kurgu uygula
             task.CompletionPercentage = ProgressForStatus(status, percentage > 0 ? percentage : task.CompletionPercentage);

@@ -179,6 +179,21 @@ function reqCard(q) {
 
 function token() { return $('input[name="__RequestVerificationToken"]').val(); }
 
+// Sunucudan dönen hata mesajını çeşitli zarf biçimlerinden ayıklar (ABP / custom).
+function serverMsg(xhr, fb) {
+    var j = xhr && xhr.responseJSON;
+    if (j) {
+        if (j.error && j.error.message) return j.error.message;   // ABP zarfı
+        if (typeof j.error === 'string') return j.error;          // { error: "..." }
+        if (j.result && j.result.error) return j.result.error;
+        if (j.message) return j.message;
+    }
+    // Düz metin yanıt (ContentResult) — HTML hata sayfası değilse mesaj olarak kullan
+    var txt = xhr && xhr.responseText;
+    if (txt && txt.length > 0 && txt.length < 400 && txt.charAt(0) !== '<') return txt;
+    return fb || 'İşlem gerçekleştirilemedi.';
+}
+
 function changeTaskStatus(id, status) {
     var t = tasks.find(function (x) { return x.id === id; });
     var pct = t ? t.completionPercentage : 0;
@@ -187,7 +202,7 @@ function changeTaskStatus(id, status) {
         url: '/Tasks/UpdateStatus', type: 'POST',
         data: { id: id, status: status, percentage: pct, __RequestVerificationToken: token() },
         success: function () { abp.notify.success('Görev durumu güncellendi.'); loadBoard(); },
-        error: function () { abp.notify.error('Güncellenemedi.'); loadBoard(); }
+        error: function (xhr) { abp.notify.error(serverMsg(xhr, 'Güncellenemedi.')); loadBoard(); }
     });
 }
 
@@ -199,7 +214,7 @@ function changeRequestStatus(id, status) {
         url: '/Requests/UpdateStatus', type: 'POST',
         data: { id: id, status: status, percentage: pct, returnUrl: '', __RequestVerificationToken: token() },
         success: function () { abp.notify.success('Talep durumu güncellendi.'); loadBoard(); },
-        error: function () { abp.notify.error('Güncellenemedi.'); loadBoard(); }
+        error: function (xhr) { abp.notify.error(serverMsg(xhr, 'Güncellenemedi.')); loadBoard(); }
     });
 }
 </script>

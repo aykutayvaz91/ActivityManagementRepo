@@ -337,10 +337,27 @@ namespace ActivityManagement.Web.Controllers
         [HttpPost]
         public async Task<IActionResult> UpdateStatus(long id, Entities.TaskStatus status, int percentage)
         {
-            await _taskAppService.UpdateStatusAsync(id, status, percentage);
-            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                return Ok(new { success = true });
-            return RedirectToAction("Detail", new { id });
+            bool ajax = Request.Headers["X-Requested-With"] == "XMLHttpRequest";
+            try
+            {
+                await _taskAppService.UpdateStatusAsync(id, status, percentage);
+                if (ajax) return Ok(new { success = true });
+                return RedirectToAction("Detail", new { id });
+            }
+            catch (Abp.UI.UserFriendlyException ex)
+            {
+                // Ör. "boş görev Tamamlandı yapılamaz" → board'da kırmızı toast (düz metin, ABP sarmasın), formda uyarı
+                if (ajax) return new ContentResult { StatusCode = 400, Content = ex.Message, ContentType = "text/plain; charset=utf-8" };
+                TempData["Uyari"] = ex.Message;
+                return RedirectToAction("Detail", new { id });
+            }
+            catch (Exception ex)
+            {
+                ActivityManagement.Logging.ErrorLog.Write(ex, "Tasks/UpdateStatus");
+                if (ajax) return new ContentResult { StatusCode = 500, Content = "Durum güncellenemedi.", ContentType = "text/plain; charset=utf-8" };
+                TempData["Uyari"] = "Durum güncellenemedi.";
+                return RedirectToAction("Detail", new { id });
+            }
         }
 
         [HttpPost]
