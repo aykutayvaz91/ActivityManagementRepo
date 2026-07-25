@@ -10,5 +10,9 @@ namespace ActivityManagement.Notifications
         Task<NotificationSummaryDto> GetSummaryAsync();
         Task MarkReadAsync(long id);
         Task MarkAllReadAsync();
+
+        // İstek/mesaj: gönderilebilecek üst yöneticiler + gönderme.
+        Task<System.Collections.Generic.List<MessageRecipientDto>> GetMessageRecipientsAsync();
+        Task SendMessageAsync(long recipientEmployeeId, string message);
     }
 }

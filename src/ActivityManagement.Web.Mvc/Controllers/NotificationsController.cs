@@ -37,5 +37,23 @@ namespace ActivityManagement.Web.Controllers
             try { await _svc.MarkAllReadAsync(); } catch { }
             return Ok();
         }
+
+        // İstek/mesaj: gönderilebilecek üst yöneticiler
+        [HttpGet]
+        public async Task<IActionResult> Recipients()
+        {
+            try { return Json(await _svc.GetMessageRecipientsAsync()); }
+            catch { return Json(new System.Collections.Generic.List<object>()); }
+        }
+
+        // İstek/mesaj gönder (üst yöneticiye)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SendMessage(long recipientEmployeeId, string message)
+        {
+            try { await _svc.SendMessageAsync(recipientEmployeeId, message); return Ok(new { ok = true }); }
+            catch (Abp.UI.UserFriendlyException ex) { return new ContentResult { StatusCode = 400, Content = ex.Message, ContentType = "text/plain; charset=utf-8" }; }
+            catch (System.Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Notifications/SendMessage"); return new ContentResult { StatusCode = 500, Content = "İstek gönderilemedi.", ContentType = "text/plain; charset=utf-8" }; }
+        }
     }
 }

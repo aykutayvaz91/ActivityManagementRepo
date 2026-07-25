@@ -11,6 +11,7 @@ namespace ActivityManagement.Entities
         DurumDegisti = 3,
         YorumEklendi = 4,
         FaaliyetAtandi = 5,
+        Mesaj = 7,        // kişiden üst yöneticiye istek/mesaj
         Genel = 9
     }
 

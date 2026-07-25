@@ -24,4 +24,12 @@ namespace ActivityManagement.Notifications.Dto
         public int UnreadCount { get; set; }
         public List<NotificationDto> Recent { get; set; } = new List<NotificationDto>();
     }
+
+    // İstek/mesaj gönderilebilecek üst yönetici.
+    public class MessageRecipientDto
+    {
+        public long Id { get; set; }
+        public string Name { get; set; }
+        public string RoleLabel { get; set; }
+    }
 }

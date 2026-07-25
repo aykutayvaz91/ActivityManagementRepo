@@ -173,6 +173,21 @@
                                 <li><div id="notifList"></div></li>
                             </ul>
                         </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link" href="#" id="msgBtn" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Üst yönetime istek/mesaj gönder">
+                                <i class="fas fa-paper-plane"></i>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow p-3" style="width:330px">
+                                <li><h6 class="mb-2"><i class="fas fa-paper-plane me-1"></i>Üst Yönetime İstek / Mesaj</h6></li>
+                                <li>
+                                    <label class="form-label small mb-1">Kime</label>
+                                    <select id="msgTo" class="form-select form-select-sm mb-2"><option value="">Yükleniyor…</option></select>
+                                    <label class="form-label small mb-1">Mesaj / İstek</label>
+                                    <textarea id="msgText" class="form-control form-control-sm mb-2" rows="3" placeholder="İhtiyacınızı / isteğinizi yazın; üst yöneticinizin bildirimlerine düşer."></textarea>
+                                    <button type="button" class="btn btn-primary btn-sm w-100" onclick="sendUpMessage()"><i class="fas fa-paper-plane me-1"></i>Gönder</button>
+                                </li>
+                            </ul>
+                        </li>
                     }
                     @if (__isAdmin)
                     {
@@ -315,6 +330,38 @@
                     body: '__RequestVerificationToken=' + encodeURIComponent(afToken())
                 }).then(function () { load(false); });
             };
+            // --- Üst yönetime istek/mesaj ---
+            var msgLoaded = false;
+            function loadRecipients() {
+                fetch('/Notifications/Recipients', { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) {
+                        if (data && data.__abp && data.result !== undefined) data = data.result;
+                        var sel = document.getElementById('msgTo'); if (!sel) return;
+                        if (!data || !data.length) { sel.innerHTML = '<option value="">Gönderebileceğiniz üst yönetici yok</option>'; return; }
+                        sel.innerHTML = data.map(function (x) { return '<option value="' + x.id + '">' + esc(x.name) + ' — ' + esc(x.roleLabel) + '</option>'; }).join('');
+                    }).catch(function () {});
+            }
+            window.sendUpMessage = function () {
+                var to = document.getElementById('msgTo').value;
+                var txt = (document.getElementById('msgText').value || '').trim();
+                if (!to) { if (window.abp) abp.notify.warn('Alıcı seçin.'); return; }
+                if (!txt) { if (window.abp) abp.notify.warn('Mesaj yazın.'); return; }
+                fetch('/Notifications/SendMessage', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': afToken() },
+                    body: 'recipientEmployeeId=' + encodeURIComponent(to) + '&message=' + encodeURIComponent(txt) + '&__RequestVerificationToken=' + encodeURIComponent(afToken())
+                }).then(function (r) {
+                    if (r.ok) {
+                        if (window.abp) abp.notify.success('İsteğiniz iletildi.');
+                        document.getElementById('msgText').value = '';
+                        var dd = bootstrap.Dropdown.getInstance(document.getElementById('msgBtn')); if (dd) dd.hide();
+                    } else { r.text().then(function (t) { if (window.abp) abp.notify.error(t || 'Gönderilemedi.'); }); }
+                }).catch(function () { if (window.abp) abp.notify.error('Gönderilemedi.'); });
+            };
+            var msgBtn = document.getElementById('msgBtn');
+            if (msgBtn) msgBtn.addEventListener('click', function () { if (!msgLoaded) { msgLoaded = true; loadRecipients(); } });
+
             document.addEventListener('DOMContentLoaded', function () {
                 load(false);
                 setInterval(function () { load(true); }, 25000);
