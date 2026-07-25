@@ -12,10 +12,16 @@ using ActivityManagement.Notifications;
 
 namespace ActivityManagement.Web.BackgroundJobs
 {
-    // Günlük SLA hatırlatması: son teslim tarihi YARIN olan, tamamlanmamış görevlerin atananlarına e-posta.
-    // SMTP yapılandırılmamışsa AppEmailSender no-op olduğundan sessizce hiçbir şey göndermez (altyapı hazır).
+    // SLA hatırlatması: son teslim/hedef tarihi ÖNÜMÜZDEKİ 24 SAAT içinde olan, kapanmamış görev/taleplerin
+    // atananlarına in-app bildirim (+ SMTP varsa e-posta). Servis 2 SAATTE BİR çalışır; her görev/talep için
+    // EN FAZLA 3 hatırlatma gönderilir, aralarında en az ~2 saat olur (Notification tablosundan sayım/son-zaman).
     public class SlaReminderHostedService : BackgroundService
     {
+        private const int MaxReminders = 3;                                  // görev/talep başına en fazla
+        private static readonly TimeSpan MinGap = TimeSpan.FromHours(2);     // hatırlatmalar arası asgari süre
+        private static readonly TimeSpan LoopInterval = TimeSpan.FromHours(2);
+        private static readonly TimeSpan Lookahead = TimeSpan.FromHours(24); // "yaklaşıyor" penceresi
+
         private readonly IServiceProvider _serviceProvider;
 
         public SlaReminderHostedService(IServiceProvider serviceProvider)
@@ -25,15 +31,14 @@ namespace ActivityManagement.Web.BackgroundJobs
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Uygulama açılışını bekle
-            try { await Task.Delay(TimeSpan.FromMinutes(3), stoppingToken); } catch { }
+            try { await Task.Delay(TimeSpan.FromMinutes(3), stoppingToken); } catch { } // açılışı bekle
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try { await RunOnceAsync(); }
                 catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "SlaReminderHostedService"); }
 
-                try { await Task.Delay(TimeSpan.FromHours(24), stoppingToken); }
+                try { await Task.Delay(LoopInterval, stoppingToken); }
                 catch { break; }
             }
         }
@@ -44,16 +49,19 @@ namespace ActivityManagement.Web.BackgroundJobs
             var sp = scope.ServiceProvider;
             var uowManager = sp.GetRequiredService<IUnitOfWorkManager>();
             var taskRepo = sp.GetRequiredService<IRepository<TaskItem, long>>();
+            var reqRepo = sp.GetRequiredService<IRepository<ServiceRequest, long>>();
             var empRepo = sp.GetRequiredService<IRepository<Employee, long>>();
+            var notifRepo = sp.GetRequiredService<IRepository<Notification, long>>();
             var sender = sp.GetRequiredService<IAppEmailSender>();
-            var notifier = sp.GetRequiredService<ActivityManagement.Notifications.INotificationManager>();
+            var notifier = sp.GetRequiredService<INotificationManager>();
 
             using var uow = uowManager.Begin();
-            var tomorrow = DateTime.Today.AddDays(1);
-            var dayAfter = DateTime.Today.AddDays(2);
+            var now = DateTime.Now;
+            var limit = now.Add(Lookahead);
 
+            // --- Görevler: SLA'sı önümüzdeki 24 saatte, geçmemiş, kapanmamış, atanmış ---
             var dueTasks = await taskRepo.GetAll()
-                .Where(t => t.DueDate.HasValue && t.DueDate.Value >= tomorrow && t.DueDate.Value < dayAfter
+                .Where(t => t.DueDate.HasValue && t.DueDate.Value > now && t.DueDate.Value <= limit
                             && t.Status != Entities.TaskStatus.Tamamlandi
                             && t.Status != Entities.TaskStatus.Iptal
                             && t.AssignedEmployeeId != null)
@@ -61,36 +69,53 @@ namespace ActivityManagement.Web.BackgroundJobs
 
             foreach (var t in dueTasks)
             {
-                // In-app bildirim (personel kaydı olan atanana)
-                await notifier.NotifyAsync(t.AssignedEmployeeId, Entities.NotificationType.SlaYaklasti,
-                    "SLA yaklaşıyor", $"{t.Title} — son teslim {t.DueDate.Value:dd.MM.yyyy}",
-                    $"/Tasks/Detail/{t.Id}", severity: "warning");
+                var link = $"/Tasks/Detail/{t.Id}";
+                if (!await ShouldRemindAsync(notifRepo, t.AssignedEmployeeId.Value, link, now)) continue;
 
-                var emp = await empRepo.GetAll().AsNoTracking()
-                    .FirstOrDefaultAsync(e => e.Id == t.AssignedEmployeeId.Value);
+                await notifier.NotifyAsync(t.AssignedEmployeeId, Entities.NotificationType.SlaYaklasti,
+                    "SLA yaklaşıyor", $"{t.Title} — son teslim {t.DueDate.Value:dd.MM.yyyy HH:mm}",
+                    link, severity: "warning");
+
+                var emp = await empRepo.GetAll().AsNoTracking().FirstOrDefaultAsync(e => e.Id == t.AssignedEmployeeId.Value);
                 if (emp != null && !string.IsNullOrWhiteSpace(emp.Email))
-                {
                     await sender.SendAsync(emp.Email,
-                        $"SLA hatırlatması: {t.Title} yarın teslim",
-                        $"<p>Merhaba {emp.FullName},</p><p><b>{System.Net.WebUtility.HtmlEncode(t.Title)}</b> görevinin son teslim tarihi <b>yarın ({t.DueDate.Value:dd.MM.yyyy})</b>.</p>");
-                }
+                        $"SLA hatırlatması: {t.Title}",
+                        $"<p>Merhaba {emp.FullName},</p><p><b>{System.Net.WebUtility.HtmlEncode(t.Title)}</b> görevinin son teslim tarihi yaklaşıyor: <b>{t.DueDate.Value:dd.MM.yyyy HH:mm}</b>.</p>");
             }
 
-            // Talepler: SLA'sı yarın olan, kapanmamış, atanan talepler → in-app bildirim
-            var reqRepo = sp.GetRequiredService<IRepository<ServiceRequest, long>>();
+            // --- Talepler: SLA'sı önümüzdeki 24 saatte, geçmemiş, kapanmamış, atanmış ---
             var dueReqs = await reqRepo.GetAll()
-                .Where(r => r.DueDate.HasValue && r.DueDate.Value >= tomorrow && r.DueDate.Value < dayAfter
+                .Where(r => r.DueDate.HasValue && r.DueDate.Value > now && r.DueDate.Value <= limit
                             && r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal
                             && r.AssignedEmployeeId != null)
                 .ToListAsync();
+
             foreach (var r in dueReqs)
             {
+                var link = $"/Requests/Detail/{r.Id}";
+                if (!await ShouldRemindAsync(notifRepo, r.AssignedEmployeeId.Value, link, now)) continue;
+
                 await notifier.NotifyAsync(r.AssignedEmployeeId, Entities.NotificationType.SlaYaklasti,
-                    "Talep SLA yaklaşıyor", $"{r.Title} — hedef {r.DueDate.Value:dd.MM.yyyy}",
-                    $"/Requests/Detail/{r.Id}", severity: "warning");
+                    "Talep SLA yaklaşıyor", $"{r.Title} — hedef {r.DueDate.Value:dd.MM.yyyy HH:mm}",
+                    link, severity: "warning");
             }
 
             await uow.CompleteAsync();
+        }
+
+        // Bu görev/talep için hatırlatma gönderilmeli mi: toplam < 3 VE son hatırlatmadan bu yana ≥ 2 saat.
+        private static async Task<bool> ShouldRemindAsync(IRepository<Notification, long> notifRepo, long recipientId, string link, DateTime now)
+        {
+            var q = notifRepo.GetAll().Where(n => n.RecipientEmployeeId == recipientId
+                && n.Type == NotificationType.SlaYaklasti && n.Link == link);
+            var count = await q.CountAsync();
+            if (count >= MaxReminders) return false;
+            if (count > 0)
+            {
+                var lastAt = await q.OrderByDescending(n => n.Id).Select(n => n.CreationTime).FirstOrDefaultAsync();
+                if (now - lastAt < MinGap) return false;
+            }
+            return true;
         }
     }
 }

@@ -26,6 +26,7 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
             SeedIntegration();        // Entegrasyon ayarları + kaynak satırları (Sunucu/Destek, kapalı)
             EncryptLegacySecrets();   // DB'deki düz-metin sırları (SMTP/entegrasyon anahtarı) DPAPI ile şifrele
             NormalizeDepartments();   // Birim değerlerini görev grubuyla aynı standarda çek (Sistem Birimi / Network Birimi)
+            TrimSlaNotifications();    // SLA hatırlatmalarını (kişi,link) başına en fazla 3 ile sınırla (eski spam temizliği)
             // NOT: Dummy görev/proje ve faaliyet tohumlaması kapatıldı. Sistem gerçek
             // kullanım için boş başlar; görevler kategori-tabanlı olarak elle oluşturulur.
             // SeedWorkItems();   // devre dışı — xlsx dummy iş kalemleri/görevler
@@ -158,6 +159,24 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
                 { src.ApiKey = ActivityManagement.Security.DpapiProtector.Protect(src.ApiKey); changed = true; }
 
             if (changed) _context.SaveChanges();
+        }
+
+        // SLA hatırlatma bildirimlerini (RecipientEmployeeId, Link) başına en fazla 3 ile sınırlar (idempotent).
+        // Eskiden her açılışta yeniden üreten sürümden kalan fazlalıkları temizler; en yeni 3'ü tutar.
+        private void TrimSlaNotifications()
+        {
+            var sla = _context.AppNotifications
+                .Where(n => n.Type == Entities.NotificationType.SlaYaklasti)
+                .ToList();
+            var extras = sla.GroupBy(n => new { n.RecipientEmployeeId, n.Link })
+                .Where(g => g.Count() > 3)
+                .SelectMany(g => g.OrderByDescending(n => n.Id).Skip(3))
+                .ToList();
+            if (extras.Count > 0)
+            {
+                _context.AppNotifications.RemoveRange(extras);
+                _context.SaveChanges();
+            }
         }
 
         // Personel "Birim" (Department) değerlerini görev grubuyla AYNI standarda çeker (idempotent göç).
