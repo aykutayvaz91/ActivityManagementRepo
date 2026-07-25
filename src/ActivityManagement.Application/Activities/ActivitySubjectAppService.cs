@@ -88,10 +88,16 @@ namespace ActivityManagement.Activities
 
         private static bool IsManager(string role) =>
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
 
         private static bool IsAdmin(string role) =>
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+
+        // Tüm takımlarda geçerli yönetici (config hariç admin gibi): Admin veya Manager.
+        private static bool IsCrossTeamManager(string role) =>
+            string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
 
         // Admin-self mi (Sistem Yöneticisi)? Login-as ile başka kişiye geçmişse false → takım kapsamı uygulanır.
         private bool IsAdminSelfContext()
@@ -103,6 +109,13 @@ namespace ActivityManagement.Activities
             long? ownId = long.TryParse(user?.FindFirst("AdminOwnEmployeeId")?.Value, out var o) ? o : (long?)null;
             // config-admin kendi kimliğinde VEYA AdminOwnEmployeeId olmayan (Google) admin → self (tümünü görür)
             return !empId.HasValue || !ownId.HasValue || empId == ownId;
+        }
+
+        // Tüm takımları görebilir mi (kapsam yok): admin-self VEYA Manager.
+        private bool SeesAllTeams()
+        {
+            var role = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            return IsAdminSelfContext() || string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
         }
 
         // Mevcut kullanıcının takımı — istek başına bir kez sorgulanır (cache'lenir)
@@ -123,7 +136,7 @@ namespace ActivityManagement.Activities
         private bool IsManagerForSubject(ActivitySubject s, (string Role, string Email, long? EmployeeId) ctx)
         {
             if (!IsManager(ctx.Role)) return false;
-            if (IsAdmin(ctx.Role)) return true;
+            if (IsCrossTeamManager(ctx.Role)) return true; // Admin/Manager → tüm takımlar
             var myTeamId = CurrentEmployeeTeamId(ctx.EmployeeId);
             return !s.TeamId.HasValue || s.TeamId == myTeamId;
         }
@@ -150,7 +163,7 @@ namespace ActivityManagement.Activities
             // Görünürlük kuralı: Admin tüm konuları görür; TakımLideri ve Uzman kendi TAKIMININ
             // konularını görür (takımdaki kişilere atanan/oluşturulan faaliyetler dahil). İşlem yetkisi
             // (efor/düzenle/sil) ayrıca "kendine ait" kuralıyla sınırlıdır (CanManage/CanLogEffort).
-            if (!IsAdminSelfContext() && ctx.EmployeeId.HasValue)
+            if (!SeesAllTeams() && ctx.EmployeeId.HasValue)
             {
                 var myTeamId = await _employeeRepository.GetAll().AsNoTracking()
                     .Where(e => e.Id == ctx.EmployeeId.Value).Select(e => e.TeamId).FirstOrDefaultAsync();
@@ -316,7 +329,7 @@ namespace ActivityManagement.Activities
             if (log == null) throw new UserFriendlyException("Efor kaydı bulunamadı.");
 
             bool canDelete = ctx.EmployeeId.HasValue && log.EmployeeId == ctx.EmployeeId.Value; // kendi eforu
-            if (!canDelete && IsAdmin(ctx.Role)) canDelete = true;                              // Admin tümü
+            if (!canDelete && IsCrossTeamManager(ctx.Role)) canDelete = true;                              // Admin tümü
             if (!canDelete && IsManager(ctx.Role) && log.ActivitySubjectId.HasValue)            // TakımLideri: kendi takımı
             {
                 var subj = await _subjectRepository.FirstOrDefaultAsync(log.ActivitySubjectId.Value);
@@ -468,7 +481,7 @@ namespace ActivityManagement.Activities
             var ctx = CurrentContext();
             var log = await _logRepository.GetAsync(id);
             // Kendi eforu VEYA Admin VEYA (TakımLideri ise) yalnız kendi TAKIMINDAKİ kişinin eforu.
-            bool canEdit = (ctx.EmployeeId.HasValue && log.EmployeeId == ctx.EmployeeId.Value) || IsAdmin(ctx.Role);
+            bool canEdit = (ctx.EmployeeId.HasValue && log.EmployeeId == ctx.EmployeeId.Value) || IsCrossTeamManager(ctx.Role);
             if (!canEdit && IsManager(ctx.Role))
             {
                 var myTeam = CurrentEmployeeTeamId(ctx.EmployeeId);

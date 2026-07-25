@@ -55,10 +55,16 @@ namespace ActivityManagement.ServiceRequests
 
         private static bool IsManager(string role) =>
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
 
         private static bool IsAdmin(string role) =>
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+
+        // Tüm takımlarda geçerli yönetici (config hariç admin gibi): Admin veya Manager.
+        private static bool IsCrossTeamManager(string role) =>
+            string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
 
         // Admin-self mi? Login-as ile başka kişiye geçmişse false → takım kapsamı uygulanır.
         private bool IsAdminSelfContext()
@@ -69,6 +75,13 @@ namespace ActivityManagement.ServiceRequests
             long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
             long? ownId = long.TryParse(user?.FindFirst("AdminOwnEmployeeId")?.Value, out var o) ? o : (long?)null;
             return !empId.HasValue || !ownId.HasValue || empId == ownId;
+        }
+
+        // Tüm takımları görebilir mi (kapsam yok): admin-self VEYA Manager.
+        private bool SeesAllTeams()
+        {
+            var role = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            return IsAdminSelfContext() || string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
         }
 
         private bool _teamIdLoaded;
@@ -87,7 +100,7 @@ namespace ActivityManagement.ServiceRequests
         private bool IsManagerForRequest(ServiceRequest r, (string Role, string Email, long? EmployeeId) ctx)
         {
             if (!IsManager(ctx.Role)) return false;
-            if (IsAdmin(ctx.Role)) return true;
+            if (IsCrossTeamManager(ctx.Role)) return true; // Admin/Manager → tüm takımlar
             var myTeamId = CurrentEmployeeTeamId(ctx.EmployeeId);
             return !r.TeamId.HasValue || r.TeamId == myTeamId;
         }
@@ -122,7 +135,7 @@ namespace ActivityManagement.ServiceRequests
                                          r.SecondaryEmployeeId == ctx.EmployeeId.Value);
 
             // Görünürlük: Admin-self tümünü; diğerleri kendi TAKIMININ talepleri + kendine atananları.
-            if (input.MineOnly != true && !IsAdminSelfContext() && ctx.EmployeeId.HasValue)
+            if (input.MineOnly != true && !SeesAllTeams() && ctx.EmployeeId.HasValue)
             {
                 var myTeamId = await _employeeRepository.GetAll().AsNoTracking()
                     .Where(e => e.Id == ctx.EmployeeId.Value).Select(e => e.TeamId).FirstOrDefaultAsync();
@@ -324,7 +337,7 @@ namespace ActivityManagement.ServiceRequests
             if (log == null) throw new UserFriendlyException("Efor kaydı bulunamadı.");
 
             bool canDelete = ctx.EmployeeId.HasValue && log.EmployeeId == ctx.EmployeeId.Value; // kendi eforu
-            if (!canDelete && IsAdmin(ctx.Role)) canDelete = true;                              // Admin tümü
+            if (!canDelete && IsCrossTeamManager(ctx.Role)) canDelete = true;                              // Admin tümü
             if (!canDelete && IsManager(ctx.Role) && log.ServiceRequestId.HasValue)             // TakımLideri: kendi takımı
             {
                 var req = await _requestRepository.FirstOrDefaultAsync(log.ServiceRequestId.Value);

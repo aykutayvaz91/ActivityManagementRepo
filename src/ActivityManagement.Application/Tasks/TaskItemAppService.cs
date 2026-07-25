@@ -85,9 +85,22 @@ namespace ActivityManagement.Tasks
 
         private bool IsManager(string role) =>
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
 
         private bool IsAdmin(string role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+
+        // Tüm takımlarda geçerli yönetici (config hariç admin gibi): Admin veya Manager.
+        private static bool IsCrossTeamManager(string role) =>
+            string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
+
+        // Tüm takımları görebilir mi (kapsam uygulanmaz): admin-self VEYA Manager.
+        private bool SeesAllTeams()
+        {
+            var role = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            return IsAdminSelfContext() || string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
+        }
 
         // Admin-self mi (Sistem Yöneticisi kendi kimliği)? Login-as ile başka kişiye geçmişse false → kapsam uygulanır.
         private bool IsAdminSelfContext()
@@ -120,7 +133,7 @@ namespace ActivityManagement.Tasks
         private bool IsManagerForTask(TaskItem task, (string Role, string Email, long? EmployeeId) ctx)
         {
             if (!IsManager(ctx.Role)) return false;
-            if (IsAdmin(ctx.Role)) return true;
+            if (IsCrossTeamManager(ctx.Role)) return true; // Admin/Manager → tüm takımlar
             var myTeamId = CurrentEmployeeTeamId(ctx.EmployeeId);
             return !task.TeamId.HasValue || task.TeamId == myTeamId;
         }
@@ -180,7 +193,7 @@ namespace ActivityManagement.Tasks
             // GÖRÜNÜRLÜK (satır bazında): Admin-self (Sistem Yöneticisi) tümünü görür; non-admin VEYA login-as ile
             // başka kişi olarak işlem yapan admin → yalnız o kişinin TAKIMININ (takımsız/kendine atanan dahil) görevleri.
             var scopeCtx = CurrentContext();
-            if (!IsAdminSelfContext() && scopeCtx.EmployeeId.HasValue)
+            if (!SeesAllTeams() && scopeCtx.EmployeeId.HasValue)
             {
                 var myTeamId = CurrentEmployeeTeamId(scopeCtx.EmployeeId);
                 query = query.Where(t =>

@@ -38,10 +38,13 @@ namespace ActivityManagement.Activities
 
         private string CurrentRole() => _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
         private bool IsAdmin() => string.Equals(CurrentRole(), "Admin", StringComparison.OrdinalIgnoreCase);
+        // Manager, tüm takımlarda admin gibi kapsam görür (config hariç).
+        private bool IsCrossTeamManager() => IsAdmin() || string.Equals(CurrentRole(), "Manager", StringComparison.OrdinalIgnoreCase);
         private bool IsManager()
         {
             var role = CurrentRole();
             return string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
         }
 
@@ -54,7 +57,7 @@ namespace ActivityManagement.Activities
         // TakımLideri yalnız kendi takımındaki personel için işlem yapabilir; Admin her yerde.
         private async Task EnsureCanActForEmployeeAsync(long targetEmployeeId)
         {
-            if (IsAdmin()) return;
+            if (IsCrossTeamManager()) return; // Admin/Manager → tüm takımlar
             var myTeam = await _employeeRepository.GetAll().AsNoTracking()
                 .Where(e => e.Id == CurrentEmployeeId()).Select(e => e.TeamId).FirstOrDefaultAsync();
             var targetTeam = await _employeeRepository.GetAll().AsNoTracking()

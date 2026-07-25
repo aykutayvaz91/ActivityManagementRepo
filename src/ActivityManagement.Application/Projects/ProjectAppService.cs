@@ -73,6 +73,8 @@ namespace ActivityManagement.Projects
             var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
             long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
             long? ownId = long.TryParse(user?.FindFirst("AdminOwnEmployeeId")?.Value, out var o) ? o : (long?)null;
+            // Manager: tüm takımları görür.
+            if (string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase)) return (false, null);
             bool isAdmin = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
             // Admin-self: config-admin kendi kimliğinde VEYA AdminOwnEmployeeId claim'i olmayan (Google) admin → tümünü görür.
             bool adminSelf = isAdmin && (!empId.HasValue || !ownId.HasValue || empId == ownId);
