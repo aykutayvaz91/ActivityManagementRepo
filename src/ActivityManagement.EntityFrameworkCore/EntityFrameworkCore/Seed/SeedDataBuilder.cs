@@ -70,10 +70,12 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
             {
                 bool isSystemAdmin = e.IsSystemAccount || (e.Title == "Sistem Yöneticisi"
                     && e.FirstName == "Sistem" && e.LastName == "Yöneticisi");
-                if (isSystemAdmin)
+                // Manager rolü "admin gibi tüm takımları görür" → hiçbir takıma bağlanmaz (takımsız kalır).
+                bool isManager = string.Equals(e.AppRole, "Manager", System.StringComparison.OrdinalIgnoreCase);
+                if (isSystemAdmin || isManager)
                 {
-                    if (!e.IsSystemAccount) e.IsSystemAccount = true; // eski kayıtları işaretle (göç)
-                    if (e.TeamId.HasValue) e.TeamId = null; // onar (takıma bağlanmaz)
+                    if (isSystemAdmin && !e.IsSystemAccount) e.IsSystemAccount = true; // eski kayıtları işaretle (göç)
+                    if (e.TeamId.HasValue) e.TeamId = null; // takıma bağlanmaz / yanlışlıkla bağlıysa onar
                     continue;
                 }
                 if (!e.TeamId.HasValue) e.TeamId = team.Id;

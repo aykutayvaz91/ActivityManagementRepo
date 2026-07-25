@@ -62,7 +62,7 @@
                                     <option value="Admin">Admin</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6" id="teamField">
                                 <label asp-for="TeamId" class="form-label">Takım</label>
                                 <select asp-for="TeamId" class="form-select">
                                     <option value="">— Takımsız —</option>
@@ -71,6 +71,7 @@
                                         <option value="@t.Id">@t.Name</option>
                                     }
                                 </select>
+                                <span class="text-muted small" id="teamManagerNote" style="display:none">Manager tüm takımları görür — takıma bağlanmaz.</span>
                             </div>
                         }
                         <div class="col-md-6">
@@ -147,4 +148,17 @@
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        (function () {
+            var role = document.getElementById('AppRole');
+            var team = document.getElementById('TeamId');
+            var note = document.getElementById('teamManagerNote');
+            function sync() {
+                var isMgr = role && role.value === 'Manager';
+                if (team) { team.disabled = isMgr; if (isMgr) team.value = ''; }
+                if (note) note.style.display = isMgr ? '' : 'none';
+            }
+            if (role) { role.addEventListener('change', sync); sync(); }
+        })();
+    </script>
 }

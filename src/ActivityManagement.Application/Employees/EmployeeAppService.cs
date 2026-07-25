@@ -207,6 +207,8 @@ namespace ActivityManagement.Employees
             // Rol atama yalnız Admin'e özel: Admin olmayan (TakımLideri) yeni personeli daima "Uzman" oluşturur
             // (aksi halde kendi kontrolündeki e-posta ile Admin personel açıp yetki yükseltebilirdi).
             if (!IsAdmin()) input.AppRole = "Uzman";
+            // Manager admin gibi TÜM takımları görür → hiçbir takıma bağlanmaz (takımsız kalır).
+            if (string.Equals(input.AppRole, "Manager", StringComparison.OrdinalIgnoreCase)) input.TeamId = null;
             // E-posta girilmemişse isim.soyisim@cmit.com.tr olarak otomatik üret (Türkçe karakter → ASCII, benzersiz)
             if (string.IsNullOrWhiteSpace(input.Email))
                 input.Email = await GenerateUniqueEmailAsync(input.FirstName, input.LastName);
@@ -271,6 +273,9 @@ namespace ActivityManagement.Employees
                 input.TeamId = employee.TeamId;
             }
 
+            // Manager admin gibi TÜM takımları görür → takımsız kalır (rol Manager ise takım bağını kaldır).
+            if (string.Equals(input.AppRole, "Manager", StringComparison.OrdinalIgnoreCase)) input.TeamId = null;
+
             ObjectMapper.Map(input, employee);
             await _employeeRepository.UpdateAsync(employee);
             return ObjectMapper.Map<EmployeeDto>(employee);
@@ -287,6 +292,8 @@ namespace ActivityManagement.Employees
             EnsureAdmin(); // rol atama yalnız Admin (API'den doğrudan çağrıya karşı korunur)
             var employee = await _employeeRepository.GetAsync(id);
             employee.AppRole = appRole;
+            // Manager admin gibi TÜM takımları görür → takımsız kalır.
+            if (string.Equals(appRole, "Manager", StringComparison.OrdinalIgnoreCase)) employee.TeamId = null;
             await _employeeRepository.UpdateAsync(employee);
         }
 
