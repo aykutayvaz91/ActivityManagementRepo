@@ -25,6 +25,7 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
             SeedRolesAndAccess();     // Rol tanımları + Rol×Sayfa erişim matrisi (mevcut yetkiler)
             SeedIntegration();        // Entegrasyon ayarları + kaynak satırları (Sunucu/Destek, kapalı)
             EncryptLegacySecrets();   // DB'deki düz-metin sırları (SMTP/entegrasyon anahtarı) DPAPI ile şifrele
+            NormalizeDepartments();   // Birim değerlerini görev grubuyla aynı standarda çek (Sistem Birimi / Network Birimi)
             // NOT: Dummy görev/proje ve faaliyet tohumlaması kapatıldı. Sistem gerçek
             // kullanım için boş başlar; görevler kategori-tabanlı olarak elle oluşturulur.
             // SeedWorkItems();   // devre dışı — xlsx dummy iş kalemleri/görevler
@@ -157,6 +158,30 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
                 { src.ApiKey = ActivityManagement.Security.DpapiProtector.Protect(src.ApiKey); changed = true; }
 
             if (changed) _context.SaveChanges();
+        }
+
+        // Personel "Birim" (Department) değerlerini görev grubuyla AYNI standarda çeker (idempotent göç).
+        //   "Sistem Yönetimi"/"Sistem" → "Sistem Birimi"   ·   "Network"/"Ağ" → "Network Birimi"
+        private void NormalizeDepartments()
+        {
+            bool changed = false;
+            foreach (var e in _context.Employees.ToList())
+            {
+                var norm = NormalizeDept(e.Department);
+                if (norm != null && norm != e.Department) { e.Department = norm; changed = true; }
+            }
+            if (changed) _context.SaveChanges();
+        }
+
+        // Serbest birim metnini standart görev grubu adına eşler. Eşleşmezse null (dokunma).
+        public static string NormalizeDept(string dept)
+        {
+            if (string.IsNullOrWhiteSpace(dept)) return null;
+            var d = dept.Trim().ToLowerInvariant();
+            if (d == "sistem birimi" || d == "network birimi") return dept.Trim(); // zaten standart
+            if (d.Contains("sistem")) return "Sistem Birimi";
+            if (d.Contains("network") || d.Contains("ağ") || d.Contains("ag")) return "Network Birimi";
+            return null;
         }
 
         // Dinamik faaliyet tipleri — boşsa varsayılanlar eklenir (Admin yönetir).

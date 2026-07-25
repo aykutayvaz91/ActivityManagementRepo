@@ -239,6 +239,16 @@ namespace ActivityManagement.Web.Controllers
                     ViewBag.ProjectName = proj.Name;
                 }
             }
+
+            // Görev grubu ön-seçimi: hedef kişinin (atanan ya da giriş yapan) birimi otomatik seçili gelsin
+            if (string.IsNullOrWhiteSpace(dto.GroupName))
+            {
+                var targetId = dto.AssignedEmployeeId ?? CurrentEmployeeId();
+                if (targetId.HasValue)
+                {
+                    try { dto.GroupName = (await _employeeAppService.GetAsync(targetId.Value))?.Department; } catch { }
+                }
+            }
             return View(dto);
         }
 

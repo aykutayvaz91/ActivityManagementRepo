@@ -293,6 +293,14 @@ namespace ActivityManagement.Tasks
                 }
             }
 
+            // Görev grubu boşsa: atanan kişinin BİRİMİ (Department) otomatik görev grubu olur.
+            // (Birim değerleri görev grubuyla aynı standarttadır: "Sistem Birimi" / "Network Birimi".)
+            if (string.IsNullOrWhiteSpace(input.GroupName) && input.AssignedEmployeeId.HasValue)
+            {
+                input.GroupName = await _employeeRepository.GetAll().AsNoTracking()
+                    .Where(e => e.Id == input.AssignedEmployeeId.Value).Select(e => e.Department).FirstOrDefaultAsync();
+            }
+
             var task = ObjectMapper.Map<TaskItem>(input);
             task.TenantId = AbpSession.TenantId ?? 1;
             task.TeamId = await ResolveTeamIdForNewTaskAsync(input, ctx);

@@ -42,8 +42,12 @@
                             <input asp-for="Title" class="form-control" placeholder="örn. Sistem Mühendisi" />
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="Department" class="form-label">Departman</label>
-                            <input asp-for="Department" class="form-control" placeholder="örn. Sistem Yönetimi" />
+                            <label asp-for="Department" class="form-label">Birim <small class="text-muted">(görev grubu)</small></label>
+                            <select asp-for="Department" class="form-select">
+                                <option value="">Seçiniz...</option>
+                                <option value="Sistem Birimi">Sistem Birimi</option>
+                                <option value="Network Birimi">Network Birimi</option>
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label asp-for="AppRole" class="form-label">Rol</label>
