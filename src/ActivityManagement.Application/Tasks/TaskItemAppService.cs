@@ -436,6 +436,18 @@ namespace ActivityManagement.Tasks
             await _taskRepository.DeleteAsync(id);
         }
 
+        // Yorum/not silme: görevin sahibi (atanan) veya yöneticisi silebilir.
+        public async Task DeleteCommentAsync(long commentId)
+        {
+            var ctx = CurrentContext();
+            var c = await _commentRepository.FirstOrDefaultAsync(commentId);
+            if (c == null) return;
+            var task = await _taskRepository.FirstOrDefaultAsync(c.TaskItemId);
+            bool can = task != null && (IsManagerForTask(task, ctx) || CanEdit(task, ctx));
+            if (!can) throw new UserFriendlyException("Bu yorumu silme yetkiniz yok.");
+            await _commentRepository.DeleteAsync(commentId);
+        }
+
         // Göreve efor girişi (Görev Detay ekranı). Giriş yapan kişi adına; ActualHours senkronlanır.
         public async Task<long> LogEffortAsync(ActivityManagement.Activities.Dto.CreateActivityLogDto input)
         {

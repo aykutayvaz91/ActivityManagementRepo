@@ -372,19 +372,26 @@ namespace ActivityManagement.Web.Controllers
 
         [HttpPost]
         [RequestSizeLimit(52428800)] // 50 MB
-        public async Task<IActionResult> AddComment(long taskId, string comment, bool isInternal = false, List<IFormFile> files = null)
+        public async Task<IActionResult> AddComment(long taskId, string comment, bool isInternal = false, List<IFormFile> files = null, decimal? hoursSpent = null)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(comment) && (files == null || files.Count == 0))
+                bool hasComment = !string.IsNullOrWhiteSpace(comment);
+                bool hasFiles = files != null && files.Any(f => f != null && f.Length > 0);
+                bool hasEffort = hoursSpent.HasValue && hoursSpent.Value > 0;
+
+                if (!hasComment && !hasFiles && !hasEffort)
                 {
-                    TempData["Uyari"] = "Yorum veya dosya girmelisiniz.";
+                    TempData["Uyari"] = "Yapılan işi (yorum), dosya veya efor süresini girmelisiniz.";
                     return RedirectToAction("Detail", new { id = taskId });
                 }
 
-                var commentId = await _taskAppService.AddCommentAsync(taskId, comment ?? "", isInternal);
+                // Yorum/not (ve varsa dosya) — yalnız içerik varsa oluştur
+                long commentId = 0;
+                if (hasComment || hasFiles)
+                    commentId = await _taskAppService.AddCommentAsync(taskId, comment ?? "", isInternal);
 
-                if (files != null && files.Count > 0)
+                if (hasFiles)
                 {
                     var relDir = $"/uploads/tasks/{taskId}";
                     var absDir = Path.Combine(_env.WebRootPath, "uploads", "tasks", taskId.ToString());
@@ -399,8 +406,44 @@ namespace ActivityManagement.Web.Controllers
                         await _taskAppService.AddAttachmentAsync(taskId, commentId, safeName, $"{relDir}/{stored}", f.Length, f.ContentType ?? "application/octet-stream");
                     }
                 }
+
+                // Efor süresi girildiyse: yapılan iş (yorumun düz metni) açıklamasıyla efor kaydet
+                if (hasEffort)
+                {
+                    var desc = StripHtml(comment);
+                    await _taskAppService.LogEffortAsync(new ActivityManagement.Activities.Dto.CreateActivityLogDto
+                    {
+                        TaskItemId = taskId,
+                        HoursSpent = hoursSpent.Value,
+                        Description = string.IsNullOrWhiteSpace(desc) ? "Görev eforu" : desc,
+                        ActivityType = "Görev",
+                        ActivityDate = DateTime.Today
+                    });
+                    TempData["Success"] = $"Kaydedildi ({hoursSpent.Value:0.##} saat efor işlendi).";
+                }
             }
             catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
+            catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Tasks/AddComment"); TempData["Uyari"] = "Kaydedilirken bir sorun oluştu."; }
+            return RedirectToAction("Detail", new { id = taskId });
+        }
+
+        // Rich text (HTML) yorumu efor açıklaması için düz metne indirger.
+        private static string StripHtml(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return null;
+            var text = System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", " ");
+            text = System.Net.WebUtility.HtmlDecode(text);
+            text = System.Text.RegularExpressions.Regex.Replace(text, "\\s+", " ").Trim();
+            return text.Length > 400 ? text.Substring(0, 400) : text;
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteComment(long commentId, long taskId)
+        {
+            try { await _taskAppService.DeleteCommentAsync(commentId); TempData["Success"] = "Yorum silindi."; }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
+            catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Tasks/DeleteComment"); TempData["Uyari"] = "Yorum silinemedi."; }
             return RedirectToAction("Detail", new { id = taskId });
         }
 

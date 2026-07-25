@@ -141,24 +141,6 @@
                 </form>
             </div>
         </div>
-
-        <!-- Faaliyet Kaydet -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-transparent"><h6 class="mb-0">Faaliyet Kaydet</h6></div>
-            <div class="card-body">
-                <div id="activityForm">
-                    <div class="mb-2">
-                        <input type="number" step="0.5" class="form-control form-control-sm" id="actHours" placeholder="Süre (saat)" min="0.5" max="24" />
-                    </div>
-                    <div class="mb-2">
-                        <textarea class="form-control form-control-sm" id="actDesc" rows="2" placeholder="Yapılan işler..."></textarea>
-                    </div>
-                    <button class="btn btn-sm btn-success w-100" onclick="logActivity()">
-                        <i class="fas fa-clock me-1"></i>Kaydet
-                    </button>
-                </div>
-            </div>
-        </div>
         }
     </div>
 
@@ -182,7 +164,18 @@
                                     @if (c.IsInternal)
                                     { <span class="badge bg-warning text-dark ms-1"><i class="fas fa-lock me-1"></i>Dahili</span> }
                                 </strong>
-                                <small class="text-muted">@c.CreationTime.ToString("dd.MM.yyyy HH:mm")</small>
+                                <span class="text-nowrap">
+                                    <small class="text-muted">@c.CreationTime.ToString("dd.MM.yyyy HH:mm")</small>
+                                    @if (Model.CanEdit)
+                                    {
+                                        <form asp-action="DeleteComment" method="post" class="d-inline" onsubmit="return confirm('Bu yorum/not silinsin mi?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="commentId" value="@c.Id" />
+                                            <input type="hidden" name="taskId" value="@Model.Id" />
+                                            <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-2" title="Sil"><i class="fas fa-trash fa-xs"></i></button>
+                                        </form>
+                                    }
+                                </span>
                             </div>
                             <div class="mb-0 small task-comment-body">@Html.Raw(c.Comment)</div>
                             @if (c.Attachments != null && c.Attachments.Any())
@@ -207,7 +200,11 @@
                         <input type="hidden" name="comment" id="commentHtml" />
                         <div id="commentEditor" style="height:120px; background:#fff"></div>
                         <div class="d-flex align-items-center justify-content-between mt-2 flex-wrap gap-2">
-                            <div class="d-flex align-items-center gap-3">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <div class="input-group input-group-sm" style="width:170px">
+                                    <span class="input-group-text"><i class="fas fa-clock"></i></span>
+                                    <input type="number" name="hoursSpent" class="form-control" step="0.5" min="0" max="24" placeholder="Efor (saat)" title="Bu iş için harcanan süre — boş bırakırsanız sadece not olarak eklenir" />
+                                </div>
                                 <label class="btn btn-sm btn-outline-secondary mb-0">
                                     <i class="fas fa-paperclip me-1"></i>Dosya <input type="file" name="files" multiple hidden id="commentFiles" />
                                 </label>
@@ -266,7 +263,7 @@ document.getElementById('completionRange')?.addEventListener('input', function()
     if (!editorEl || typeof Quill === 'undefined') return;
     var quill = new Quill('#commentEditor', {
         theme: 'snow',
-        placeholder: 'Yorum yazın... (Ctrl+V ile ekran görüntüsü yapıştırabilirsiniz)',
+        placeholder: 'Ne yapıldı? Yapılan işi yazın; sağdaki alana efor süresini girin. (Ctrl+V ile ekran görüntüsü yapıştırabilirsiniz)',
         modules: { toolbar: [['bold','italic','underline'],['link','image'],[{ 'list':'ordered' },{ 'list':'bullet' }],['clean']] }
     });
     var form = document.getElementById('commentForm');
@@ -281,36 +278,5 @@ document.getElementById('completionRange')?.addEventListener('input', function()
         });
     }
 })();
-
-function logActivity() {
-    var hours = parseFloat($('#actHours').val());
-    var desc = $('#actDesc').val().trim();
-    if (!hours || hours <= 0) { alert('Süre giriniz.'); return; }
-    if (!desc) { alert('Açıklama giriniz.'); return; }
-
-    $.ajax({
-        url: '/api/services/app/TaskItem/LogEffort',
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({
-            taskItemId: @Model.Id,
-            description: desc,
-            activityDate: new Date().toISOString(),
-            hoursSpent: hours,
-            activityType: 'Görev'
-        }),
-        success: function() {
-            abp.notify.success('Efor kaydedildi.');
-            $('#actHours').val('');
-            $('#actDesc').val('');
-            setTimeout(function(){ location.reload(); }, 700);
-        },
-        error: function(xhr) {
-            var m = 'Kayıt sırasında hata oluştu.';
-            try { var j = xhr.responseJSON; if (j && j.error && j.error.message) m = j.error.message; } catch(e){}
-            abp.notify.error(m);
-        }
-    });
-}
 </script>
 }
