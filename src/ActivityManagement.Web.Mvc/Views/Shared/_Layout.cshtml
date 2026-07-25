@@ -283,13 +283,13 @@
                 var html = '';
                 items.forEach(function (x) {
                     var bg = x.isRead ? '' : 'background:rgba(13,110,253,.06);';
-                    html += '<a href="#" onclick="notifClick(' + x.id + ',' + JSON.stringify(x.link || '') + ');return false;" ' +
+                    html += '<a href="#" id="notif-' + x.id + '" onclick="notifClick(' + x.id + ',' + JSON.stringify(x.link || '') + ',' + (x.isRead ? 1 : 0) + ');return false;" ' +
                         'class="dropdown-item d-flex gap-2 py-2 border-bottom" style="white-space:normal;' + bg + '">' +
                         '<span class="text-' + (x.severity || 'info') + '"><i class="fas ' + (x.icon || 'fa-bell') + '"></i></span>' +
                         '<span class="flex-fill"><span class="fw-semibold small">' + esc(x.title) + '</span>' +
                         '<span class="d-block text-muted small">' + esc(x.message) + '</span>' +
                         '<span class="d-block text-muted" style="font-size:.7rem">' + esc(x.timeAgo) + '</span></span>' +
-                        (x.isRead ? '' : '<span class="badge bg-primary align-self-start" style="width:8px;height:8px;padding:0;border-radius:50%"></span>') +
+                        (x.isRead ? '' : '<span class="notif-dot badge bg-primary align-self-start" style="width:8px;height:8px;padding:0;border-radius:50%"></span>') +
                         '</a>';
                 });
                 if (list) list.innerHTML = html;
@@ -316,14 +316,43 @@
                         started = true;
                     }).catch(function () {});
             }
-            window.notifClick = function (id, link) {
+            // Rozeti (üstteki kırmızı) bir azalt; 0 olunca gizle.
+            function decBadge() {
+                var badge = document.getElementById('notifBadge');
+                if (!badge || badge.style.display === 'none') return;
+                var cur = parseInt((badge.textContent || '0').replace('+', ''), 10);
+                if (isNaN(cur)) return;
+                var nv = cur > 0 ? cur - 1 : 0;
+                badge.textContent = nv > 99 ? '99+' : nv;
+                badge.style.display = nv > 0 ? '' : 'none';
+            }
+            window.notifClick = function (id, link, wasRead) {
+                // Optimistik: tıklar tıklamaz rozet düşsün + satır okundu görünsün (link'e gidilse bile hemen geri bildirim).
+                if (!wasRead) {
+                    decBadge();
+                    var row = document.getElementById('notif-' + id);
+                    if (row) {
+                        row.style.background = '';
+                        var dot = row.querySelector('.notif-dot');
+                        if (dot) dot.remove();
+                    }
+                }
                 fetch('/Notifications/MarkRead', {
                     method: 'POST', credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': afToken() },
                     body: 'id=' + id + '&__RequestVerificationToken=' + encodeURIComponent(afToken())
-                }).then(function () { if (link) window.location = link; else load(false); });
+                }).then(function () { if (link) window.location = link; else load(false); })
+                  .catch(function () { if (link) window.location = link; });
             };
             window.markAllNotifRead = function () {
+                // Optimistik: rozeti hemen gizle + tüm satırları okundu göster.
+                var badge = document.getElementById('notifBadge');
+                if (badge) { badge.textContent = '0'; badge.style.display = 'none'; }
+                var list = document.getElementById('notifList');
+                if (list) {
+                    list.querySelectorAll('a').forEach(function (a) { a.style.background = ''; });
+                    list.querySelectorAll('.notif-dot').forEach(function (d) { d.remove(); });
+                }
                 fetch('/Notifications/MarkAllRead', {
                     method: 'POST', credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': afToken() },
