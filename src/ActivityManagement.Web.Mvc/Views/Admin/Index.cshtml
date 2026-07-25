@@ -49,6 +49,10 @@
                     </select>
                     <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="fas fa-right-left me-1"></i>Geç</button>
                 </form>
+                <form asp-action="ReturnToSelf" method="post" class="mt-2">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap"><i class="fas fa-rotate-left me-1"></i>Kendime Dön (Sistem Yöneticisi)</button>
+                </form>
             </div>
         </div>
     </div>

@@ -280,17 +280,17 @@ namespace ActivityManagement.Web.Controllers
         public async Task<IActionResult> ActAs(long employeeId)
         {
             if (!IsAdmin()) return AccessDeniedRedirect();
-            var allEmps = (await _employeeAppService.GetAllListAsync()).Items;
-            var emp = allEmps.FirstOrDefault(e => e.Id == employeeId);
-            if (emp == null)
+            // Doğrudan id ile çöz (Sistem Yöneticisi dropdown'da olmasa da kendine dönüş çalışsın).
+            ActivityManagement.Employees.Dto.EmployeeDto emp;
+            try { emp = await _employeeAppService.GetAsync(employeeId); } catch { emp = null; }
+            if (emp == null || emp.Id == 0)
             {
                 TempData["Uyari"] = "Personel bulunamadı.";
                 return RedirectToAction("Index");
             }
             var adminEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name ?? "admin";
-            // Admin'in kendi (Sistem Yöneticisi) personel id'si — mevcut claim'den; yoksa admin e-postasından bul
-            var ownId = User.FindFirst("AdminOwnEmployeeId")?.Value
-                        ?? allEmps.FirstOrDefault(e => e.Email == adminEmail)?.Id.ToString();
+            // Admin'in kendi (Sistem Yöneticisi) personel id'si — mevcut claim'den
+            var ownId = User.FindFirst("AdminOwnEmployeeId")?.Value;
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, adminEmail),
@@ -307,6 +307,18 @@ namespace ActivityManagement.Web.Controllers
                 new ClaimsPrincipal(identity),
                 new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
             TempData["Success"] = $"Artık '{emp.FullName}' olarak işlem yapıyorsunuz. (Görev/efor bu kişi adına kaydedilir.)";
+            return RedirectToAction("Index");
+        }
+
+        // Kendine (Sistem Yöneticisi) dön — login-as'i sıfırlar. (Sistem Yöneticisi dropdown'da olmadığından ayrı buton.)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReturnToSelf()
+        {
+            if (!IsAdmin()) return AccessDeniedRedirect();
+            var ownId = User.FindFirst("AdminOwnEmployeeId")?.Value;
+            if (long.TryParse(ownId, out var id)) return await ActAs(id);
+            TempData["Uyari"] = "Kendi (Sistem Yöneticisi) kaydınız bulunamadı.";
             return RedirectToAction("Index");
         }
 

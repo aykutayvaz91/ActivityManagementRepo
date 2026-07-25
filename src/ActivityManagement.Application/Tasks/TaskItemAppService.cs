@@ -90,6 +90,28 @@ namespace ActivityManagement.Tasks
 
         private bool IsAdmin(string role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
 
+        // Rol rütbesi (hiyerarşi): Uzman(1) < TakımLideri(2) < Manager(3) < Admin(4).
+        private static int RoleRank(string role) =>
+            string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ? 4 :
+            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase) ? 3 :
+            string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
+
+        // Hiyerarşik üste görev atanamaz: atanan/2. sorumlu rütbesi, atayanın rütbesinden YÜKSEK olamaz.
+        private async Task EnsureCanAssignAsync(long? assigneeId, long? secondaryId, string myRole)
+        {
+            int myRank = RoleRank(myRole);
+            foreach (var id in new[] { assigneeId, secondaryId })
+            {
+                if (!id.HasValue) continue;
+                var emp = await _employeeRepository.GetAll().AsNoTracking()
+                    .Where(e => e.Id == id.Value).Select(e => new { e.AppRole, e.FirstName, e.LastName }).FirstOrDefaultAsync();
+                if (emp == null) continue;
+                if (RoleRank(emp.AppRole) > myRank)
+                    throw new UserFriendlyException(
+                        $"Hiyerarşik üstünüze ({emp.FirstName} {emp.LastName}) görev atayamazsınız. İhtiyaçlarınızı üst yöneticinize iletebilirsiniz.");
+            }
+        }
+
         // Tüm takımlarda geçerli yönetici (config hariç admin gibi): Admin veya Manager.
         private static bool IsCrossTeamManager(string role) =>
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
@@ -306,6 +328,9 @@ namespace ActivityManagement.Tasks
                 }
             }
 
+            // Hiyerarşi: kendinden yüksek role (üst yöneticiye) görev atanamaz.
+            await EnsureCanAssignAsync(input.AssignedEmployeeId, input.SecondaryEmployeeId, ctx.Role);
+
             // Görev grubu boşsa: atanan kişinin BİRİMİ (Department) otomatik görev grubu olur.
             // (Birim değerleri görev grubuyla aynı standarttadır: "Sistem Birimi" / "Network Birimi".)
             if (string.IsNullOrWhiteSpace(input.GroupName) && input.AssignedEmployeeId.HasValue)
@@ -425,6 +450,9 @@ namespace ActivityManagement.Tasks
             // Boş görev "Tamamlandı" yapılamaz — Tamamlandı'ya GEÇERKEN efor zorunlu.
             if (input.Status == Entities.TaskStatus.Tamamlandi && task.Status != Entities.TaskStatus.Tamamlandi)
                 await EnsureHasEffortForCompletionAsync(task.Id);
+
+            // Hiyerarşi: kendinden yüksek role (üst yöneticiye) görev atanamaz.
+            await EnsureCanAssignAsync(input.AssignedEmployeeId, input.SecondaryEmployeeId, ctx.Role);
 
             var prevAssignee = task.AssignedEmployeeId;
             ObjectMapper.Map(input, task);

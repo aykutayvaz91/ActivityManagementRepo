@@ -292,8 +292,9 @@ namespace ActivityManagement.Employees
 
         public async Task<ListResultDto<EmployeeDto>> GetAllListAsync()
         {
+            // Sistem Yöneticisi (config-admin) atama/sorumlu dropdown'larında GÖSTERİLMEZ.
             var employees = await _employeeRepository.GetAll()
-                .Where(e => e.IsActive)
+                .Where(e => e.IsActive && !e.IsSystemAccount)
                 .OrderBy(e => e.LastName)
                 .ToListAsync();
             return new ListResultDto<EmployeeDto>(ObjectMapper.Map<List<EmployeeDto>>(employees));
