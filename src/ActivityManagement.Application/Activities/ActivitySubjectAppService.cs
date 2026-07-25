@@ -208,6 +208,7 @@ namespace ActivityManagement.Activities
                 TenantId = AbpSession.TenantId ?? 1,
                 Title = input.Title,
                 Description = input.Description,
+                ActivityType = input.ActivityType,
                 SubCategoryId = input.SubCategoryId,
                 CategoryId = await ResolveCategoryIdAsync(input),
                 ProjectId = input.ProjectId,
@@ -232,6 +233,7 @@ namespace ActivityManagement.Activities
                 throw new UserFriendlyException("Faaliyet konusu için kategori zorunludur (proje seçilirse otomatik dolar).");
             subject.Title = input.Title;
             subject.Description = input.Description;
+            subject.ActivityType = input.ActivityType;
             subject.SubCategoryId = input.SubCategoryId;
             subject.CategoryId = await ResolveCategoryIdAsync(input);
             subject.ProjectId = input.ProjectId;
@@ -281,7 +283,9 @@ namespace ActivityManagement.Activities
                 Description = input.Description,
                 ActivityDate = input.ActivityDate == default ? DateTime.Today : input.ActivityDate,
                 HoursSpent = input.HoursSpent,
-                ActivityType = string.IsNullOrWhiteSpace(input.ActivityType) ? "Faaliyet" : input.ActivityType
+                // Efor faaliyetin tipini devralır (raporlama). Form tip gönderdiyse o, yoksa konunun tipi, o da yoksa "Faaliyet".
+                ActivityType = !string.IsNullOrWhiteSpace(input.ActivityType) ? input.ActivityType
+                               : (!string.IsNullOrWhiteSpace(subject.ActivityType) ? subject.ActivityType : "Faaliyet")
             };
             await _logRepository.InsertAsync(log);
             await CurrentUnitOfWork.SaveChangesAsync();

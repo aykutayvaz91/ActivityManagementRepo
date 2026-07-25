@@ -9,6 +9,7 @@ namespace ActivityManagement.Activities.Dto
     {
         public string Title { get; set; }
         public string Description { get; set; }
+        public string ActivityType { get; set; }
         public long? CategoryId { get; set; }
         public string CategoryName { get; set; }
         public long? SubCategoryId { get; set; }
@@ -38,6 +39,7 @@ namespace ActivityManagement.Activities.Dto
         public long Id { get; set; }
         public string Title { get; set; }
         public string Description { get; set; }
+        public string ActivityType { get; set; }
         public long? CategoryId { get; set; }
         public long? SubCategoryId { get; set; }
         public long? ProjectId { get; set; }

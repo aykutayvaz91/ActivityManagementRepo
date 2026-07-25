@@ -113,6 +113,7 @@ namespace ActivityManagement.Web.Controllers
             ViewBag.Categories = await _categoryAppService.GetAllAsync(onlyActive: true);
             ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
             ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
+            ViewBag.ActivityTypes = await _activityTypeAppService.GetAllAsync(onlyActive: true);
             ViewBag.PreselectProjectId = projectId;   // proje detayından "Faaliyet Ekle" ile gelince modal ön-seçer
             return View(subjects);
         }

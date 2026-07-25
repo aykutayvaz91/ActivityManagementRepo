@@ -41,6 +41,7 @@
                     <dt class="col-sm-3">Atanan</dt><dd class="col-sm-9">@(Model.AssignedEmployeeName ?? "<atanmadı>") @(string.IsNullOrEmpty(Model.SecondaryEmployeeName) ? "" : $"/ 2. {Model.SecondaryEmployeeName}")</dd>
                     <dt class="col-sm-3">Takım</dt><dd class="col-sm-9">@(Model.TeamName ?? "-")</dd>
                     <dt class="col-sm-3">Proje</dt><dd class="col-sm-9">@(Model.ProjectName ?? "-")</dd>
+                    <dt class="col-sm-3">Faaliyet Tipi</dt><dd class="col-sm-9">@(string.IsNullOrEmpty(Model.ActivityType) ? "-" : Model.ActivityType)</dd>
                     <dt class="col-sm-3">Önem</dt><dd class="col-sm-9">@Model.PriorityScore / 10</dd>
                     <dt class="col-sm-3">Geliş</dt><dd class="col-sm-9">@(Model.ReceivedDate?.ToString("dd.MM.yyyy HH:mm") ?? "-")</dd>
                     <dt class="col-sm-3">SLA</dt><dd class="col-sm-9 @(Model.IsOverdue ? "text-danger fw-bold" : "")">@(Model.DueDate?.ToString("dd.MM.yyyy") ?? "-") @(Model.IsOverdue ? "(gecikti)" : "")</dd>
@@ -134,8 +135,8 @@
                             <div class="col-6"><label class="form-label small">Süre (saat)</label><input type="number" name="hoursSpent" class="form-control form-control-sm" step="0.25" min="0.25" value="1" required /></div>
                             <div class="col-12"><label class="form-label small">Faaliyet Tipi</label>
                                 <select name="activityType" class="form-select form-select-sm">
-                                    <option value="Talep">Talep</option>
-                                    @foreach (var t in types) { <option value="@t.Name">@t.Name</option> }
+                                    <option value="Talep" selected="@(string.IsNullOrEmpty(Model.ActivityType))">Talep</option>
+                                    @foreach (var t in types) { <option value="@t.Name" selected="@(t.Name == Model.ActivityType)">@t.Name</option> }
                                 </select>
                             </div>
                             <div class="col-12"><label class="form-label small">Açıklama</label><textarea name="description" class="form-control form-control-sm" rows="2"></textarea></div>

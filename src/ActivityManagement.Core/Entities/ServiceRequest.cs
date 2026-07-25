@@ -40,6 +40,9 @@ namespace ActivityManagement.Entities
         public string Title { get; set; }
         public string Description { get; set; }
 
+        // Faaliyet Tipi (ActivityTypeDef adı; psm sunucu talepleri varsayılan "Kurulum"). Efor bu tipi devralır → raporlama.
+        public string ActivityType { get; set; }
+
         // Talep eden (sistemimiz dışı bir kişi/müşteri olabilir).
         public string RequesterName { get; set; }
         public string RequesterEmail { get; set; }

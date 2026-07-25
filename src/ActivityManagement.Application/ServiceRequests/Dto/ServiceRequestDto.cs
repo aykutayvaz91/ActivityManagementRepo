@@ -15,6 +15,7 @@ namespace ActivityManagement.ServiceRequests.Dto
 
         public string Title { get; set; }
         public string Description { get; set; }
+        public string ActivityType { get; set; }
 
         public string RequesterName { get; set; }
         public string RequesterEmail { get; set; }
@@ -69,6 +70,7 @@ namespace ActivityManagement.ServiceRequests.Dto
         public string ExternalUrl { get; set; }
         public string Title { get; set; }
         public string Description { get; set; }
+        public string ActivityType { get; set; }
         public string RequesterName { get; set; }
         public string RequesterEmail { get; set; }
         public string ExtraInfo { get; set; }
@@ -99,6 +101,7 @@ namespace ActivityManagement.ServiceRequests.Dto
         public string ExternalUrl { get; set; }
         public string Title { get; set; }
         public string Description { get; set; }
+        public string ActivityType { get; set; }
         public string RequesterName { get; set; }
         public string RequesterEmail { get; set; }
         public string ExtraInfo { get; set; }

@@ -268,6 +268,7 @@ namespace ActivityManagement.EntityFrameworkCore
             {
                 b.ToTable("ActivitySubjects");
                 b.Property(s => s.Title).IsRequired().HasMaxLength(256);
+                b.Property(s => s.ActivityType).HasMaxLength(64);
                 b.Property(s => s.Description).HasMaxLength(2000);
                 b.HasOne(s => s.Category)
                  .WithMany()
@@ -305,6 +306,7 @@ namespace ActivityManagement.EntityFrameworkCore
             {
                 b.ToTable("ServiceRequests");
                 b.Property(s => s.Title).IsRequired().HasMaxLength(512);
+                b.Property(s => s.ActivityType).HasMaxLength(64);
                 b.Property(s => s.Description).HasMaxLength(4000);
                 b.Property(s => s.ExternalRef).HasMaxLength(128);
                 b.Property(s => s.ExternalUrl).HasMaxLength(1024);

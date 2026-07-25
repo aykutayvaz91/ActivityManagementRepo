@@ -194,6 +194,13 @@
                         <input type="date" name="DueDate" class="form-control" />
                     </div>
                     <div class="col-md-6">
+                        <label class="form-label">Faaliyet Tipi <small class="text-muted">(rapor kırılımı — Sunucu talebi boşsa "Kurulum")</small></label>
+                        <select name="ActivityType" class="form-select">
+                            <option value="">— (kaynağa göre) —</option>
+                            @foreach (var at in types) { <option value="@at.Name">@at.Name</option> }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label">Proje <small class="text-muted">(opsiyonel)</small></label>
                         <select name="ProjectId" class="form-select">
                             <option value="">— Yok —</option>

@@ -168,6 +168,9 @@ namespace ActivityManagement.ServiceRequests
                 ExternalUrl = input.ExternalUrl,
                 Title = input.Title,
                 Description = input.Description,
+                // Faaliyet tipi: verilmezse Sunucu Kurulum talepleri varsayılan "Kurulum" (sonra değiştirilebilir)
+                ActivityType = !string.IsNullOrWhiteSpace(input.ActivityType) ? input.ActivityType
+                               : (input.Source == RequestSource.SunucuKurulum ? "Kurulum" : null),
                 RequesterName = input.RequesterName,
                 RequesterEmail = input.RequesterEmail,
                 ExtraInfo = input.ExtraInfo,
@@ -203,6 +206,7 @@ namespace ActivityManagement.ServiceRequests
             r.ExternalUrl = input.ExternalUrl;
             r.Title = input.Title;
             r.Description = input.Description;
+            r.ActivityType = input.ActivityType;
             r.RequesterName = input.RequesterName;
             r.RequesterEmail = input.RequesterEmail;
             r.ExtraInfo = input.ExtraInfo;
@@ -289,8 +293,10 @@ namespace ActivityManagement.ServiceRequests
                 ProjectId = r.ProjectId,   // talep bir projeye bağlıysa efor projeye de sayılır (raporlama)
                 Description = input.Description,
                 ActivityDate = input.ActivityDate == default ? DateTime.Today : input.ActivityDate,
+                // Efor talebin tipini devralır (raporlama). Form tip gönderdiyse o, yoksa talebin tipi, o da yoksa "Talep".
                 HoursSpent = input.HoursSpent,
-                ActivityType = string.IsNullOrWhiteSpace(input.ActivityType) ? "Talep" : input.ActivityType
+                ActivityType = !string.IsNullOrWhiteSpace(input.ActivityType) ? input.ActivityType
+                               : (!string.IsNullOrWhiteSpace(r.ActivityType) ? r.ActivityType : "Talep")
             };
             await _logRepository.InsertAsync(log);
             await CurrentUnitOfWork.SaveChangesAsync();
@@ -372,6 +378,9 @@ namespace ActivityManagement.ServiceRequests
                     CompletionPercentage = 0,
                     PriorityScore = ClampScore(mappedScore ?? 5),
                     Priority = ScoreToPriority(mappedScore ?? 5),
+                    // Sunucu Kurulum talepleri varsayılan "Kurulum" (portal tip göndermediyse); sonra elle değiştirilebilir
+                    ActivityType = !string.IsNullOrWhiteSpace(input.ActivityType) ? input.ActivityType
+                                   : (input.Source == RequestSource.SunucuKurulum ? "Kurulum" : null),
                     AssignedEmployeeId = resolvedEmpId,   // ilk içe aktarımda portal ataması uygulanır
                     TeamId = resolvedTeamId
                 };

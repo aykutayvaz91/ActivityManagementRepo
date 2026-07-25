@@ -13,6 +13,9 @@ namespace ActivityManagement.Entities
         public string Title { get; set; }
         public string Description { get; set; }
 
+        // Faaliyet Tipi (ActivityTypeDef adı: Destek, Bakım, Kurulum...). Efor bu tipi devralır → raporlama.
+        public string ActivityType { get; set; }
+
         public long? CategoryId { get; set; }
         public virtual Category Category { get; set; }
 

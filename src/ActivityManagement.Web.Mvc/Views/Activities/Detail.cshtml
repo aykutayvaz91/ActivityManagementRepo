@@ -64,7 +64,7 @@
                             <select name="ActivityType" class="form-select form-select-sm">
                                 @foreach (var t in actTypes)
                                 {
-                                    <option value="@t.Name">@t.Name</option>
+                                    <option value="@t.Name" selected="@(t.Name == Model.ActivityType)">@t.Name</option>
                                 }
                             </select>
                         </div>

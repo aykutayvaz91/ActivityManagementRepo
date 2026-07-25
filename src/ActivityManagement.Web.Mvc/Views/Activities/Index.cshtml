@@ -10,6 +10,8 @@
                     ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>();
     var projects = ViewBag.Projects as System.Collections.Generic.IList<ActivityManagement.Projects.Dto.ProjectDto>
                     ?? new System.Collections.Generic.List<ActivityManagement.Projects.Dto.ProjectDto>();
+    var actTypes = ViewBag.ActivityTypes as System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>();
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -122,6 +124,16 @@
                             <div class="col-12">
                                 <label class="form-label">Açıklama</label>
                                 <textarea name="Description" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Faaliyet Tipi <small class="text-muted">(rapor kırılımı)</small></label>
+                                <select name="ActivityType" class="form-select">
+                                    <option value="">— Seçiniz —</option>
+                                    @foreach (var at in actTypes)
+                                    {
+                                        <option value="@at.Name">@at.Name</option>
+                                    }
+                                </select>
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label">Atanan Uzman</label>
