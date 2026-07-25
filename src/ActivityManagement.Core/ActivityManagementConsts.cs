@@ -4,11 +4,11 @@ namespace ActivityManagement
     {
         public const string LocalizationSourceName = "ActivityManagement";
 
-        // Yazılım sürümü — şema: 1.MAJOR.MINOR
-        //   MAJOR (ortadaki): yeni özellik/modül eklenince artar (1.9.0 → 1.10.0)
-        //   MINOR (sondaki): küçük düzeltme/iyileştirmede artar (1.9.0 → 1.9.1)
-        //   İlk sayı (1): komple tasarım/altyapı değişiminde artar (→ 2.0.0)
-        public const string AppVersion = "1.9.0";
+        // Yazılım sürümü — şema: 1.MAJOR.MINOR  (MINOR .1'den başlar, ".0" KULLANILMAZ)
+        //   Her küçük değişiklikte MINOR artar:            1.9.2 → 1.9.3 → 1.9.4 → 1.9.5
+        //   5'ten sonra (veya büyük değişiklikte) MAJOR atlanır, MINOR .1'e döner:  1.9.5 → 1.10.1
+        //   Komple tasarım/altyapı değişiminde ilk sayı artar:  → 2.1.1
+        public const string AppVersion = "1.9.2";
 
         public const string ConnectionStringName = "Default";
 
