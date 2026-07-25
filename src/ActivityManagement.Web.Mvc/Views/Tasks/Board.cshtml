@@ -1,10 +1,10 @@
-﻿@{
-    ViewData["Title"] = "Görev Panosu";
+@{
+    ViewData["Title"] = "Pano";
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="fas fa-columns text-primary me-2"></i>Görev Panosu</h2>
+    <h2><i class="fas fa-columns text-primary me-2"></i>Pano</h2>
     <div class="d-flex gap-2">
         <a href="/Tasks/Gantt" class="btn btn-outline-secondary"><i class="fas fa-stream me-1"></i>Gantt</a>
         @if (User?.IsInRole("Admin") == true)
@@ -19,10 +19,18 @@
 </div>
 
 <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-    <select id="projectFilter" class="form-select form-select-sm" style="max-width:320px" onchange="loadBoard()">
+    <div class="btn-group btn-group-sm" role="group">
+        <input type="radio" class="btn-check" name="boardMode" id="mBoth" value="both" checked onchange="loadBoard()">
+        <label class="btn btn-outline-primary" for="mBoth"><i class="fas fa-layer-group me-1"></i>İkisi</label>
+        <input type="radio" class="btn-check" name="boardMode" id="mTasks" value="tasks" onchange="loadBoard()">
+        <label class="btn btn-outline-primary" for="mTasks"><i class="fas fa-clipboard-list me-1"></i>Görevler</label>
+        <input type="radio" class="btn-check" name="boardMode" id="mReq" value="requests" onchange="loadBoard()">
+        <label class="btn btn-outline-primary" for="mReq"><i class="fas fa-inbox me-1"></i>Talepler</label>
+    </div>
+    <select id="projectFilter" class="form-select form-select-sm" style="max-width:280px" onchange="loadBoard()">
         <option value="">Tüm Projeler</option>
     </select>
-    <small class="text-muted"><i class="fas fa-info-circle me-1"></i>Ekip panosu — tüm görevler görüntülenir. Yalnızca <strong>size atanmış</strong> görevleri sürükleyerek durumunu güncelleyebilirsiniz; diğerleri (<i class="fas fa-lock"></i>) salt görünümdür.</small>
+    <small class="text-muted"><i class="fas fa-info-circle me-1"></i>Ekip panosu. Yalnızca <strong>size ait</strong> kartları (<i class="fas fa-clipboard-list"></i> görev / <i class="fas fa-inbox"></i> talep) sürükleyerek durum güncellersiniz; diğerleri (<i class="fas fa-lock"></i>) salt görünüm.</small>
 </div>
 
 @Html.AntiForgeryToken()
@@ -33,10 +41,29 @@
 @section Scripts {
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
-var statuses = [], tasks = [];
+var statuses = [], tasks = [], requests = [];
+
+// RequestStatus (0..6) → kolon (TaskStatus statusValue) eşlemesi
+function reqToCol(rs) {
+    switch (rs) {
+        case 2: return 1;          // DevamEdiyor → DevamEdiyor
+        case 4: case 5: return 2;  // Çözüldü/Kapandı → Tamamlandı
+        case 6: return 3;          // İptal → İptal
+        default: return 0;         // Yeni/Atandı/Beklemede → Beklemede
+    }
+}
+// Kolon (TaskStatus statusValue) → yeni RequestStatus (sürükleyince)
+function colToReq(cv) {
+    switch (cv) {
+        case 1: return 2;  // DevamEdiyor
+        case 2: return 4;  // Tamamlandı → Çözüldü
+        case 3: return 6;  // İptal
+        default: return 3; // Beklemede/Ertelendi → Beklemede
+    }
+}
+function mode() { return document.querySelector('input[name="boardMode"]:checked').value; }
 
 $(document).ready(function () {
-    // proje filtresi doldur
     $.get('/api/services/app/Project/GetAll', { maxResultCount: 200 }, function (r) {
         r.result.items.forEach(function (p) {
             $('#projectFilter').append('<option value="' + p.id + '">[' + p.code + '] ' + p.name + '</option>');
@@ -46,49 +73,56 @@ $(document).ready(function () {
 });
 
 function loadBoard() {
-    $.when(
-        $.get('/api/services/app/WorkflowStatus/GetAll', { onlyActive: true }),
-        $.get('/api/services/app/TaskItem/GetAll', { projectId: $('#projectFilter').val() || null, maxResultCount: 1000 })
-    ).done(function (s, t) {
+    var m = mode();
+    var calls = [$.get('/api/services/app/WorkflowStatus/GetAll', { onlyActive: true })];
+    calls.push(m === 'requests' ? null : $.get('/api/services/app/TaskItem/GetAll', { projectId: $('#projectFilter').val() || null, maxResultCount: 1000 }));
+    calls.push(m === 'tasks' ? null : $.get('/api/services/app/ServiceRequest/GetAll', { maxResultCount: 1000 }));
+    $.when.apply($, calls.map(function (c) { return c || $.Deferred().resolve([{ result: { items: [] } }]).promise(); }))
+     .done(function (s, t, r) {
         statuses = s[0].result;
-        tasks = t[0].result.items;
+        tasks = (t && t[0] && t[0].result) ? (t[0].result.items || []) : [];
+        requests = (r && r[0] && r[0].result) ? (r[0].result.items || r[0].result || []) : [];
         renderBoard();
-    });
+     });
 }
 
 function renderBoard() {
     var html = '';
     statuses.forEach(function (st) {
         var colTasks = tasks.filter(function (t) { return t.status === st.statusValue; });
+        var colReqs = requests.filter(function (q) { return reqToCol(q.status) === st.statusValue; });
         html += '<div class="flex-shrink-0" style="width:300px">';
         html += '<div class="card shadow-sm h-100">';
         html += '<div class="card-header bg-' + (st.color || 'secondary') + ' text-white d-flex justify-content-between">';
-        html += '<span>' + st.name + '</span><span class="badge bg-light text-dark">' + colTasks.length + '</span></div>';
+        html += '<span>' + st.name + '</span><span class="badge bg-light text-dark">' + (colTasks.length + colReqs.length) + '</span></div>';
         html += '<div class="card-body p-2 board-col" data-status="' + st.statusValue + '" style="min-height:120px">';
-        colTasks.forEach(function (t) { html += card(t); });
+        colTasks.forEach(function (t) { html += taskCard(t); });
+        colReqs.forEach(function (q) { html += reqCard(q); });
         html += '</div></div></div>';
     });
     $('#board').html(html);
 
-    // her kolona sortable
     document.querySelectorAll('.board-col').forEach(function (col) {
         new Sortable(col, {
-            group: 'tasks',
+            group: 'board',
             animation: 150,
-            draggable: '.task-card',
-            filter: '.not-editable',              // kendine ait olmayan kartlar sürüklenemez
-            preventOnFilter: false,               // kilitli karta tıklama/link çalışsın
-            onMove: function (evt) {
-                // taşınan kart kendine ait değilse bırakmayı engelle (ek güvenlik)
-                return !evt.dragged.classList.contains('not-editable');
-            },
+            draggable: '.kanban-card',
+            filter: '.not-editable',
+            preventOnFilter: false,
+            onMove: function (evt) { return !evt.dragged.classList.contains('not-editable'); },
             onAdd: function (evt) {
-                var id = parseInt(evt.item.getAttribute('data-id'));
-                var newStatus = parseInt(evt.to.getAttribute('data-status'));
-                var t = tasks.find(function (x) { return x.id === id; });
-                if (!t) return;
-                if (!t.canEdit) { abp.notify.warn('Bu görev üzerinde yetkiniz yok.'); loadBoard(); return; }
-                changeStatus(id, newStatus);
+                var el = evt.item;
+                var id = parseInt(el.getAttribute('data-id'));
+                var colVal = parseInt(evt.to.getAttribute('data-status'));
+                if (el.getAttribute('data-kind') === 'request') {
+                    var q = requests.find(function (x) { return x.id === id; });
+                    if (!q || !(q.canManage || q.canLogEffort)) { abp.notify.warn('Bu talep üzerinde yetkiniz yok.'); loadBoard(); return; }
+                    changeRequestStatus(id, colToReq(colVal));
+                } else {
+                    var t = tasks.find(function (x) { return x.id === id; });
+                    if (!t || !t.canEdit) { abp.notify.warn('Bu görev üzerinde yetkiniz yok.'); loadBoard(); return; }
+                    changeTaskStatus(id, colVal);
+                }
             }
         });
     });
@@ -99,15 +133,16 @@ function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function card(t) {
+function taskCard(t) {
     var pr = { 0: 'secondary', 1: 'info', 2: 'warning', 3: 'danger' };
     var overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 2;
     var editable = !!t.canEdit;
-    var h = '<div class="card mb-2 task-card ' + (editable ? '' : 'not-editable') + '" data-id="' + t.id + '" '
+    var h = '<div class="card mb-2 kanban-card ' + (editable ? '' : 'not-editable') + '" data-id="' + t.id + '" data-kind="task" '
           + 'style="' + (editable ? 'cursor:grab' : 'cursor:not-allowed;opacity:.5;filter:grayscale(60%)') + '">';
     h += '<div class="card-body p-2">';
     h += '<div class="small fw-semibold mb-1 d-flex align-items-center gap-1">';
-    if (!editable) h += '<i class="fas fa-lock text-muted" style="font-size:.7rem" title="Size ait değil — sadece görüntüleme"></i>';
+    h += '<i class="fas fa-clipboard-list text-primary" style="font-size:.7rem" title="Görev"></i>';
+    if (!editable) h += '<i class="fas fa-lock text-muted" style="font-size:.7rem"></i>';
     h += '<a href="/Tasks/Detail/' + t.id + '" class="text-decoration-none">' + escHtml(t.title) + '</a></div>';
     h += '<div class="d-flex justify-content-between align-items-center">';
     h += '<span class="badge bg-' + (pr[t.priority] || 'secondary') + '">' + escHtml(t.priorityText) + '</span>';
@@ -121,16 +156,49 @@ function card(t) {
     return h;
 }
 
-function changeStatus(id, status) {
+function reqCard(q) {
+    var editable = !!(q.canManage || q.canLogEffort);
+    var h = '<div class="card mb-2 kanban-card ' + (editable ? '' : 'not-editable') + '" data-id="' + q.id + '" data-kind="request" '
+          + 'style="border-left:3px solid #0dcaf0;' + (editable ? 'cursor:grab' : 'cursor:not-allowed;opacity:.5;filter:grayscale(60%)') + '">';
+    h += '<div class="card-body p-2">';
+    h += '<div class="small fw-semibold mb-1 d-flex align-items-center gap-1">';
+    h += '<i class="fas fa-inbox text-info" style="font-size:.7rem" title="Talep"></i>';
+    if (!editable) h += '<i class="fas fa-lock text-muted" style="font-size:.7rem"></i>';
+    h += '<a href="/Requests/Detail/' + q.id + '" class="text-decoration-none">' + escHtml(q.title) + '</a></div>';
+    h += '<div class="d-flex justify-content-between align-items-center">';
+    h += '<span class="badge bg-light text-dark border">' + escHtml(q.sourceText) + '</span>';
+    if (q.assignedEmployeeName) h += '<small class="text-muted">' + escHtml(q.assignedEmployeeName) + '</small>';
+    h += '</div>';
+    h += '<div class="small text-muted mt-1"><span class="badge bg-secondary" style="font-size:.6rem">' + escHtml(q.statusText) + '</span> · önem ' + q.priorityScore + '</div>';
+    var overdue = q.isOverdue;
+    if (q.dueDate) h += '<div class="small ' + (overdue ? 'text-danger' : 'text-muted') + '"><i class="far fa-calendar me-1"></i>' + new Date(q.dueDate).toLocaleDateString('tr-TR') + '</div>';
+    h += '<div class="progress mt-1" style="height:4px"><div class="progress-bar bg-info" style="width:' + q.completionPercentage + '%"></div></div>';
+    h += '</div></div>';
+    return h;
+}
+
+function token() { return $('input[name="__RequestVerificationToken"]').val(); }
+
+function changeTaskStatus(id, status) {
     var t = tasks.find(function (x) { return x.id === id; });
     var pct = t ? t.completionPercentage : 0;
-    if (status === 2) pct = 100; // Tamamlandı
-    var token = $('input[name="__RequestVerificationToken"]').val();
+    if (status === 2) pct = 100;
     $.ajax({
-        url: '/Tasks/UpdateStatus',
-        type: 'POST',
-        data: { id: id, status: status, percentage: pct, __RequestVerificationToken: token },
-        success: function () { abp.notify.success('Durum güncellendi.'); loadBoard(); },
+        url: '/Tasks/UpdateStatus', type: 'POST',
+        data: { id: id, status: status, percentage: pct, __RequestVerificationToken: token() },
+        success: function () { abp.notify.success('Görev durumu güncellendi.'); loadBoard(); },
+        error: function () { abp.notify.error('Güncellenemedi.'); loadBoard(); }
+    });
+}
+
+function changeRequestStatus(id, status) {
+    var q = requests.find(function (x) { return x.id === id; });
+    var pct = q ? q.completionPercentage : 0;
+    if (status === 4) pct = 100; // Çözüldü
+    $.ajax({
+        url: '/Requests/UpdateStatus', type: 'POST',
+        data: { id: id, status: status, percentage: pct, returnUrl: '', __RequestVerificationToken: token() },
+        success: function () { abp.notify.success('Talep durumu güncellendi.'); loadBoard(); },
         error: function () { abp.notify.error('Güncellenemedi.'); loadBoard(); }
     });
 }
