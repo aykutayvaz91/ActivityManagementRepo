@@ -97,6 +97,7 @@ namespace ActivityManagement.Employees
         {
             var query = _employeeRepository.GetAll()
                 .Include(e => e.Team)
+                .Where(e => !e.IsSystemAccount) // Sistem Yöneticisi personel listesinde/sayımında görünmez
                 .WhereIf(!string.IsNullOrWhiteSpace(input.Filter),
                     e => e.FirstName.Contains(input.Filter) || e.LastName.Contains(input.Filter) ||
                          e.Department.Contains(input.Filter) || e.Title.Contains(input.Filter))

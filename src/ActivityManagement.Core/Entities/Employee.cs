@@ -34,6 +34,10 @@ namespace ActivityManagement.Entities
 
         public bool IsActive { get; set; } = true;
 
+        // Sistem hesabı (config-admin "Sistem Yöneticisi") — Personeller listesinde/sayımlarında GÖSTERİLMEZ,
+        // gerçek personel sayılmaz. Yalnız login-as/işlem kimliği için vardır.
+        public bool IsSystemAccount { get; set; } = false;
+
         // İzin durumu: izinliyse görev atamalarında 1. sorumlu atlanır, 2. sorumluya atanır.
         public bool IsOnLeave { get; set; }
         public DateTime? LeaveEndDate { get; set; } // opsiyonel bilgi: "... tarihine kadar izinli"

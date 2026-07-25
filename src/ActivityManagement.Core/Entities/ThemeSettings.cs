@@ -8,5 +8,7 @@ namespace ActivityManagement.Entities
         public string PrimaryColor { get; set; } = "#0d6efd"; // varsayılan Bootstrap mavisi
         public string LogoUrl { get; set; }
         public string BrandName { get; set; } = "Faaliyet Yönetim Sistemi";
+        // Açıksa üst menüde sabit marka yerine, giriş yapan kişinin TAKIMININ kısa adı (ShortName) gösterilir.
+        public bool UseTeamNameAsBrand { get; set; } = false;
     }
 }

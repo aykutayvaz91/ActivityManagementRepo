@@ -103,6 +103,11 @@
                         <input name="Name" id="f_name" class="form-control" required />
                     </div>
                     <div class="mb-2">
+                        <label class="form-label small">Kısa Ad <small class="text-muted">(ör. INFRA)</small></label>
+                        <input name="ShortName" id="f_short" class="form-control text-uppercase" maxlength="32" placeholder="INFRA / SOFTWARE / SUPPORT" />
+                        <small class="text-muted">Üst menü "takıma göre marka" açıksa gösterilir.</small>
+                    </div>
+                    <div class="mb-2">
                         <label class="form-label small">Açıklama</label>
                         <textarea name="Description" id="f_desc" class="form-control" rows="2"></textarea>
                     </div>
@@ -133,6 +138,7 @@ function editTeam(t) {
     document.getElementById('formTitle').innerText = 'Takım Düzenle: ' + t.name;
     document.getElementById('f_id').value = t.id;
     document.getElementById('f_name').value = t.name;
+    document.getElementById('f_short').value = t.shortName || '';
     document.getElementById('f_desc').value = t.description || '';
     document.getElementById('f_leader').value = t.leaderId || '';
     document.getElementById('f_active').checked = t.isActive;
@@ -142,6 +148,7 @@ function resetForm() {
     document.getElementById('formTitle').innerText = 'Yeni Takım';
     document.getElementById('f_id').value = 0;
     document.getElementById('f_name').value = '';
+    document.getElementById('f_short').value = '';
     document.getElementById('f_desc').value = '';
     document.getElementById('f_leader').value = '';
     document.getElementById('f_active').checked = true;

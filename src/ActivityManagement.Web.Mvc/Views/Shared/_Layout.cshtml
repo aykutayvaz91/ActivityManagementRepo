@@ -44,10 +44,13 @@
         /* Footer navbar ile aynı temaya (ana renk) bağlı */
         .footer { flex-shrink: 0; background-color: var(--app-primary) !important; }
         .footer, .footer small { color: rgba(255,255,255,.9) !important; }
+        /* Menü katmanlaşması: dropdown'lar içerik/kartların üstünde kalsın (çakışma önlemi) */
+        .navbar { z-index: 1030; }
+        .navbar .dropdown-menu { z-index: 1056; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-xl navbar-dark bg-primary">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
                 @if (!string.IsNullOrEmpty(__logo))
@@ -210,6 +213,7 @@
         <div class="container">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-1">
                 <small>&copy; @DateTime.Now.Year Faaliyet Yönetim Sistemi · CMIT Bilişim Arge A.Ş.</small>
+                <small class="opacity-75" title="Yazılım sürümü">v@(ActivityManagement.ActivityManagementConsts.AppVersion)</small>
                 <small class="opacity-75"><i class="fas fa-code me-1"></i>Designed by <strong>Aykut AYVAZ</strong></small>
             </div>
         </div>

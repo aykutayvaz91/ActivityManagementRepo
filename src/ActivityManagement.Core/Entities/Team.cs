@@ -9,6 +9,8 @@ namespace ActivityManagement.Entities
         public int TenantId { get; set; }
 
         public string Name { get; set; }
+        // Kısa ön-isim / kod (ör. INFRA, SOFTWARE, SUPPORT). Üst menüde takıma göre marka gösteriminde kullanılır.
+        public string ShortName { get; set; }
         public string Description { get; set; }
 
         public long? LeaderId { get; set; }

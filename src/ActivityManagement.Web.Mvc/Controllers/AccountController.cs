@@ -51,6 +51,7 @@ namespace ActivityManagement.Web.Controllers
                             Email = adminEmail,
                             AppRole = "Admin",
                             IsActive = true,
+                            IsSystemAccount = true, // Personeller listesinde/sayımında gösterilmez
                             HireDate = DateTime.Today
                         };
                         var id = await _employeeRepository.InsertAndGetIdAsync(newEmp);

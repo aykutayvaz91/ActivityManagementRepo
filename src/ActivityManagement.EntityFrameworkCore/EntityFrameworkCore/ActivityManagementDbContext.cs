@@ -103,6 +103,7 @@ namespace ActivityManagement.EntityFrameworkCore
             {
                 b.ToTable("Teams");
                 b.Property(t => t.Name).IsRequired().HasMaxLength(128);
+                b.Property(t => t.ShortName).HasMaxLength(32);
                 b.Property(t => t.Description).HasMaxLength(2000);
                 b.HasOne(t => t.Leader)
                  .WithMany()

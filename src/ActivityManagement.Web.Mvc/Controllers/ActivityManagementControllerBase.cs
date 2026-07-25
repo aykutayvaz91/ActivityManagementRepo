@@ -29,7 +29,8 @@ namespace ActivityManagement.Web.Controllers
                         var t = await themeSvc.GetAsync();
                         ViewData["ThemePrimary"] = t.PrimaryColor;
                         ViewData["ThemeLogo"] = t.LogoUrl;
-                        ViewData["ThemeBrand"] = t.BrandName;
+                        // Efektif marka: "takıma göre" açıksa kişinin takım kısa adı (INFRA...), yoksa marka adı
+                        ViewData["ThemeBrand"] = string.IsNullOrWhiteSpace(t.EffectiveBrand) ? t.BrandName : t.EffectiveBrand;
                     }
 
                     // Rol × Sayfa erişimi — izinli sayfa anahtarları (menü gizleme + action guard)

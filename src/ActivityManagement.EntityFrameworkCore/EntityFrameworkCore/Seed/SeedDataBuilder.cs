@@ -57,6 +57,7 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
 
             // Ad ve lideri sabitle
             team.Name = "Infrastructure Team";
+            if (string.IsNullOrWhiteSpace(team.ShortName)) team.ShortName = "INFRA"; // üst menü marka ön-ismi
             team.IsActive = true;
             if (leader != null) team.LeaderId = leader.Id;
 
@@ -65,11 +66,12 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
             // aksi halde takım-izolasyonlu personel listelerinde görünür. Yanlışlıkla bağlanmışsa onarılır.
             foreach (var e in _context.Employees.ToList())
             {
-                bool isSystemAdmin = e.Title == "Sistem Yöneticisi"
-                    && e.FirstName == "Sistem" && e.LastName == "Yöneticisi";
+                bool isSystemAdmin = e.IsSystemAccount || (e.Title == "Sistem Yöneticisi"
+                    && e.FirstName == "Sistem" && e.LastName == "Yöneticisi");
                 if (isSystemAdmin)
                 {
-                    if (e.TeamId.HasValue) e.TeamId = null; // onar
+                    if (!e.IsSystemAccount) e.IsSystemAccount = true; // eski kayıtları işaretle (göç)
+                    if (e.TeamId.HasValue) e.TeamId = null; // onar (takıma bağlanmaz)
                     continue;
                 }
                 if (!e.TeamId.HasValue) e.TeamId = team.Id;

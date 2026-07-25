@@ -60,6 +60,7 @@ namespace ActivityManagement.Teams
             var team = new Team
             {
                 Name = input.Name,
+                ShortName = input.ShortName?.Trim(),
                 Description = input.Description,
                 LeaderId = input.LeaderId,
                 IsActive = input.IsActive
@@ -74,6 +75,7 @@ namespace ActivityManagement.Teams
             EnsureAdmin();
             var team = await _teamRepository.GetAsync(input.Id);
             team.Name = input.Name;
+            team.ShortName = input.ShortName?.Trim();
             team.Description = input.Description;
             team.LeaderId = input.LeaderId;
             team.IsActive = input.IsActive;
@@ -93,6 +95,7 @@ namespace ActivityManagement.Teams
             {
                 Id = t.Id,
                 Name = t.Name,
+                ShortName = t.ShortName,
                 Description = t.Description,
                 LeaderId = t.LeaderId,
                 LeaderName = t.Leader?.FullName,

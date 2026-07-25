@@ -178,7 +178,7 @@ namespace ActivityManagement.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SaveTheme(string primaryColor, string brandName, Microsoft.AspNetCore.Http.IFormFile logoFile)
+        public async Task<IActionResult> SaveTheme(string primaryColor, string brandName, bool useTeamNameAsBrand, Microsoft.AspNetCore.Http.IFormFile logoFile)
         {
             if (!IsAdmin()) return AccessDeniedRedirect();
             try
@@ -186,6 +186,7 @@ namespace ActivityManagement.Web.Controllers
                 var dto = await _themeAppService.GetAsync();
                 dto.PrimaryColor = string.IsNullOrWhiteSpace(primaryColor) ? dto.PrimaryColor : primaryColor;
                 dto.BrandName = string.IsNullOrWhiteSpace(brandName) ? dto.BrandName : brandName;
+                dto.UseTeamNameAsBrand = useTeamNameAsBrand;
 
                 if (logoFile != null && logoFile.Length > 0)
                 {

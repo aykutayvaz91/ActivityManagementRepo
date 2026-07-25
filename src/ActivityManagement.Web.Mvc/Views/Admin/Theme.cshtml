@@ -34,6 +34,14 @@
                         <input type="text" name="brandName" value="@theme.BrandName" class="form-control" />
                     </div>
                     <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input type="hidden" name="useTeamNameAsBrand" value="false" />
+                            <input class="form-check-input" type="checkbox" name="useTeamNameAsBrand" value="true" id="useTeamBrand" @(theme.UseTeamNameAsBrand ? "checked" : "") />
+                            <label class="form-check-label" for="useTeamBrand">Üst menüde takım kısa adını göster</label>
+                        </div>
+                        <small class="text-muted">Açıksa marka adı yerine giriş yapan kişinin <strong>takım kısa adı</strong> (ör. INFRA, SOFTWARE, SUPPORT) gösterilir. Takım kısa adları <a href="/Admin/Teams">Takım Yönetimi</a>'nden girilir.</small>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Şirket Logosu (cmit)</label>
                         @if (!string.IsNullOrEmpty(theme.LogoUrl))
                         {
