@@ -21,6 +21,10 @@ namespace ActivityManagement.Entities
         public long? ActivitySubjectId { get; set; }
         public virtual ActivitySubject ActivitySubject { get; set; }
 
+        // Bağlı olduğu talep (varsa) — psm.tdv.org / destek.cmit.com.tr taleplerine harcanan efor.
+        public long? ServiceRequestId { get; set; }
+        public virtual ServiceRequest ServiceRequest { get; set; }
+
         public string Description { get; set; }
         public DateTime ActivityDate { get; set; }
         public decimal HoursSpent { get; set; }

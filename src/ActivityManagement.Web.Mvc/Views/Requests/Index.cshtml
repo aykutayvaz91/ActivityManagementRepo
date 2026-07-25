@@ -1,0 +1,246 @@
+@using ActivityManagement.Entities
+@{
+    ViewData["Title"] = "Talepler";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var sunucu = ViewBag.Sunucu as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto> ?? new();
+    var destek = ViewBag.Destek as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto> ?? new();
+    var employees = ViewBag.Employees as System.Collections.Generic.IReadOnlyList<ActivityManagement.Employees.Dto.EmployeeDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>();
+    var projects = ViewBag.Projects as System.Collections.Generic.IReadOnlyList<ActivityManagement.Projects.Dto.ProjectDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Projects.Dto.ProjectDto>();
+    var types = ViewBag.ActivityTypes as System.Collections.Generic.IReadOnlyList<ActivityManagement.Activities.Dto.ActivityTypeDefDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>();
+    bool isManager = ViewBag.IsManager == true;
+    var statuses = System.Enum.GetValues(typeof(RequestStatus)).Cast<RequestStatus>().ToList();
+    var statusNames = new System.Collections.Generic.Dictionary<int,string> {
+        {0,"Yeni"},{1,"Atandı"},{2,"Devam Ediyor"},{3,"Beklemede"},{4,"Çözüldü"},{5,"Kapandı"},{6,"İptal"}
+    };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-inbox text-primary me-2"></i>Talepler</h2>
+    @if (isManager)
+    {
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+            <i class="fas fa-plus me-1"></i>Yeni Talep
+        </button>
+    }
+</div>
+
+<ul class="nav nav-tabs mb-3" id="reqTabs">
+    <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#tab-sunucu">
+            <i class="fas fa-server me-1"></i>Sunucu Talepleri
+            <span class="badge bg-secondary ms-1">@sunucu.Count(x => x.IsOpen)</span>
+            <small class="text-muted d-none d-md-inline">(psm.tdv.org)</small>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-destek">
+            <i class="fas fa-headset me-1"></i>Destek Talepleri
+            <span class="badge bg-secondary ms-1">@destek.Count(x => x.IsOpen)</span>
+            <small class="text-muted d-none d-md-inline">(destek.cmit.com.tr)</small>
+        </a>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade show active" id="tab-sunucu">
+        <div class="card shadow-sm"><div class="card-body p-2">
+            @await Html.PartialAsync("_RequestTable", sunucu)
+        </div></div>
+    </div>
+    <div class="tab-pane fade" id="tab-destek">
+        <div class="card shadow-sm"><div class="card-body p-2">
+            @await Html.PartialAsync("_RequestTable", destek)
+        </div></div>
+    </div>
+</div>
+
+@* ===== Ata Modal ===== *@
+<div class="modal fade" id="assignModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/Requests/Assign">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="as_id" />
+        <input type="hidden" name="returnUrl" value="/Requests" />
+        <div class="modal-header"><h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Talebi Ata</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <label class="form-label">Atanan Kişi</label>
+                <select name="assignedEmployeeId" id="as_emp" class="form-select">
+                    <option value="">— Atama yok —</option>
+                    @foreach (var e in employees) { <option value="@e.Id">@e.FullName</option> }
+                </select>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">2. Sorumlu <small class="text-muted">(opsiyonel)</small></label>
+                <select name="secondaryEmployeeId" id="as_emp2" class="form-select">
+                    <option value="">— Yok —</option>
+                    @foreach (var e in employees) { <option value="@e.Id">@e.FullName</option> }
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Vazgeç</button><button type="submit" class="btn btn-primary">Kaydet</button></div>
+    </form>
+</div></div></div>
+
+@* ===== Durum Modal ===== *@
+<div class="modal fade" id="statusModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/Requests/UpdateStatus">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="st_id" />
+        <input type="hidden" name="returnUrl" value="/Requests" />
+        <div class="modal-header"><h5 class="modal-title"><i class="fas fa-flag me-2"></i>Durum Güncelle</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <label class="form-label">Durum</label>
+                <select name="status" id="st_status" class="form-select">
+                    @foreach (var s in statuses) { <option value="@((int)s)">@statusNames[(int)s]</option> }
+                </select>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">İlerleme (%)</label>
+                <input type="number" name="percentage" id="st_pct" class="form-control" min="0" max="100" step="5" value="0" />
+                <small class="text-muted">Tamamlandı/Çözüldü → %100, Devam → en az %25 (otomatik).</small>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Vazgeç</button><button type="submit" class="btn btn-primary">Kaydet</button></div>
+    </form>
+</div></div></div>
+
+@* ===== Efor Modal ===== *@
+<div class="modal fade" id="effortModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/Requests/LogEffort">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="serviceRequestId" id="ef_id" />
+        <input type="hidden" name="returnUrl" value="/Requests" />
+        <div class="modal-header"><h5 class="modal-title"><i class="fas fa-clock me-2"></i>Efor Gir — <span id="ef_title"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="row g-2">
+                <div class="col-6">
+                    <label class="form-label">Tarih</label>
+                    <input type="date" name="activityDate" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label">Süre (saat)</label>
+                    <input type="number" name="hoursSpent" class="form-control" step="0.25" min="0.25" value="1" required />
+                </div>
+            </div>
+            <div class="mb-2 mt-2">
+                <label class="form-label">Faaliyet Tipi</label>
+                <select name="activityType" class="form-select">
+                    <option value="Talep">Talep</option>
+                    @foreach (var t in types) { <option value="@t.Name">@t.Name</option> }
+                </select>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Açıklama</label>
+                <textarea name="description" class="form-control" rows="3"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Vazgeç</button><button type="submit" class="btn btn-success">Kaydet</button></div>
+    </form>
+</div></div></div>
+
+@if (isManager)
+{
+    @* ===== Yeni Talep Modal ===== *@
+    <div class="modal fade" id="createModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+        <form method="post" action="/Requests/Create">
+            @Html.AntiForgeryToken()
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-plus me-2"></i>Yeni Talep</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Kaynak</label>
+                        <select name="Source" class="form-select">
+                            <option value="0">Sunucu Kurulum (psm.tdv.org)</option>
+                            <option value="1">Dış Destek (destek.cmit.com.tr)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Talep No <small class="text-muted">(portal)</small></label>
+                        <input type="text" name="ExternalRef" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Portal Bağlantısı</label>
+                        <input type="url" name="ExternalUrl" class="form-control" placeholder="https://..." />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Başlık *</label>
+                        <input type="text" name="Title" class="form-control" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Talep Eden</label>
+                        <input type="text" name="RequesterName" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Talep Eden E-posta</label>
+                        <input type="email" name="RequesterEmail" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Atanan Kişi</label>
+                        <select name="AssignedEmployeeId" class="form-select">
+                            <option value="">— Sonra atanacak —</option>
+                            @foreach (var e in employees) { <option value="@e.Id">@e.FullName</option> }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Önem (1-10)</label>
+                        <input type="number" name="PriorityScore" class="form-control" min="1" max="10" value="5" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">SLA / Hedef Tarih</label>
+                        <input type="date" name="DueDate" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Proje <small class="text-muted">(opsiyonel)</small></label>
+                        <select name="ProjectId" class="form-select">
+                            <option value="">— Yok —</option>
+                            @foreach (var p in projects) { <option value="@p.Id">[@p.Code] @p.Name</option> }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Ek Bilgi <small class="text-muted">(sunucu/müşteri)</small></label>
+                        <input type="text" name="ExtraInfo" class="form-control" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Açıklama</label>
+                        <textarea name="Description" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Vazgeç</button><button type="submit" class="btn btn-primary">Oluştur</button></div>
+        </form>
+    </div></div></div>
+}
+
+@section Scripts {
+<script>
+function openAssign(id, empId, emp2) {
+    document.getElementById('as_id').value = id;
+    document.getElementById('as_emp').value = empId || '';
+    document.getElementById('as_emp2').value = emp2 || '';
+    new bootstrap.Modal(document.getElementById('assignModal')).show();
+}
+function openStatus(id, status, pct) {
+    document.getElementById('st_id').value = id;
+    document.getElementById('st_status').value = status;
+    document.getElementById('st_pct').value = pct;
+    new bootstrap.Modal(document.getElementById('statusModal')).show();
+}
+function openEffort(id, title) {
+    document.getElementById('ef_id').value = id;
+    document.getElementById('ef_title').textContent = title;
+    new bootstrap.Modal(document.getElementById('effortModal')).show();
+}
+// Menüden #tab-destek / #tab-sunucu ile gelindiğinde ilgili sekmeyi aç
+document.addEventListener('DOMContentLoaded', function () {
+    var h = window.location.hash;
+    if (h === '#tab-destek' || h === '#tab-sunucu') {
+        var trigger = document.querySelector('#reqTabs a[href="' + h + '"]');
+        if (trigger) new bootstrap.Tab(trigger).show();
+    }
+});
+</script>
+}

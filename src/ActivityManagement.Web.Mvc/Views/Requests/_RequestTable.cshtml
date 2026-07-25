@@ -1,0 +1,106 @@
+@using ActivityManagement.Entities
+@model System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto>
+@{
+    var reqList = Model ?? new System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto>();
+    System.Func<RequestStatus, string> statusColor = s =>
+        s == RequestStatus.Yeni ? "secondary" :
+        s == RequestStatus.Atandi ? "info" :
+        s == RequestStatus.DevamEdiyor ? "primary" :
+        s == RequestStatus.Beklemede ? "warning" :
+        s == RequestStatus.Cozuldu ? "success" :
+        s == RequestStatus.Kapandi ? "dark" : "danger";
+}
+
+@if (!reqList.Any())
+{
+    <div class="text-center py-5 text-muted">
+        <i class="fas fa-inbox fa-3x mb-3"></i>
+        <p>Bu kategoride talep bulunmuyor.</p>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Ref</th>
+                    <th>Başlık</th>
+                    <th>Talep Eden</th>
+                    <th>Atanan</th>
+                    <th class="text-center">Önem</th>
+                    <th class="text-center">Durum</th>
+                    <th class="text-center">SLA</th>
+                    <th style="min-width:110px">İlerleme</th>
+                    <th class="text-end">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in reqList)
+                {
+                    <tr class="@(r.IsOverdue ? "table-danger" : "")">
+                        <td>
+                            @if (!string.IsNullOrEmpty(r.ExternalUrl))
+                            {
+                                <a href="@r.ExternalUrl" target="_blank" rel="noopener" title="Portalda aç">@(r.ExternalRef ?? "-") <i class="fas fa-external-link-alt fa-xs"></i></a>
+                            }
+                            else
+                            {
+                                <span class="text-muted">@(r.ExternalRef ?? "-")</span>
+                            }
+                        </td>
+                        <td>
+                            <a href="/Requests/Detail/@r.Id" class="fw-semibold text-decoration-none">@r.Title</a>
+                            @if (r.TotalHours > 0)
+                            {
+                                <small class="text-muted d-block"><i class="fas fa-clock me-1"></i>@r.TotalHours.ToString("0.##") saat efor</small>
+                            }
+                        </td>
+                        <td><small>@(r.RequesterName ?? "-")</small></td>
+                        <td><small>@(r.AssignedEmployeeName ?? "<atanmadı>")</small></td>
+                        <td class="text-center"><span class="badge bg-light text-dark border">@r.PriorityScore</span></td>
+                        <td class="text-center"><span class="badge bg-@statusColor(r.Status)">@r.StatusText</span></td>
+                        <td class="text-center">
+                            <small class="@(r.IsOverdue ? "text-danger fw-bold" : "text-muted")">
+                                @(r.DueDate.HasValue ? r.DueDate.Value.ToString("dd.MM.yyyy") : "-")
+                            </small>
+                        </td>
+                        <td>
+                            <div class="progress" style="height:6px">
+                                <div class="progress-bar" style="width:@r.CompletionPercentage%"></div>
+                            </div>
+                            <small class="text-muted">@r.CompletionPercentage%</small>
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <a href="/Requests/Detail/@r.Id" class="btn btn-sm btn-outline-info" title="Detay"><i class="fas fa-eye"></i></a>
+                            @if (r.CanManage)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        title="Ata"
+                                        onclick="openAssign(@r.Id, '@(r.AssignedEmployeeId?.ToString() ?? "")', '@(r.SecondaryEmployeeId?.ToString() ?? "")')">
+                                    <i class="fas fa-user-plus"></i>
+                                </button>
+                            }
+                            @if (r.CanManage || r.CanLogEffort)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        title="Durum"
+                                        onclick="openStatus(@r.Id, @((int)r.Status), @r.CompletionPercentage)">
+                                    <i class="fas fa-flag"></i>
+                                </button>
+                            }
+                            @if (r.CanLogEffort)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-success"
+                                        title="Efor Gir"
+                                        onclick="openEffort(@r.Id, '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(r.Title ?? ""))')">
+                                    <i class="fas fa-clock"></i>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

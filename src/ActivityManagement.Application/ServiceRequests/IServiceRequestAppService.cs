@@ -1,0 +1,31 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Abp.Application.Services;
+using ActivityManagement.Activities.Dto;
+using ActivityManagement.Entities;
+using ActivityManagement.ServiceRequests.Dto;
+
+namespace ActivityManagement.ServiceRequests
+{
+    public interface IServiceRequestAppService : IApplicationService
+    {
+        Task<List<ServiceRequestDto>> GetAllAsync(GetServiceRequestsInput input);
+        Task<ServiceRequestDto> GetAsync(long id);
+        Task<ServiceRequestDto> CreateAsync(CreateUpdateServiceRequestDto input);
+        Task<ServiceRequestDto> UpdateAsync(CreateUpdateServiceRequestDto input);
+        Task DeleteAsync(long id);
+
+        // Talebi bir uzmana (ve opsiyonel yedeğe) ata — yönetici.
+        Task<ServiceRequestDto> AssignAsync(long id, long? assignedEmployeeId, long? secondaryEmployeeId = null);
+        // Durum + ilerleme güncelle — atanan kişi veya yönetici.
+        Task<ServiceRequestDto> UpdateStatusAsync(long id, RequestStatus status, int percentage);
+
+        // Efor: yalnız atanan kişi kendi adına girer (faaliyet kuralı).
+        Task<ActivityLogDto> LogEffortAsync(CreateActivityLogDto input);
+        Task<List<ActivityLogDto>> GetEffortsAsync(long serviceRequestId);
+        Task DeleteEffortAsync(long id);
+
+        // Faz 2: Portaldan idempotent upsert (webhook alıcısı / sync). (Source, ExternalRef) anahtarı.
+        Task<long> UpsertFromPortalAsync(PortalRequestDto input);
+    }
+}

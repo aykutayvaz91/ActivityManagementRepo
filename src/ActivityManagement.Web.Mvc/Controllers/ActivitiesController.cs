@@ -20,6 +20,7 @@ namespace ActivityManagement.Web.Controllers
         private readonly IProjectAppService _projectAppService;
         private readonly IActivityTypeAppService _activityTypeAppService;
         private readonly ITaskItemAppService _taskAppService;
+        private readonly ActivityManagement.ServiceRequests.IServiceRequestAppService _requestAppService;
 
         public ActivitiesController(
             IActivitySubjectAppService subjectAppService,
@@ -27,7 +28,8 @@ namespace ActivityManagement.Web.Controllers
             IEmployeeAppService employeeAppService,
             IProjectAppService projectAppService,
             IActivityTypeAppService activityTypeAppService,
-            ITaskItemAppService taskAppService)
+            ITaskItemAppService taskAppService,
+            ActivityManagement.ServiceRequests.IServiceRequestAppService requestAppService)
         {
             _subjectAppService = subjectAppService;
             _categoryAppService = categoryAppService;
@@ -35,6 +37,7 @@ namespace ActivityManagement.Web.Controllers
             _projectAppService = projectAppService;
             _activityTypeAppService = activityTypeAppService;
             _taskAppService = taskAppService;
+            _requestAppService = requestAppService;
         }
 
         private bool IsManager() => User.IsInRole("Admin") || User.IsInRole("TakımLideri");
@@ -70,16 +73,19 @@ namespace ActivityManagement.Web.Controllers
             }
             ViewBag.DayTasks = dayTasks;
             ViewBag.MyTasks = myActiveTasks;
+            // Bana atanan açık talepler (efor girişinde seçilebilsin)
+            ViewBag.MyRequests = await _requestAppService.GetAllAsync(
+                new ActivityManagement.ServiceRequests.Dto.GetServiceRequestsInput { MineOnly = true, OnlyOpen = true });
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddDayEffort(DateTime date, decimal hoursSpent, string description, string activityType, long? taskItemId, long? projectId)
+        public async Task<IActionResult> AddDayEffort(DateTime date, decimal hoursSpent, string description, string activityType, long? taskItemId, long? projectId, long? serviceRequestId)
         {
             try
             {
-                await _subjectAppService.AddManualEffortAsync(date, hoursSpent, description, activityType, taskItemId, projectId);
+                await _subjectAppService.AddManualEffortAsync(date, hoursSpent, description, activityType, taskItemId, projectId, serviceRequestId);
                 TempData["Success"] = "Efor kaydı eklendi.";
             }
             catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }

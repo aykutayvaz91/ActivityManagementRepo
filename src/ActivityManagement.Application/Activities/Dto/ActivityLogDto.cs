@@ -17,6 +17,8 @@ namespace ActivityManagement.Activities.Dto
         public string ProjectName { get; set; }
         public long? ActivitySubjectId { get; set; }
         public string ActivitySubjectTitle { get; set; }
+        public long? ServiceRequestId { get; set; }
+        public string ServiceRequestTitle { get; set; }
         public string Description { get; set; }
         public DateTime ActivityDate { get; set; }
         public decimal HoursSpent { get; set; }
@@ -30,6 +32,7 @@ namespace ActivityManagement.Activities.Dto
         public long? TaskItemId { get; set; }
         public long? ProjectId { get; set; }
         public long? ActivitySubjectId { get; set; }
+        public long? ServiceRequestId { get; set; }
         public string Description { get; set; }
         public DateTime ActivityDate { get; set; } = DateTime.Today;
         public decimal HoursSpent { get; set; }

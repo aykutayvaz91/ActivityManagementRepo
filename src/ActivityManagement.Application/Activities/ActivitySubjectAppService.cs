@@ -383,7 +383,7 @@ namespace ActivityManagement.Activities
             if (!ctx.EmployeeId.HasValue) return result;
 
             var logs = await _logRepository.GetAll().AsNoTracking()
-                .Include(a => a.Employee).Include(a => a.ActivitySubject).Include(a => a.TaskItem).Include(a => a.Project)
+                .Include(a => a.Employee).Include(a => a.ActivitySubject).Include(a => a.TaskItem).Include(a => a.Project).Include(a => a.ServiceRequest)
                 .Where(a => a.EmployeeId == ctx.EmployeeId.Value && a.ActivityDate >= day && a.ActivityDate < next)
                 .OrderBy(a => a.Id)
                 .ToListAsync();
@@ -395,6 +395,8 @@ namespace ActivityManagement.Activities
                 EmployeeName = a.Employee?.FullName,
                 ActivitySubjectId = a.ActivitySubjectId,
                 ActivitySubjectTitle = a.ActivitySubject?.Title,
+                ServiceRequestId = a.ServiceRequestId,
+                ServiceRequestTitle = a.ServiceRequest?.Title,
                 TaskItemId = a.TaskItemId,
                 TaskTitle = a.TaskItem?.Title,
                 ProjectId = a.ProjectId,
@@ -411,7 +413,7 @@ namespace ActivityManagement.Activities
         }
 
         // R1: Serbest (manuel) günlük efor ekleme — proje/görev opsiyonel. Proje seçilirse efor projeye sayılır.
-        public async Task AddManualEffortAsync(DateTime date, decimal hoursSpent, string description, string activityType, long? taskItemId = null, long? projectId = null)
+        public async Task AddManualEffortAsync(DateTime date, decimal hoursSpent, string description, string activityType, long? taskItemId = null, long? projectId = null, long? serviceRequestId = null)
         {
             var ctx = CurrentContext();
             if (!ctx.EmployeeId.HasValue)
@@ -428,7 +430,8 @@ namespace ActivityManagement.Activities
                 ActivityType = string.IsNullOrWhiteSpace(activityType) ? "Faaliyet" : activityType,
                 Description = description,
                 TaskItemId = taskItemId,
-                ProjectId = projectId
+                ProjectId = projectId,
+                ServiceRequestId = serviceRequestId
             });
             await CurrentUnitOfWork.SaveChangesAsync();
         }

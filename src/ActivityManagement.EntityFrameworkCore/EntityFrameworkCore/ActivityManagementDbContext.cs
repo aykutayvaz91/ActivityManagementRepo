@@ -30,6 +30,7 @@ namespace ActivityManagement.EntityFrameworkCore
         public DbSet<ThemeSettings> ThemeSettings { get; set; }
         public DbSet<AppRoleDef> AppRoles { get; set; }
         public DbSet<RolePageAccess> RolePageAccesses { get; set; }
+        public DbSet<ServiceRequest> ServiceRequests { get; set; }
 
         public ActivityManagementDbContext(DbContextOptions<ActivityManagementDbContext> options)
             : base(options)
@@ -252,6 +253,11 @@ namespace ActivityManagement.EntityFrameworkCore
                  .HasForeignKey(a => a.ActivitySubjectId)
                  .IsRequired(false)
                  .OnDelete(DeleteBehavior.SetNull);
+                b.HasOne(a => a.ServiceRequest)
+                 .WithMany(s => s.Logs)
+                 .HasForeignKey(a => a.ServiceRequestId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<ActivitySubject>(b =>
@@ -284,6 +290,50 @@ namespace ActivityManagement.EntityFrameworkCore
                  .HasForeignKey(s => s.TeamId)
                  .IsRequired(false)
                  .OnDelete(DeleteBehavior.SetNull);
+                b.HasOne(s => s.Project)
+                 .WithMany()
+                 .HasForeignKey(s => s.ProjectId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<ServiceRequest>(b =>
+            {
+                b.ToTable("ServiceRequests");
+                b.Property(s => s.Title).IsRequired().HasMaxLength(512);
+                b.Property(s => s.Description).HasMaxLength(4000);
+                b.Property(s => s.ExternalRef).HasMaxLength(128);
+                b.Property(s => s.ExternalUrl).HasMaxLength(1024);
+                b.Property(s => s.RequesterName).HasMaxLength(256);
+                b.Property(s => s.RequesterEmail).HasMaxLength(256);
+                b.Property(s => s.ExtraInfo).HasMaxLength(2000);
+                // (Source, ExternalRef) idempotent upsert için indekslenir (ExternalRef null olabilir → filtered unique)
+                b.HasIndex(s => new { s.Source, s.ExternalRef });
+                b.HasOne(s => s.AssignedEmployee)
+                 .WithMany()
+                 .HasForeignKey(s => s.AssignedEmployeeId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.SetNull);
+                b.HasOne(s => s.SecondaryEmployee)
+                 .WithMany()
+                 .HasForeignKey(s => s.SecondaryEmployeeId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.NoAction);
+                b.HasOne(s => s.Team)
+                 .WithMany()
+                 .HasForeignKey(s => s.TeamId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.SetNull);
+                b.HasOne(s => s.Category)
+                 .WithMany()
+                 .HasForeignKey(s => s.CategoryId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(s => s.SubCategory)
+                 .WithMany()
+                 .HasForeignKey(s => s.SubCategoryId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(s => s.Project)
                  .WithMany()
                  .HasForeignKey(s => s.ProjectId)

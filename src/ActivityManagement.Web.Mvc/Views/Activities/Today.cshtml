@@ -11,6 +11,8 @@
                   ?? new System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>();
     var dayTasks = ViewBag.DayTasks as System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>
                    ?? new System.Collections.Generic.List<ActivityManagement.Tasks.Dto.TaskItemDto>();
+    var myRequests = ViewBag.MyRequests as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto>
+                     ?? new System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto>();
     var dstr = day.ToString("yyyy-MM-dd");
     bool complete = de.MissingHours <= 0;
 }
@@ -69,7 +71,8 @@
                         @foreach (var e in de.Efforts)
                         {
                             string subj;
-                            if (!string.IsNullOrEmpty(e.ActivitySubjectTitle)) subj = "Konu: " + e.ActivitySubjectTitle;
+                            if (!string.IsNullOrEmpty(e.ServiceRequestTitle)) subj = "Talep: " + e.ServiceRequestTitle;
+                            else if (!string.IsNullOrEmpty(e.ActivitySubjectTitle)) subj = "Konu: " + e.ActivitySubjectTitle;
                             else if (!string.IsNullOrEmpty(e.TaskTitle)) subj = "Görev: " + e.TaskTitle;
                             else if (!string.IsNullOrEmpty(e.ProjectName)) subj = "Proje: " + e.ProjectName;
                             else subj = "-";
@@ -159,6 +162,17 @@
                         <small class="text-muted">Seçilirse efor bu göreve bağlanır.</small>
                     </div>
                     <div class="mb-2">
+                        <label class="form-label small">Talep <small class="text-muted">(opsiyonel)</small></label>
+                        <select name="serviceRequestId" id="ef_request" class="form-select form-select-sm">
+                            <option value="">— Talep yok —</option>
+                            @foreach (var r in myRequests)
+                            {
+                                <option value="@r.Id">[@r.SourceText] @r.Title</option>
+                            }
+                        </select>
+                        <small class="text-muted">Seçilirse efor bu talebe bağlanır.</small>
+                    </div>
+                    <div class="mb-2">
                         <label class="form-label small">Faaliyet Tipi</label>
                         <select name="activityType" id="ef_type" class="form-select form-select-sm">
                             @foreach (var t in types)
@@ -196,6 +210,7 @@ function editEffort(id, desc, hours, type, projectId) {
     document.getElementById('ef_hours').value = hours;
     if (type) document.getElementById('ef_type').value = type;
     document.getElementById('ef_project').value = projectId || '';
+    var reqSel = document.getElementById('ef_request'); if (reqSel) reqSel.value = '';
     window.scrollTo(0, document.body.scrollHeight);
 }
 function resetEffortForm() {
@@ -205,6 +220,8 @@ function resetEffortForm() {
     document.getElementById('ef_desc').value = '';
     document.getElementById('ef_hours').value = 1;
     document.getElementById('ef_project').value = '';
+    var reqSel = document.getElementById('ef_request'); if (reqSel) reqSel.value = '';
+    var taskSel = document.getElementById('ef_task'); if (taskSel) taskSel.value = '';
 }
 </script>
 }

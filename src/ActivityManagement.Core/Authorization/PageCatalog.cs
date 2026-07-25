@@ -17,6 +17,8 @@ namespace ActivityManagement.Authorization
             new PageDef("Dashboard",  "Ana Sayfa (Panel)"),
             new PageDef("Employees",  "Personeller"),
             new PageDef("Projects",   "Projeler"),
+            new PageDef("Work",       "İşlerim (Genel Bakış)"),
+            new PageDef("Requests",   "Talepler"),
             new PageDef("Tasks",      "Görevler (Admin Liste)"),
             new PageDef("Board",      "Pano"),
             new PageDef("MyTasks",    "Görevlerim"),
@@ -31,9 +33,9 @@ namespace ActivityManagement.Authorization
         // Admin: her sayfa (kod içinde ayrıca her zaman true). Aşağıda Admin dahil edilmez; Admin özel.
         public static readonly Dictionary<string, HashSet<string>> DefaultAccess = new Dictionary<string, HashSet<string>>
         {
-            ["Admin"] = new HashSet<string> { "Dashboard","Employees","Projects","Tasks","Board","MyTasks","Activities","DailyEffort","TaskQuery","Reports","Admin" },
-            ["TakımLideri"] = new HashSet<string> { "Dashboard","Employees","Projects","Board","MyTasks","Activities","DailyEffort","TaskQuery","Reports","Admin" },
-            ["Uzman"] = new HashSet<string> { "Dashboard","Employees","Projects","Board","MyTasks","Activities","DailyEffort","TaskQuery","Reports" },
+            ["Admin"] = new HashSet<string> { "Dashboard","Employees","Projects","Work","Requests","Tasks","Board","MyTasks","Activities","DailyEffort","TaskQuery","Reports","Admin" },
+            ["TakımLideri"] = new HashSet<string> { "Dashboard","Employees","Projects","Work","Requests","Board","MyTasks","Activities","DailyEffort","TaskQuery","Reports","Admin" },
+            ["Uzman"] = new HashSet<string> { "Dashboard","Employees","Projects","Work","Requests","Board","MyTasks","Activities","DailyEffort","TaskQuery","Reports" },
         };
 
         public static readonly (string Name, string Display)[] SystemRoles = new[]

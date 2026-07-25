@@ -1,0 +1,67 @@
+@model System.Collections.Generic.List<ActivityManagement.Web.Models.WorkItemRow>
+@{
+    ViewData["Title"] = "İşlerim — Genel Bakış";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    bool noEmp = ViewBag.NoEmployee == true;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-briefcase text-primary me-2"></i>İşlerim <small class="text-muted fs-6">Genel Bakış</small></h2>
+    <div class="btn-group">
+        <a href="/Tasks/MyTasks" class="btn btn-outline-primary btn-sm"><i class="fas fa-user-check me-1"></i>Görevlerim</a>
+        <a href="/Requests" class="btn btn-outline-info btn-sm"><i class="fas fa-inbox me-1"></i>Talepler</a>
+        <a href="/Activities" class="btn btn-outline-success btn-sm"><i class="fas fa-clipboard-check me-1"></i>Faaliyetler</a>
+        <a href="/Activities/Today" class="btn btn-outline-secondary btn-sm"><i class="fas fa-business-time me-1"></i>Günlük Efor</a>
+    </div>
+</div>
+
+@if (noEmp)
+{
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>Bu hesabın bir personel kaydı yok (Sistem Yöneticisi). Kişisel iş listesi görüntülemek için
+        üst menüden <strong>bir kişi olarak işlem yapın</strong> (login-as) ya da <a href="/Requests">Talepler</a> / <a href="/Tasks">Görevler</a> ekranlarını kullanın.
+    </div>
+    return;
+}
+
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-3"><div class="card text-center shadow-sm border-primary"><div class="card-body py-2"><div class="fs-4 fw-bold text-primary">@ViewBag.OpenTaskCount</div><small class="text-muted">Açık Görev</small></div></div></div>
+    <div class="col-6 col-md-3"><div class="card text-center shadow-sm border-info"><div class="card-body py-2"><div class="fs-4 fw-bold text-info">@ViewBag.OpenReqCount</div><small class="text-muted">Açık Talep</small></div></div></div>
+    <div class="col-6 col-md-3"><div class="card text-center shadow-sm border-success"><div class="card-body py-2"><div class="fs-4 fw-bold text-success">@ViewBag.SubjectCount</div><small class="text-muted">Faaliyet</small></div></div></div>
+    <div class="col-6 col-md-3"><div class="card text-center shadow-sm @(ViewBag.OverdueCount > 0 ? "border-danger" : "")"><div class="card-body py-2"><div class="fs-4 fw-bold @(ViewBag.OverdueCount > 0 ? "text-danger" : "text-muted")">@ViewBag.OverdueCount</div><small class="text-muted">Gecikmiş</small></div></div></div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header"><i class="fas fa-list-check me-2"></i>Üzerimdeki Açık İşler <small class="text-muted">(SLA / önem sırasına göre)</small></div>
+    <div class="card-body p-2">
+        @if (!Model.Any())
+        {
+            <div class="text-center py-5 text-muted"><i class="fas fa-mug-hot fa-3x mb-3"></i><p>Üzerinizde açık iş görünmüyor. 🎉</p></div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Tür</th><th>Başlık</th><th>Bağlam</th><th class="text-center">Önem</th><th class="text-center">Durum</th><th class="text-center">SLA</th><th style="min-width:100px">İlerleme</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var w in Model)
+                        {
+                            <tr class="@(w.IsOverdue ? "table-danger" : "")">
+                                <td><span class="badge bg-@w.KindColor"><i class="fas @w.KindIcon me-1"></i>@w.Kind</span></td>
+                                <td><a href="@w.Link" class="fw-semibold text-decoration-none">@w.Title</a></td>
+                                <td><small class="text-muted">@(w.Context ?? "-")</small></td>
+                                <td class="text-center"><span class="badge bg-light text-dark border">@w.PriorityScore</span></td>
+                                <td class="text-center"><span class="badge bg-@w.StatusColor">@w.StatusText</span></td>
+                                <td class="text-center"><small class="@(w.IsOverdue ? "text-danger fw-bold" : "text-muted")">@(w.DueDate.HasValue ? w.DueDate.Value.ToString("dd.MM.yyyy") : "-")</small></td>
+                                <td><div class="progress" style="height:6px"><div class="progress-bar" style="width:@w.Percentage%"></div></div><small class="text-muted">@w.Percentage%</small></td>
+                                <td class="text-end"><a href="@w.Link" class="btn btn-sm btn-outline-info"><i class="fas fa-arrow-right"></i></a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

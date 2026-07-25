@@ -22,7 +22,7 @@ namespace ActivityManagement.Activities
         Task<int> CompleteDayTo8HoursAsync(System.DateTime? date = null);
         // R1: günlük efor özeti + serbest ekleme + düzenleme
         Task<DayEffortDto> GetDayEffortsAsync(System.DateTime? date = null);
-        Task AddManualEffortAsync(System.DateTime date, decimal hoursSpent, string description, string activityType, long? taskItemId = null, long? projectId = null);
+        Task AddManualEffortAsync(System.DateTime date, decimal hoursSpent, string description, string activityType, long? taskItemId = null, long? projectId = null, long? serviceRequestId = null);
         Task UpdateEffortAsync(long id, decimal hoursSpent, string description, System.DateTime activityDate, string activityType, long? projectId = null);
     }
 }

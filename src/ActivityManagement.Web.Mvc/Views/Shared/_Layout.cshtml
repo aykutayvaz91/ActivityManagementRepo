@@ -59,39 +59,73 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarMain">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    @if (Can("Employees"))
-                    {
-                        <li class="nav-item"><a class="nav-link" href="/Employees"><i class="fas fa-users me-1"></i>Personeller</a></li>
+                    @* İŞLERİM hub: Genel Bakış + Görevlerim/Görevler + Pano + Faaliyetler + Görev Sorgula *@
+                    @{
+                        bool __canWorkHub = Can("Work") || Can("MyTasks") || Can("Board") || Can("Activities")
+                            || (__isAdmin && Can("Tasks")) || Can("TaskQuery");
                     }
-                    @if (Can("Projects"))
+                    @if (__canWorkHub)
                     {
-                        <li class="nav-item"><a class="nav-link" href="/Projects"><i class="fas fa-project-diagram me-1"></i>Projeler</a></li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="workMenu" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-briefcase me-1"></i>İşlerim
+                            </a>
+                            <ul class="dropdown-menu">
+                                @if (Can("Work"))
+                                {
+                                    <li><a class="dropdown-item" href="/Work"><i class="fas fa-list-check me-2"></i>Genel Bakış</a></li>
+                                }
+                                @* Sistem Yöneticisi (admin kendi kimliği) → "Görevler" (kategoriler). Login-as/normal → "Görevlerim". *@
+                                @if (((!__isAdmin && __hasEmp) || __actingAsOther) && Can("MyTasks"))
+                                {
+                                    <li><a class="dropdown-item" href="/Tasks/MyTasks"><i class="fas fa-user-check me-2"></i>Görevlerim</a></li>
+                                }
+                                @if (__isAdmin && !__actingAsOther && Can("Tasks"))
+                                {
+                                    <li><a class="dropdown-item" href="/Tasks"><i class="fas fa-clipboard-list me-2"></i>Görevler</a></li>
+                                }
+                                @if (Can("Board"))
+                                {
+                                    <li><a class="dropdown-item" href="/Tasks/Board"><i class="fas fa-columns me-2"></i>Pano</a></li>
+                                }
+                                @if (Can("Activities"))
+                                {
+                                    <li><a class="dropdown-item" href="/Activities"><i class="fas fa-clipboard-check me-2"></i>Faaliyetler</a></li>
+                                }
+                                @if (Can("TaskQuery"))
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><a class="dropdown-item" href="/Tasks/Completed"><i class="fas fa-magnifying-glass me-2"></i>Görev Sorgula</a></li>
+                                }
+                            </ul>
+                        </li>
                     }
-                    @* Sistem Yöneticisi (admin kendi kimliği) → "Görevler" (kategorilerdeki görevler).
-                       Login-as ile başka kişi → "Görevlerim". Normal kullanıcı → "Görevlerim". *@
-                    @if (__isAdmin && !__actingAsOther && Can("Tasks"))
+                    @* TALEPLER: Sunucu (psm.tdv.org) + Destek (destek.cmit.com.tr) *@
+                    @if (Can("Requests"))
                     {
-                        <li class="nav-item"><a class="nav-link" href="/Tasks"><i class="fas fa-clipboard-list me-1"></i>Görevler</a></li>
-                    }
-                    @if (Can("Board"))
-                    {
-                        <li class="nav-item"><a class="nav-link" href="/Tasks/Board"><i class="fas fa-columns me-1"></i>Pano</a></li>
-                    }
-                    @if (((!__isAdmin && __hasEmp) || __actingAsOther) && Can("MyTasks"))
-                    {
-                        <li class="nav-item"><a class="nav-link" href="/Tasks/MyTasks"><i class="fas fa-user-check me-1"></i>Görevlerim</a></li>
-                    }
-                    @if (Can("Activities"))
-                    {
-                        <li class="nav-item"><a class="nav-link" href="/Activities"><i class="fas fa-clipboard-check me-1"></i>Faaliyetler</a></li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="reqMenu" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-inbox me-1"></i>Talepler
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="/Requests"><i class="fas fa-layer-group me-2"></i>Tüm Talepler</a></li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li><a class="dropdown-item" href="/Requests#tab-sunucu"><i class="fas fa-server me-2"></i>Sunucu Talepleri</a></li>
+                                <li><a class="dropdown-item" href="/Requests#tab-destek"><i class="fas fa-headset me-2"></i>Destek Talepleri</a></li>
+                            </ul>
+                        </li>
                     }
                     @if (Can("DailyEffort"))
                     {
                         <li class="nav-item"><a class="nav-link" href="/Activities/Today"><i class="fas fa-business-time me-1"></i>Günlük Efor</a></li>
                     }
-                    @if (Can("TaskQuery"))
+                    @if (Can("Projects"))
                     {
-                        <li class="nav-item"><a class="nav-link" href="/Tasks/Completed"><i class="fas fa-magnifying-glass me-1"></i>Görev Sorgula</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/Projects"><i class="fas fa-project-diagram me-1"></i>Projeler</a></li>
+                    }
+                    @if (Can("Employees"))
+                    {
+                        <li class="nav-item"><a class="nav-link" href="/Employees"><i class="fas fa-users me-1"></i>Personeller</a></li>
                     }
                     @if (Can("Reports"))
                     {
