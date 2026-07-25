@@ -2,6 +2,9 @@
     Layout = null;
     var returnUrl = ViewBag.ReturnUrl as string ?? "/";
     var googleEnabled = ViewBag.GoogleEnabled as bool? ?? false;
+    var logo = ViewData["ThemeLogo"] as string;
+    var brand = ViewData["ThemeBrand"] as string;
+    if (string.IsNullOrWhiteSpace(brand)) brand = "Faaliyet Yönetim Sistemi";
 }
 <!DOCTYPE html>
 <html lang="tr">
@@ -24,9 +27,17 @@
         <div class="d-flex justify-content-center">
             <div class="card shadow-lg login-card">
                 <div class="card-body p-4 p-md-5">
-                    <div class="brand-icon"><i class="fas fa-tasks"></i></div>
-                    <h4 class="text-center mb-1">Faaliyet Yönetim Sistemi</h4>
-                    <p class="text-center text-muted small mb-4">CMIT • Devam etmek için giriş yapın</p>
+                    @if (!string.IsNullOrEmpty(logo))
+                    {
+                        <img src="@logo" alt="logo" style="max-height:72px;max-width:100%" class="d-block mx-auto mb-3" />
+                    }
+                    else
+                    {
+                        <div class="brand-icon"><i class="fas fa-tasks"></i></div>
+                    }
+                    <h4 class="text-center mb-1">@brand</h4>
+                    <p class="text-center text-muted small mb-1">CMIT • Devam etmek için giriş yapın</p>
+                    <p class="text-center text-muted mb-4" style="font-size:.72rem" title="Yazılım sürümü">v@(ActivityManagement.ActivityManagementConsts.AppVersion)</p>
 
                     @if (TempData["AdminError"] != null)
                     {
