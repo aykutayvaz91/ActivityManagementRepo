@@ -23,6 +23,7 @@ namespace ActivityManagement.Activities
         private readonly IRepository<SubCategory, long> _subCategoryRepository;
         private readonly IRepository<Project, long> _projectRepository;
         private readonly IRepository<SubCategoryResponsibility, long> _responsibilityRepository;
+        private readonly IRepository<TaskItem, long> _taskRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public ActivitySubjectAppService(
@@ -32,6 +33,7 @@ namespace ActivityManagement.Activities
             IRepository<SubCategory, long> subCategoryRepository,
             IRepository<Project, long> projectRepository,
             IRepository<SubCategoryResponsibility, long> responsibilityRepository,
+            IRepository<TaskItem, long> taskRepository,
             IHttpContextAccessor httpContextAccessor)
         {
             _subjectRepository = subjectRepository;
@@ -40,7 +42,23 @@ namespace ActivityManagement.Activities
             _subCategoryRepository = subCategoryRepository;
             _projectRepository = projectRepository;
             _responsibilityRepository = responsibilityRepository;
+            _taskRepository = taskRepository;
             _httpContextAccessor = httpContextAccessor;
+        }
+
+        // Parti 1c: Bir görevin ActualHours'unu ActivityLog toplamıyla senkronlar (efor eklenince/silinince/değişince).
+        private async Task RecomputeTaskHoursAsync(long? taskItemId)
+        {
+            if (!taskItemId.HasValue) return;
+            var sum = await _logRepository.GetAll()
+                .Where(l => l.TaskItemId == taskItemId.Value)
+                .Select(l => (decimal?)l.HoursSpent).SumAsync() ?? 0m;
+            var task = await _taskRepository.FirstOrDefaultAsync(taskItemId.Value);
+            if (task != null && task.ActualHours != sum)
+            {
+                task.ActualHours = sum;
+                await CurrentUnitOfWork.SaveChangesAsync();
+            }
         }
 
         // Proje seçildiyse faaliyet kategorilerini projeden doldur (override).
@@ -302,7 +320,10 @@ namespace ActivityManagement.Activities
             }
             if (!canDelete)
                 throw new UserFriendlyException("Bu efor kaydını silme yetkiniz yok.");
+            var taskId = log.TaskItemId;
             await _logRepository.DeleteAsync(id);
+            await CurrentUnitOfWork.SaveChangesAsync();
+            await RecomputeTaskHoursAsync(taskId); // görev eforu silinince ActualHours düşsün
         }
 
         // V4: Günü 8 saate tamamla — kullanıcının sorumlu olduğu alt kategoriler için 1'er saatlik
@@ -434,6 +455,7 @@ namespace ActivityManagement.Activities
                 ServiceRequestId = serviceRequestId
             });
             await CurrentUnitOfWork.SaveChangesAsync();
+            await RecomputeTaskHoursAsync(taskItemId); // görev eforu → ActualHours
         }
 
         // R1: Efor kaydı düzenleme (otomatik girilenler dahil) — kendi kaydı VEYA yönetici. Proje değiştirilebilir.
@@ -441,7 +463,15 @@ namespace ActivityManagement.Activities
         {
             var ctx = CurrentContext();
             var log = await _logRepository.GetAsync(id);
-            bool canEdit = (ctx.EmployeeId.HasValue && log.EmployeeId == ctx.EmployeeId.Value) || IsManager(ctx.Role);
+            // Kendi eforu VEYA Admin VEYA (TakımLideri ise) yalnız kendi TAKIMINDAKİ kişinin eforu.
+            bool canEdit = (ctx.EmployeeId.HasValue && log.EmployeeId == ctx.EmployeeId.Value) || IsAdmin(ctx.Role);
+            if (!canEdit && IsManager(ctx.Role))
+            {
+                var myTeam = CurrentEmployeeTeamId(ctx.EmployeeId);
+                var logEmpTeam = await _employeeRepository.GetAll().AsNoTracking()
+                    .Where(e => e.Id == log.EmployeeId).Select(e => e.TeamId).FirstOrDefaultAsync();
+                canEdit = myTeam.HasValue && logEmpTeam == myTeam;
+            }
             if (!canEdit)
                 throw new UserFriendlyException("Bu efor kaydını düzenleme yetkiniz yok.");
             if (hoursSpent <= 0)
@@ -452,6 +482,7 @@ namespace ActivityManagement.Activities
             if (!string.IsNullOrWhiteSpace(activityType)) log.ActivityType = activityType;
             log.ProjectId = projectId;   // proje ata/temizle
             await CurrentUnitOfWork.SaveChangesAsync();
+            await RecomputeTaskHoursAsync(log.TaskItemId); // saat değişince görev ActualHours güncellensin
         }
 
         // --- yardımcılar ---

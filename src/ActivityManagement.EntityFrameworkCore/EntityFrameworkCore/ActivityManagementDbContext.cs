@@ -118,7 +118,7 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.Property(s => s.SenderDisplayName).HasMaxLength(128);
                 b.Property(s => s.SmtpHost).HasMaxLength(256);
                 b.Property(s => s.SmtpUserName).HasMaxLength(256);
-                b.Property(s => s.SmtpPassword).HasMaxLength(256);
+                b.Property(s => s.SmtpPassword).HasMaxLength(1024); // DPAPI şifreli değer uzun (base64+prefix)
             });
 
             modelBuilder.Entity<ProjectEmployee>(b =>
@@ -347,14 +347,14 @@ namespace ActivityManagement.EntityFrameworkCore
             modelBuilder.Entity<IntegrationSettings>(b =>
             {
                 b.ToTable("IntegrationSettings");
-                b.Property(s => s.InboundApiKey).HasMaxLength(256);
+                b.Property(s => s.InboundApiKey).HasMaxLength(1024); // DPAPI şifreli değer uzun
             });
 
             modelBuilder.Entity<IntegrationSource>(b =>
             {
                 b.ToTable("IntegrationSources");
                 b.Property(s => s.BaseUrl).HasMaxLength(512);
-                b.Property(s => s.ApiKey).HasMaxLength(512);
+                b.Property(s => s.ApiKey).HasMaxLength(1024); // DPAPI şifreli değer uzun
                 b.Property(s => s.AuthHeader).HasMaxLength(64);
                 b.Property(s => s.AuthScheme).HasMaxLength(32);
                 b.Property(s => s.Filter).HasMaxLength(1024);

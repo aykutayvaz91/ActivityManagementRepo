@@ -24,6 +24,7 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
             SeedActivityTypes();      // Dinamik faaliyet tipleri (Destek, Bakım, ...)
             SeedRolesAndAccess();     // Rol tanımları + Rol×Sayfa erişim matrisi (mevcut yetkiler)
             SeedIntegration();        // Entegrasyon ayarları + kaynak satırları (Sunucu/Destek, kapalı)
+            EncryptLegacySecrets();   // DB'deki düz-metin sırları (SMTP/entegrasyon anahtarı) DPAPI ile şifrele
             // NOT: Dummy görev/proje ve faaliyet tohumlaması kapatıldı. Sistem gerçek
             // kullanım için boş başlar; görevler kategori-tabanlı olarak elle oluşturulur.
             // SeedWorkItems();   // devre dışı — xlsx dummy iş kalemleri/görevler
@@ -133,6 +134,27 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
                 }
             }
             _context.SaveChanges();
+        }
+
+        // DB'deki mevcut düz-metin sırları DPAPI ile şifreler (tek seferlik göç; "DPAPI:" önekli olanlara dokunmaz).
+        private void EncryptLegacySecrets()
+        {
+            bool changed = false;
+            bool NeedsEnc(string v) => !string.IsNullOrWhiteSpace(v) && !v.StartsWith("DPAPI:", System.StringComparison.Ordinal);
+
+            var email = _context.EmailSettings.FirstOrDefault();
+            if (email != null && NeedsEnc(email.SmtpPassword))
+            { email.SmtpPassword = ActivityManagement.Security.DpapiProtector.Protect(email.SmtpPassword); changed = true; }
+
+            var integ = _context.IntegrationSettings.FirstOrDefault();
+            if (integ != null && NeedsEnc(integ.InboundApiKey))
+            { integ.InboundApiKey = ActivityManagement.Security.DpapiProtector.Protect(integ.InboundApiKey); changed = true; }
+
+            foreach (var src in _context.IntegrationSources.ToList())
+                if (NeedsEnc(src.ApiKey))
+                { src.ApiKey = ActivityManagement.Security.DpapiProtector.Protect(src.ApiKey); changed = true; }
+
+            if (changed) _context.SaveChanges();
         }
 
         // Dinamik faaliyet tipleri — boşsa varsayılanlar eklenir (Admin yönetir).

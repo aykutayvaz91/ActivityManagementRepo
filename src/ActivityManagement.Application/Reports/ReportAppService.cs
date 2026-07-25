@@ -45,6 +45,7 @@ namespace ActivityManagement.Reports
                 .Include(a => a.Project)
                 .Include(a => a.TaskItem)
                 .Include(a => a.ActivitySubject)
+                .Include(a => a.ServiceRequest)
                 .Where(a => a.EmployeeId == input.EmployeeId.Value &&
                             a.ActivityDate >= input.StartDate &&
                             a.ActivityDate <= input.EndDate)
@@ -141,7 +142,8 @@ namespace ActivityManagement.Reports
                 .Select(a => new DetailedActivityDto
                 {
                     Date = a.ActivityDate,
-                    SubHeading = a.ActivitySubject?.Title ?? a.TaskItem?.Title ?? a.Project?.Name ?? "—",
+                    SubHeading = a.ServiceRequest != null ? ("Talep: " + a.ServiceRequest.Title)
+                                 : a.ActivitySubject?.Title ?? a.TaskItem?.Title ?? a.Project?.Name ?? "—",
                     ActivityType = string.IsNullOrWhiteSpace(a.ActivityType) ? "—" : a.ActivityType,
                     Detail = a.Description,
                     Hours = a.HoursSpent

@@ -333,6 +333,14 @@ namespace ActivityManagement.ServiceRequests
 
         public async Task<long> UpsertFromPortalAsync(PortalRequestDto input)
         {
+            // GÜVENLİK (defense-in-depth): bu metot yalnız portal entegrasyonu içindir —
+            // anonim webhook (IntegrationController, token'lı) VEYA context'siz HostedService çağırır.
+            // Dynamic API üzerinden kimliği doğrulanmış (ör. Uzman) bir kullanıcı çağıramaz; yalnız Admin istisna.
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user?.Identity?.IsAuthenticated == true &&
+                !string.Equals(user.FindFirst(ClaimTypes.Role)?.Value, "Admin", StringComparison.OrdinalIgnoreCase))
+                throw new UserFriendlyException("Bu işlem yalnızca portal entegrasyonu üzerinden yapılır.");
+
             if (input == null || string.IsNullOrWhiteSpace(input.Title))
                 throw new UserFriendlyException("Geçersiz talep verisi (başlık zorunlu).");
 

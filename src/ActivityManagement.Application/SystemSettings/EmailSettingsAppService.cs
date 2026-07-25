@@ -62,7 +62,7 @@ namespace ActivityManagement.SystemSettings
             s.SmtpPort = input.SmtpPort;
             s.SmtpUserName = input.SmtpUserName;
             if (!string.IsNullOrWhiteSpace(input.SmtpPassword))
-                s.SmtpPassword = input.SmtpPassword;
+                s.SmtpPassword = ActivityManagement.Security.DpapiProtector.Protect(input.SmtpPassword); // DB'de şifreli tut
             s.EnableSsl = input.EnableSsl;
             await CurrentUnitOfWork.SaveChangesAsync();
             return MapToDto(s);
@@ -81,7 +81,7 @@ namespace ActivityManagement.SystemSettings
                 EnableSsl = s.EnableSsl,
                 Credentials = string.IsNullOrWhiteSpace(s.SmtpUserName)
                     ? null
-                    : new NetworkCredential(s.SmtpUserName, s.SmtpPassword)
+                    : new NetworkCredential(s.SmtpUserName, ActivityManagement.Security.DpapiProtector.Unprotect(s.SmtpPassword))
             };
 
             using var message = new MailMessage

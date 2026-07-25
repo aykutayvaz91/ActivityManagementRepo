@@ -13,6 +13,8 @@ namespace ActivityManagement.SystemSettings
                              string authHeader, string authScheme, string filter, int initialLookbackDays);
 
         // Webhook alıcısı için (yetki denetimi YOK — anonim endpoint kullanır).
+        // GÜVENLİK: dynamic API'ye AÇILMAZ (anahtarı sızdırmasın) — yalnız IntegrationController içinden çağrılır.
+        [Abp.Application.Services.RemoteService(false)]
         Task<(bool Enabled, string Key)> GetInboundAsync();
     }
 }

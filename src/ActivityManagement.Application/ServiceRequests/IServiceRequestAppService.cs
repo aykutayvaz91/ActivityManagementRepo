@@ -26,6 +26,8 @@ namespace ActivityManagement.ServiceRequests
         Task DeleteEffortAsync(long id);
 
         // Faz 2: Portaldan idempotent upsert (webhook alıcısı / sync). (Source, ExternalRef) anahtarı.
+        // GÜVENLİK: dynamic API'ye AÇILMAZ — yalnız sunucu-içi (IntegrationController token'lı / HostedService) çağırır.
+        [Abp.Application.Services.RemoteService(false)]
         Task<long> UpsertFromPortalAsync(PortalRequestDto input);
     }
 }

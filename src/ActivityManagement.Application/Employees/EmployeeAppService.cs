@@ -52,10 +52,22 @@ namespace ActivityManagement.Employees
                    string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
         }
 
+        private bool IsAdmin()
+        {
+            var role = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            return string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+        }
+
         private void EnsureManager()
         {
             if (!IsManager())
                 throw new UserFriendlyException("Bu işlem için yetkiniz yok. Personel sayfasını yalnızca Admin/Takım Lideri düzenleyebilir.");
+        }
+
+        private void EnsureAdmin()
+        {
+            if (!IsAdmin())
+                throw new UserFriendlyException("Bu işlem yalnızca Admin tarafından yapılabilir.");
         }
 
         private long? CurrentEmployeeId()
@@ -188,6 +200,9 @@ namespace ActivityManagement.Employees
         public async Task<EmployeeDto> CreateAsync(CreateUpdateEmployeeDto input)
         {
             EnsureManager();
+            // Rol atama yalnız Admin'e özel: Admin olmayan (TakımLideri) yeni personeli daima "Uzman" oluşturur
+            // (aksi halde kendi kontrolündeki e-posta ile Admin personel açıp yetki yükseltebilirdi).
+            if (!IsAdmin()) input.AppRole = "Uzman";
             // E-posta girilmemişse isim.soyisim@cmit.com.tr olarak otomatik üret (Türkçe karakter → ASCII, benzersiz)
             if (string.IsNullOrWhiteSpace(input.Email))
                 input.Email = await GenerateUniqueEmailAsync(input.FirstName, input.LastName);
@@ -236,12 +251,16 @@ namespace ActivityManagement.Employees
         {
             var employee = await _employeeRepository.GetAsync(input.Id);
             bool isManager = IsManager();
+            bool isAdmin = IsAdmin();
 
-            if (!isManager)
+            // Yönetici olmayan yalnız KENDİ kaydını düzenler.
+            if (!isManager && input.Id != CurrentEmployeeId())
+                throw new UserFriendlyException("Sadece kendi kaydınızı düzenleyebilirsiniz.");
+
+            // HASSAS alanlar (rol/aktiflik/hesap bağlantısı/takım) yalnız ADMIN tarafından değiştirilebilir.
+            // (TakımLideri de dahil olmak üzere Admin olmayan hiç kimse AppRole'ü "Admin" yapıp yetki yükseltemez.)
+            if (!isAdmin)
             {
-                if (input.Id != CurrentEmployeeId())
-                    throw new UserFriendlyException("Sadece kendi kaydınızı düzenleyebilirsiniz.");
-
                 input.AppRole = employee.AppRole;
                 input.IsActive = employee.IsActive;
                 input.UserId = employee.UserId;
@@ -261,6 +280,7 @@ namespace ActivityManagement.Employees
 
         public async Task UpdateRoleAsync(long id, string appRole)
         {
+            EnsureAdmin(); // rol atama yalnız Admin (API'den doğrudan çağrıya karşı korunur)
             var employee = await _employeeRepository.GetAsync(id);
             employee.AppRole = appRole;
             await _employeeRepository.UpdateAsync(employee);

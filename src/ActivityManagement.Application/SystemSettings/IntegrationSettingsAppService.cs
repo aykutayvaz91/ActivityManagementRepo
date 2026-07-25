@@ -102,7 +102,7 @@ namespace ActivityManagement.SystemSettings
             var s = await GetOrCreateAsync();
             // "Temizle" işaretliyse anahtar silinir (webhook kapanır); değilse boş bırakılırsa korunur.
             if (clearInboundKey) s.InboundApiKey = null;
-            else if (!string.IsNullOrWhiteSpace(inboundApiKey)) s.InboundApiKey = inboundApiKey.Trim();
+            else if (!string.IsNullOrWhiteSpace(inboundApiKey)) s.InboundApiKey = ActivityManagement.Security.DpapiProtector.Protect(inboundApiKey.Trim());
             s.SyncEnabled = syncEnabled;
             s.IntervalMinutes = intervalMinutes < 1 ? 1 : (intervalMinutes > 1440 ? 1440 : intervalMinutes);
             await CurrentUnitOfWork.SaveChangesAsync();
@@ -115,7 +115,7 @@ namespace ActivityManagement.SystemSettings
             var s = await _sourceRepo.GetAsync(id);
             s.Enabled = enabled;
             s.BaseUrl = baseUrl?.Trim();
-            if (!string.IsNullOrWhiteSpace(apiKey)) s.ApiKey = apiKey.Trim();  // boşsa değişmez
+            if (!string.IsNullOrWhiteSpace(apiKey)) s.ApiKey = ActivityManagement.Security.DpapiProtector.Protect(apiKey.Trim());  // boşsa değişmez, şifreli tut
             s.AuthHeader = string.IsNullOrWhiteSpace(authHeader) ? "Authorization" : authHeader.Trim();
             s.AuthScheme = authScheme?.Trim() ?? "";
             s.Filter = filter?.Trim();
@@ -125,9 +125,17 @@ namespace ActivityManagement.SystemSettings
 
         public async Task<(bool Enabled, string Key)> GetInboundAsync()
         {
+            // GÜVENLİK: yalnız anonim webhook (IntegrationController) VEYA Admin anahtarı çözebilir.
+            // Dynamic API üzerinden kimliği doğrulanmış non-admin çağrı anahtarı SIZDIRMAZ (false,null döner).
+            var user = _http.HttpContext?.User;
+            if (user?.Identity?.IsAuthenticated == true &&
+                !string.Equals(user.FindFirst(ClaimTypes.Role)?.Value, "Admin", StringComparison.OrdinalIgnoreCase))
+                return (false, null);
+
             var s = await _settingsRepo.GetAll().AsNoTracking().FirstOrDefaultAsync();
             var key = s?.InboundApiKey;
-            return (!string.IsNullOrWhiteSpace(key), key);
+            if (string.IsNullOrWhiteSpace(key)) return (false, null);
+            return (true, ActivityManagement.Security.DpapiProtector.Unprotect(key)); // çözülmüş anahtar (webhook karşılaştırması için)
         }
     }
 }

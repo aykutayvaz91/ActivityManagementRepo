@@ -95,7 +95,9 @@ namespace ActivityManagement.Web.BackgroundJobs
                 var src = await sourceRepo.GetAll().AsNoTracking().FirstOrDefaultAsync(s => s.Id == sourceId);
                 await uow.CompleteAsync();
                 if (src == null) return;
-                source = src.Source; baseUrl = src.BaseUrl; apiKey = src.ApiKey;
+                source = src.Source; baseUrl = src.BaseUrl;
+                apiKey = ActivityManagement.Security.DpapiProtector.Unprotect(src.ApiKey); // DB'de şifreli → çöz
+
                 authHeader = string.IsNullOrWhiteSpace(src.AuthHeader) ? "Authorization" : src.AuthHeader;
                 authScheme = src.AuthScheme ?? "";
                 filter = src.Filter;

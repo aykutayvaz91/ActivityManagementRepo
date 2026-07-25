@@ -20,19 +20,57 @@ namespace ActivityManagement.Activities
     public class ActivityLogAppService : ActivityManagementAppServiceBase, IActivityLogAppService
     {
         private readonly IRepository<ActivityLog, long> _activityRepository;
+        private readonly IRepository<TaskItem, long> _taskRepository;
+        private readonly IRepository<Employee, long> _employeeRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ActivityLogAppService(IRepository<ActivityLog, long> activityRepository, IHttpContextAccessor httpContextAccessor)
+        public ActivityLogAppService(
+            IRepository<ActivityLog, long> activityRepository,
+            IRepository<TaskItem, long> taskRepository,
+            IRepository<Employee, long> employeeRepository,
+            IHttpContextAccessor httpContextAccessor)
         {
             _activityRepository = activityRepository;
+            _taskRepository = taskRepository;
+            _employeeRepository = employeeRepository;
             _httpContextAccessor = httpContextAccessor;
         }
 
+        private string CurrentRole() => _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+        private bool IsAdmin() => string.Equals(CurrentRole(), "Admin", StringComparison.OrdinalIgnoreCase);
         private bool IsManager()
         {
-            var role = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            var role = CurrentRole();
             return string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private long? CurrentEmployeeId()
+        {
+            var c = _httpContextAccessor.HttpContext?.User?.FindFirst("EmployeeId")?.Value;
+            return long.TryParse(c, out var id) ? id : (long?)null;
+        }
+
+        // TakımLideri yalnız kendi takımındaki personel için işlem yapabilir; Admin her yerde.
+        private async Task EnsureCanActForEmployeeAsync(long targetEmployeeId)
+        {
+            if (IsAdmin()) return;
+            var myTeam = await _employeeRepository.GetAll().AsNoTracking()
+                .Where(e => e.Id == CurrentEmployeeId()).Select(e => e.TeamId).FirstOrDefaultAsync();
+            var targetTeam = await _employeeRepository.GetAll().AsNoTracking()
+                .Where(e => e.Id == targetEmployeeId).Select(e => e.TeamId).FirstOrDefaultAsync();
+            if (!myTeam.HasValue || targetTeam != myTeam)
+                throw new UserFriendlyException("Yalnız kendi takımınızdaki personel için efor işlemi yapabilirsiniz.");
+        }
+
+        private async Task RecomputeTaskHoursAsync(long? taskItemId)
+        {
+            if (!taskItemId.HasValue) return;
+            var sum = await _activityRepository.GetAll()
+                .Where(l => l.TaskItemId == taskItemId.Value)
+                .Select(l => (decimal?)l.HoursSpent).SumAsync() ?? 0m;
+            var task = await _taskRepository.FirstOrDefaultAsync(taskItemId.Value);
+            if (task != null && task.ActualHours != sum) { task.ActualHours = sum; await CurrentUnitOfWork.SaveChangesAsync(); }
         }
 
         public async Task<PagedResultDto<ActivityLogDto>> GetAllAsync(GetActivitiesInput input)
@@ -56,6 +94,7 @@ namespace ActivityManagement.Activities
             // Efor girişinin asıl kapısı ActivitySubject.LogEffortAsync'tir; bu doğrudan yol yalnız yöneticiye açık.
             if (!IsManager())
                 throw new UserFriendlyException("Efor girişi faaliyet konusu üzerinden yapılır.");
+            await EnsureCanActForEmployeeAsync(input.EmployeeId); // TakımLideri yalnız kendi takımı
 
             var log = new ActivityLog
             {
@@ -70,6 +109,7 @@ namespace ActivityManagement.Activities
             };
             await _activityRepository.InsertAsync(log);
             await CurrentUnitOfWork.SaveChangesAsync();
+            await RecomputeTaskHoursAsync(log.TaskItemId);
             return MapToDto(log);
         }
 
@@ -77,7 +117,13 @@ namespace ActivityManagement.Activities
         {
             if (!IsManager())
                 throw new UserFriendlyException("Efor kaydı silme yetkiniz yok.");
+            var log = await _activityRepository.FirstOrDefaultAsync(id);
+            if (log == null) return;
+            await EnsureCanActForEmployeeAsync(log.EmployeeId); // TakımLideri yalnız kendi takımı
+            var taskId = log.TaskItemId;
             await _activityRepository.DeleteAsync(id);
+            await CurrentUnitOfWork.SaveChangesAsync();
+            await RecomputeTaskHoursAsync(taskId);
         }
 
         public async Task<List<ActivityLogDto>> GetEmployeeActivitiesAsync(long employeeId, DateTime startDate, DateTime endDate)

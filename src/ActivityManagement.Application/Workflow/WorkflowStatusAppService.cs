@@ -43,10 +43,20 @@ namespace ActivityManagement.Workflow
     public class WorkflowStatusAppService : ActivityManagementAppServiceBase, IWorkflowStatusAppService
     {
         private readonly IRepository<WorkflowStatus, int> _repo;
+        private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor _http;
 
-        public WorkflowStatusAppService(IRepository<WorkflowStatus, int> repo)
+        public WorkflowStatusAppService(IRepository<WorkflowStatus, int> repo, Microsoft.AspNetCore.Http.IHttpContextAccessor http)
         {
             _repo = repo;
+            _http = http;
+        }
+
+        // Durum tanımları görev semantiğini belirler → yalnız Admin yönetir (API'den doğrudan çağrıya karşı).
+        private void EnsureAdmin()
+        {
+            var role = _http.HttpContext?.User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Uzman";
+            if (!string.Equals(role, "Admin", System.StringComparison.OrdinalIgnoreCase))
+                throw new Abp.UI.UserFriendlyException("İş akışı durumlarını yalnızca Admin yönetebilir.");
         }
 
         public async Task<List<WorkflowStatusDto>> GetAllAsync(bool onlyActive = false)
@@ -59,6 +69,7 @@ namespace ActivityManagement.Workflow
 
         public async Task<WorkflowStatusDto> CreateAsync(CreateUpdateWorkflowStatusDto input)
         {
+            EnsureAdmin();
             var e = new WorkflowStatus
             {
                 Name = input.Name, Color = input.Color, SortOrder = input.SortOrder,
@@ -71,6 +82,7 @@ namespace ActivityManagement.Workflow
 
         public async Task<WorkflowStatusDto> UpdateAsync(CreateUpdateWorkflowStatusDto input)
         {
+            EnsureAdmin();
             var e = await _repo.GetAsync(input.Id);
             e.Name = input.Name; e.Color = input.Color; e.SortOrder = input.SortOrder;
             e.IsActive = input.IsActive; e.IsCompletedState = input.IsCompletedState; e.StatusValue = input.StatusValue;
@@ -79,6 +91,7 @@ namespace ActivityManagement.Workflow
 
         public async Task DeleteAsync(int id)
         {
+            EnsureAdmin();
             await _repo.DeleteAsync(id);
         }
     }
