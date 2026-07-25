@@ -30,16 +30,19 @@ namespace ActivityManagement.Theming
             _http = http;
         }
 
-        // Giriş yapan kişinin takımının kısa adı (ör. INFRA). Yoksa null.
+        // Giriş yapan kişinin takımının kısa adı (ör. INFRA). Sistem Yöneticisi → "ADMIN". Yoksa null.
         private async Task<string> CurrentTeamShortNameAsync()
         {
             var v = _http.HttpContext?.User?.FindFirst("EmployeeId")?.Value;
             if (!long.TryParse(v, out var empId)) return null;
-            var teamId = await _employeeRepo.GetAll().AsNoTracking()
-                .Where(e => e.Id == empId).Select(e => e.TeamId).FirstOrDefaultAsync();
-            if (!teamId.HasValue) return null;
+            var emp = await _employeeRepo.GetAll().AsNoTracking()
+                .Where(e => e.Id == empId)
+                .Select(e => new { e.IsSystemAccount, e.TeamId }).FirstOrDefaultAsync();
+            if (emp == null) return null;
+            if (emp.IsSystemAccount) return "ADMIN"; // Sistem Yöneticisi'nin "takımı" ADMIN → üst menüde ADMIN yazar
+            if (!emp.TeamId.HasValue) return null;
             var sn = await _teamRepo.GetAll().AsNoTracking()
-                .Where(t => t.Id == teamId.Value).Select(t => t.ShortName).FirstOrDefaultAsync();
+                .Where(t => t.Id == emp.TeamId.Value).Select(t => t.ShortName).FirstOrDefaultAsync();
             return string.IsNullOrWhiteSpace(sn) ? null : sn;
         }
 
