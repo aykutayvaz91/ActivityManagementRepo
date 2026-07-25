@@ -4,8 +4,8 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
     var categories = ViewBag.Categories as System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>
                      ?? new System.Collections.Generic.List<ActivityManagement.Categories.Dto.CategoryDto>();
-    var statusLabels = new[] { "Beklemede", "Devam Ediyor", "Tamamlandı", "İptal", "Ertelendi" };
-    var statusColors = new[] { "secondary", "primary", "success", "dark", "warning" };
+    var statusLabels = new[] { "Beklemede", "Devam Ediyor", "Tamamlandı", "İptal", "Ertelendi", "Kapatıldı" };
+    var statusColors = new[] { "secondary", "primary", "success", "dark", "warning", "secondary" };
     var priorityBadges = new[]
     {
         "<span class=\"badge bg-light text-dark border\">Düşük</span>",
@@ -14,7 +14,7 @@
         "<span class=\"badge bg-danger\">Kritik</span>"
     };
     var activeTasks = Model
-        .Where(t => t.Status != ActivityManagement.Entities.TaskStatus.Tamamlandi && t.Status != ActivityManagement.Entities.TaskStatus.Iptal)
+        .Where(t => t.Status != ActivityManagement.Entities.TaskStatus.Tamamlandi && t.Status != ActivityManagement.Entities.TaskStatus.Kapatildi && t.Status != ActivityManagement.Entities.TaskStatus.Iptal)
         .ToList();
     var timelineTasks = activeTasks.Where(t => t.DueDate.HasValue).OrderBy(t => t.DueDate).ToList();
 }

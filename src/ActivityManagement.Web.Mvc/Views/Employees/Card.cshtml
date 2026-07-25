@@ -322,8 +322,8 @@ $(document).ready(function () {
 });
 
 function loadEmployeeTasks() {
-    var statusColors = { 0:'secondary',1:'primary',2:'success',3:'dark',4:'warning' };
-    var statusLabels = { 0:'Beklemede',1:'Devam Ediyor',2:'Tamamlandı',3:'İptal',4:'Ertelendi' };
+    var statusColors = { 0:'secondary',1:'primary',2:'success',3:'dark',4:'warning',5:'secondary' };
+    var statusLabels = { 0:'Beklemede',1:'Devam Ediyor',2:'Tamamlandı',3:'İptal',4:'Ertelendi',5:'Kapatıldı' };
     $.ajax({
         url: '/api/services/app/TaskItem/GetAll',
         data: { assignedEmployeeId: @Model.Id, maxResultCount: 500 },

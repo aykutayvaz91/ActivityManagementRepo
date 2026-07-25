@@ -66,7 +66,7 @@ namespace ActivityManagement.Reports
                 EndDate = input.EndDate,
                 TotalHours = activities.Sum(a => a.HoursSpent),
                 TotalActivities = activities.Count,
-                CompletedTaskCount = tasks.Count(t => t.Status == Entities.TaskStatus.Tamamlandi),
+                CompletedTaskCount = tasks.Count(t => (t.Status == Entities.TaskStatus.Tamamlandi || t.Status == Entities.TaskStatus.Kapatildi)),
                 PendingTaskCount = tasks.Count(t => t.Status == Entities.TaskStatus.Beklemede),
                 InProgressTaskCount = tasks.Count(t => t.Status == Entities.TaskStatus.DevamEdiyor)
             };
@@ -93,7 +93,7 @@ namespace ActivityManagement.Reports
                     ProjectCode = g.Key.Code,
                     TotalHours = g.Sum(x => x.HoursSpent),
                     TaskCount = tasks.Count(t => t.ProjectId == g.Key.ProjectId),
-                    CompletedTaskCount = tasks.Count(t => t.ProjectId == g.Key.ProjectId && t.Status == Entities.TaskStatus.Tamamlandi)
+                    CompletedTaskCount = tasks.Count(t => t.ProjectId == g.Key.ProjectId && (t.Status == Entities.TaskStatus.Tamamlandi || t.Status == Entities.TaskStatus.Kapatildi))
                 })
                 .ToList();
 
@@ -110,7 +110,7 @@ namespace ActivityManagement.Reports
 
             // Aktivite/Görev tipi bazlı kırılım: seçilen tarih aralığında TAMAMLANAN görevler, tiplerine göre
             report.TaskTypeBreakdown = tasks
-                .Where(t => t.Status == Entities.TaskStatus.Tamamlandi &&
+                .Where(t => (t.Status == Entities.TaskStatus.Tamamlandi || t.Status == Entities.TaskStatus.Kapatildi) &&
                             t.CompletedDate.HasValue &&
                             t.CompletedDate.Value.Date >= input.StartDate.Date &&
                             t.CompletedDate.Value.Date <= input.EndDate.Date)
@@ -152,7 +152,7 @@ namespace ActivityManagement.Reports
 
             // V4: Tip bazlı BİRLEŞİK kırılım — görev (tamamlanan, tarih aralığında) + faaliyet (efor) tip tip birleştirilir.
             var taskByType = tasks
-                .Where(t => t.Status == Entities.TaskStatus.Tamamlandi &&
+                .Where(t => (t.Status == Entities.TaskStatus.Tamamlandi || t.Status == Entities.TaskStatus.Kapatildi) &&
                             t.CompletedDate.HasValue &&
                             t.CompletedDate.Value.Date >= input.StartDate.Date &&
                             t.CompletedDate.Value.Date <= input.EndDate.Date)
@@ -223,7 +223,7 @@ namespace ActivityManagement.Reports
                     Title = emp.Title,
                     TotalHours = activities.Sum(a => a.HoursSpent),
                     TotalActivities = activities.Count,
-                    CompletedTasks = tasks.Count(t => t.Status == Entities.TaskStatus.Tamamlandi),
+                    CompletedTasks = tasks.Count(t => (t.Status == Entities.TaskStatus.Tamamlandi || t.Status == Entities.TaskStatus.Kapatildi)),
                     PendingTasks = tasks.Count(t => t.Status == Entities.TaskStatus.Beklemede)
                 });
             }

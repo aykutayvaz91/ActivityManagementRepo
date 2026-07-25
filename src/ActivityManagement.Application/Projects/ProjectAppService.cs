@@ -334,7 +334,8 @@ namespace ActivityManagement.Projects
             dto.SubCategoryName = p.SubCategory?.Name;
             dto.TeamName = p.Team?.Name;
             dto.MemberCount = p.ProjectEmployees?.Count ?? 0;
-            dto.TaskCount = p.Tasks?.Count ?? 0;
+            // Kapatıldı (arşiv) görevler aktif ilerleme %'sinde hesaba KATILMAZ (paydadan da düşülür).
+            dto.TaskCount = p.Tasks?.Count(t => t.Status != Entities.TaskStatus.Kapatildi) ?? 0;
             dto.CompletedTaskCount = p.Tasks?.Count(t => t.Status == Entities.TaskStatus.Tamamlandi) ?? 0;
             dto.Members = p.ProjectEmployees?.Select(pe => new ProjectMemberDto
             {

@@ -11,8 +11,8 @@
     bool isManager = ViewBag.IsManager == true;
     long? lockedTeamId = ViewBag.LockedTeamId as long?;
     var lockedTeamName = lockedTeamId.HasValue ? (teams.FirstOrDefault(t => t.Id == lockedTeamId.Value)?.Name ?? "Takımım") : null;
-    var statusText = new[] { "Beklemede", "Devam Ediyor", "Tamamlandı", "İptal", "Ertelendi" };
-    var statusColor = new[] { "secondary", "primary", "success", "dark", "warning" };
+    var statusText = new[] { "Beklemede", "Devam Ediyor", "Tamamlandı", "İptal", "Ertelendi", "Kapatıldı" };
+    var statusColor = new[] { "secondary", "primary", "success", "dark", "warning", "secondary" };
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">

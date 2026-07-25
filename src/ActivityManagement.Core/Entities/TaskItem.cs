@@ -11,7 +11,10 @@ namespace ActivityManagement.Entities
         DevamEdiyor = 1,
         Tamamlandi = 2,
         Iptal = 3,
-        Ertelendi = 4
+        Ertelendi = 4,
+        // Arşiv: tamamlanmış görev, tamamlandığı AY geçtikten sonra otomatik "Kapatıldı"ya çekilir
+        // (aylık rapor çekildikten sonra). Rapor/geçmişte "tamamlanmış iş" sayılır; aktif ilerleme %'lerinde hesaba KATILMAZ.
+        Kapatildi = 5
     }
 
     public enum TaskPriority

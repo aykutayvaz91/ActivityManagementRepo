@@ -69,6 +69,7 @@ namespace ActivityManagement.Web.Controllers
                     (t.StartDate.HasValue && t.StartDate.Value.Date == day) ||
                     (t.DueDate.HasValue && t.DueDate.Value.Date == day)).ToList();
                 myActiveTasks = mine.Where(t => t.Status != ActivityManagement.Entities.TaskStatus.Tamamlandi
+                                             && t.Status != ActivityManagement.Entities.TaskStatus.Kapatildi
                                              && t.Status != ActivityManagement.Entities.TaskStatus.Iptal).ToList();
             }
             ViewBag.DayTasks = dayTasks;

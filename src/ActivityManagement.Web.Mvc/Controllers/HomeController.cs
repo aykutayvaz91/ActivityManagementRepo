@@ -56,18 +56,20 @@ namespace ActivityManagement.Web.Controllers
                 projects = projects.Where(p => p.TeamId == myTeam || p.TeamId == null).ToList();
             }
 
+            // Kapatıldı (arşiv) görevler aktif panoda/sayaçlarda gösterilmez.
+            var activeTasks = tasks.Where(t => t.Status != Entities.TaskStatus.Kapatildi).ToList();
             ViewBag.EmployeeCount = employees.Count;
             ViewBag.ProjectCount = projects.Count;
-            ViewBag.TotalTaskCount = tasks.Count;
-            ViewBag.PendingTaskCount = tasks.Count(t => t.Status == Entities.TaskStatus.Beklemede);
-            ViewBag.InProgressTaskCount = tasks.Count(t => t.Status == Entities.TaskStatus.DevamEdiyor);
-            ViewBag.CompletedTaskCount = tasks.Count(t => t.Status == Entities.TaskStatus.Tamamlandi);
+            ViewBag.TotalTaskCount = activeTasks.Count;
+            ViewBag.PendingTaskCount = activeTasks.Count(t => t.Status == Entities.TaskStatus.Beklemede);
+            ViewBag.InProgressTaskCount = activeTasks.Count(t => t.Status == Entities.TaskStatus.DevamEdiyor);
+            ViewBag.CompletedTaskCount = activeTasks.Count(t => t.Status == Entities.TaskStatus.Tamamlandi);
             // "Aktif Projeler": tamamlanmamış/iptal edilmemiş (Planlandı + Devam) tüm açık projeler
             ViewBag.ActiveProjects = projects
                 .Where(p => p.Status != Entities.ProjectStatus.Tamamlandi && p.Status != Entities.ProjectStatus.Iptal)
                 .OrderByDescending(p => p.Status)
                 .Take(6).ToList();
-            ViewBag.RecentTasks = tasks.OrderByDescending(t => t.CreationTime).Take(8).ToList();
+            ViewBag.RecentTasks = activeTasks.OrderByDescending(t => t.CreationTime).Take(8).ToList();
 
             return View();
         }

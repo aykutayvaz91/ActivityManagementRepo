@@ -63,6 +63,7 @@ namespace ActivityManagement.Web.BackgroundJobs
             var dueTasks = await taskRepo.GetAll()
                 .Where(t => t.DueDate.HasValue && t.DueDate.Value > now && t.DueDate.Value <= limit
                             && t.Status != Entities.TaskStatus.Tamamlandi
+                            && t.Status != Entities.TaskStatus.Kapatildi
                             && t.Status != Entities.TaskStatus.Iptal
                             && t.AssignedEmployeeId != null)
                 .ToListAsync();

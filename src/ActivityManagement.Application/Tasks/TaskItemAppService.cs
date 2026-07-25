@@ -458,7 +458,8 @@ namespace ActivityManagement.Tasks
             ObjectMapper.Map(input, task);
             // İlerleme yüzdesi duruma göre kurgulanır (Tamamlandı %100, Planlandı %0, Devam taban %25 / elle değer korunur)
             task.CompletionPercentage = ProgressForStatus(task.Status, input.CompletionPercentage);
-            task.CompletedDate = task.Status == Entities.TaskStatus.Tamamlandi
+            // Tamamlandı VEYA Kapatıldı (arşiv) → tamamlanma tarihi korunur (rapor/geçmiş için); diğer durumlarda sıfırlanır.
+            task.CompletedDate = (task.Status == Entities.TaskStatus.Tamamlandi || task.Status == Entities.TaskStatus.Kapatildi)
                 ? (task.CompletedDate ?? DateTime.Now)
                 : (DateTime?)null;
             await CurrentUnitOfWork.SaveChangesAsync();
@@ -537,12 +538,28 @@ namespace ActivityManagement.Tasks
         {
             switch (status)
             {
-                case Entities.TaskStatus.Tamamlandi: return 100;
+                case Entities.TaskStatus.Tamamlandi:
+                case Entities.TaskStatus.Kapatildi: return 100; // Kapatıldı = tamamlanmış (arşiv)
                 case Entities.TaskStatus.Beklemede: return 0;
                 case Entities.TaskStatus.DevamEdiyor:
                     return (currentPct <= 0 || currentPct >= 100) ? 25 : currentPct; // taban 25, elle girilen ara değer korunur
                 default: // Ertelendi / İptal
                     return currentPct < 0 ? 0 : (currentPct > 100 ? 100 : currentPct);
+            }
+        }
+
+        // Görev durumu → Türkçe etiket (tüm @t.StatusText kullanan view'lar buradan beslenir).
+        private static string StatusText(Entities.TaskStatus s)
+        {
+            switch (s)
+            {
+                case Entities.TaskStatus.Beklemede: return "Beklemede";
+                case Entities.TaskStatus.DevamEdiyor: return "Devam Ediyor";
+                case Entities.TaskStatus.Tamamlandi: return "Tamamlandı";
+                case Entities.TaskStatus.Iptal: return "İptal";
+                case Entities.TaskStatus.Ertelendi: return "Ertelendi";
+                case Entities.TaskStatus.Kapatildi: return "Kapatıldı";
+                default: return s.ToString();
             }
         }
 
@@ -556,7 +573,9 @@ namespace ActivityManagement.Tasks
             task.Status = status;
             // Panodan/istemciden gelen yüzde varsa onu baz al, yoksa mevcut; duruma göre kurgu uygula
             task.CompletionPercentage = ProgressForStatus(status, percentage > 0 ? percentage : task.CompletionPercentage);
-            task.CompletedDate = status == Entities.TaskStatus.Tamamlandi ? DateTime.Now : (DateTime?)null;
+            // Tamamlandı/Kapatıldı → tamamlanma tarihi korunur; diğerlerinde sıfırlanır.
+            task.CompletedDate = (status == Entities.TaskStatus.Tamamlandi || status == Entities.TaskStatus.Kapatildi)
+                ? (task.CompletedDate ?? DateTime.Now) : (DateTime?)null;
         }
 
         public async Task<long> AddCommentAsync(long taskId, string comment, bool isInternal = false)
@@ -678,7 +697,7 @@ namespace ActivityManagement.Tasks
             dto.AssignedEmployeeName = t.AssignedEmployee?.FullName;
             dto.SecondaryEmployeeName = t.SecondaryEmployee?.FullName;
             dto.AssignedByEmployeeName = t.AssignedByEmployee?.FullName;
-            dto.StatusText = t.Status.ToString();
+            dto.StatusText = StatusText(t.Status);
             dto.PriorityText = t.Priority.ToString();
             dto.ApprovalStatusText = ApprovalText(t.ApprovalStatus);
             dto.SubCategoryName = t.SubCategory?.Name;

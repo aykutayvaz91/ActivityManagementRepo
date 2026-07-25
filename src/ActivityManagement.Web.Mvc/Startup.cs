@@ -65,6 +65,9 @@ namespace ActivityManagement.Web
             // Günlük SLA hatırlatma servisi (SMTP yapılandırılmamışsa no-op)
             services.AddHostedService<ActivityManagement.Web.BackgroundJobs.SlaReminderHostedService>();
 
+            // Otomatik arşiv: tamamlandığı AY geçen görevleri "Kapatıldı"ya çeker (~12 saatte bir)
+            services.AddHostedService<ActivityManagement.Web.BackgroundJobs.TaskAutoCloseHostedService>();
+
             // FAZ 2 — Talep PULL senkron servisi (Admin → Entegrasyon; varsayılan kapalı, no-op)
             services.AddHttpClient();
             services.AddHostedService<ActivityManagement.Web.BackgroundJobs.RequestSyncHostedService>();

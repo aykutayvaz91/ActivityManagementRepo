@@ -127,6 +127,10 @@
                             @Html.Raw($"<option value=\"2\" {Sel(ActivityManagement.Entities.TaskStatus.Tamamlandi)}>Tamamlandı</option>")
                             @Html.Raw($"<option value=\"3\" {Sel(ActivityManagement.Entities.TaskStatus.Iptal)}>İptal</option>")
                             @Html.Raw($"<option value=\"4\" {Sel(ActivityManagement.Entities.TaskStatus.Ertelendi)}>Ertelendi</option>")
+                            @if (Model.Status == ActivityManagement.Entities.TaskStatus.Kapatildi)
+                            {
+                                @Html.Raw($"<option value=\"5\" {Sel(ActivityManagement.Entities.TaskStatus.Kapatildi)}>Kapatıldı (arşiv)</option>")
+                            }
                         </select>
                     </div>
                     <div class="mb-2">

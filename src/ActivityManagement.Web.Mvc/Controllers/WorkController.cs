@@ -53,9 +53,11 @@ namespace ActivityManagement.Web.Controllers
 
             try
             {
-                // 1) Açık görevlerim
+                // 1) Açık görevlerim (Tamamlandı/Kapatıldı/İptal hariç — Kapatıldı arşivdir, açık işte görünmez)
                 var tasks = (await _taskAppService.GetEmployeeTasksAsync(myId.Value)).Items
-                    .Where(t => t.Status != Entities.TaskStatus.Tamamlandi && t.Status != Entities.TaskStatus.Iptal);
+                    .Where(t => t.Status != Entities.TaskStatus.Tamamlandi
+                                && t.Status != Entities.TaskStatus.Kapatildi
+                                && t.Status != Entities.TaskStatus.Iptal);
                 foreach (var t in tasks)
                 {
                     rows.Add(new WorkItemRow
