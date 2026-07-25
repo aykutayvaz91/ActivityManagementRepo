@@ -40,10 +40,10 @@ namespace ActivityManagement.Theming
                 .Select(e => new { e.IsSystemAccount, e.TeamId }).FirstOrDefaultAsync();
             if (emp == null) return null;
             if (emp.IsSystemAccount) return "ADMIN"; // Sistem Yöneticisi'nin "takımı" ADMIN → üst menüde ADMIN yazar
-            if (!emp.TeamId.HasValue) return null;
+            if (!emp.TeamId.HasValue) return "FYS"; // takımsız (ör. Manager) → uzun ad yerine kısa marka "FYS"
             var sn = await _teamRepo.GetAll().AsNoTracking()
                 .Where(t => t.Id == emp.TeamId.Value).Select(t => t.ShortName).FirstOrDefaultAsync();
-            return string.IsNullOrWhiteSpace(sn) ? null : sn;
+            return string.IsNullOrWhiteSpace(sn) ? "FYS" : sn; // takım kısa adı yoksa da "FYS"
         }
 
         private bool IsAdmin()
