@@ -22,6 +22,7 @@ namespace ActivityManagement.ServiceRequests
         private readonly IRepository<ActivityLog, long> _logRepository;
         private readonly IRepository<Employee, long> _employeeRepository;
         private readonly IRepository<Team, long> _teamRepository;
+        private readonly ActivityManagement.Notifications.INotificationManager _notificationManager;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public ServiceRequestAppService(
@@ -29,12 +30,14 @@ namespace ActivityManagement.ServiceRequests
             IRepository<ActivityLog, long> logRepository,
             IRepository<Employee, long> employeeRepository,
             IRepository<Team, long> teamRepository,
+            ActivityManagement.Notifications.INotificationManager notificationManager,
             IHttpContextAccessor httpContextAccessor)
         {
             _requestRepository = requestRepository;
             _logRepository = logRepository;
             _employeeRepository = employeeRepository;
             _teamRepository = teamRepository;
+            _notificationManager = notificationManager;
             _httpContextAccessor = httpContextAccessor;
         }
 
@@ -181,6 +184,11 @@ namespace ActivityManagement.ServiceRequests
             };
             await _requestRepository.InsertAsync(entity);
             await CurrentUnitOfWork.SaveChangesAsync();
+
+            if (entity.AssignedEmployeeId.HasValue)
+                await _notificationManager.NotifyAsync(entity.AssignedEmployeeId, NotificationType.TalepAtandi,
+                    "Size bir talep atandı", entity.Title, $"/Requests/Detail/{entity.Id}", severity: "info", actorEmployeeId: ctx.EmployeeId);
+
             return await GetAsync(entity.Id);
         }
 
@@ -221,12 +229,19 @@ namespace ActivityManagement.ServiceRequests
             var r = await _requestRepository.GetAsync(id);
             EnsureCanManage(r, ctx);
 
+            var previousAssignee = r.AssignedEmployeeId;
             r.AssignedEmployeeId = assignedEmployeeId;
             r.SecondaryEmployeeId = secondaryEmployeeId;
             r.TeamId = await ResolveTeamIdAsync(assignedEmployeeId, ctx.EmployeeId) ?? r.TeamId;
             if (assignedEmployeeId.HasValue && r.Status == RequestStatus.Yeni)
                 r.Status = RequestStatus.Atandi;
             await CurrentUnitOfWork.SaveChangesAsync();
+
+            // Bildirim: yeni bir kişiye atandıysa (kendine değilse)
+            if (assignedEmployeeId.HasValue && assignedEmployeeId != previousAssignee)
+                await _notificationManager.NotifyAsync(assignedEmployeeId, NotificationType.TalepAtandi,
+                    "Size bir talep atandı", r.Title, $"/Requests/Detail/{r.Id}", severity: "info", actorEmployeeId: ctx.EmployeeId);
+
             return await GetAsync(r.Id);
         }
 

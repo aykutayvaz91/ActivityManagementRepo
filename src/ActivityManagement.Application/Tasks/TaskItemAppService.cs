@@ -26,6 +26,7 @@ namespace ActivityManagement.Tasks
         private readonly IRepository<Project, long> _projectRepository;
         private readonly IRepository<Team, long> _teamRepository;
         private readonly ActivityManagement.Notifications.IAppEmailSender _emailSender;
+        private readonly ActivityManagement.Notifications.INotificationManager _notificationManager;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public TaskItemAppService(
@@ -37,6 +38,7 @@ namespace ActivityManagement.Tasks
             IRepository<Project, long> projectRepository,
             IRepository<Team, long> teamRepository,
             ActivityManagement.Notifications.IAppEmailSender emailSender,
+            ActivityManagement.Notifications.INotificationManager notificationManager,
             IHttpContextAccessor httpContextAccessor)
         {
             _taskRepository = taskRepository;
@@ -47,6 +49,7 @@ namespace ActivityManagement.Tasks
             _projectRepository = projectRepository;
             _teamRepository = teamRepository;
             _emailSender = emailSender;
+            _notificationManager = notificationManager;
             _httpContextAccessor = httpContextAccessor;
         }
 
@@ -302,6 +305,11 @@ namespace ActivityManagement.Tasks
             {
                 if (task.AssignedEmployeeId.HasValue)
                 {
+                    // In-app bildirim (kendine değilse)
+                    await _notificationManager.NotifyAsync(task.AssignedEmployeeId, Entities.NotificationType.GorevAtandi,
+                        "Size bir görev atandı", task.Title, $"/Tasks/Detail/{task.Id}", severity: "info",
+                        actorEmployeeId: CurrentContext().EmployeeId);
+
                     var emp = await _employeeRepository.GetAll().AsNoTracking()
                         .FirstOrDefaultAsync(e => e.Id == task.AssignedEmployeeId.Value);
                     if (emp != null && !string.IsNullOrWhiteSpace(emp.Email))
@@ -379,6 +387,7 @@ namespace ActivityManagement.Tasks
                 input.ProjectId = task.ProjectId;
             }
 
+            var prevAssignee = task.AssignedEmployeeId;
             ObjectMapper.Map(input, task);
             // İlerleme yüzdesi duruma göre kurgulanır (Tamamlandı %100, Planlandı %0, Devam taban %25 / elle değer korunur)
             task.CompletionPercentage = ProgressForStatus(task.Status, input.CompletionPercentage);
@@ -386,6 +395,12 @@ namespace ActivityManagement.Tasks
                 ? (task.CompletedDate ?? DateTime.Now)
                 : (DateTime?)null;
             await CurrentUnitOfWork.SaveChangesAsync();
+
+            // Yeniden atama bildirimi: yeni bir kişiye atandıysa (kendine değilse)
+            if (task.AssignedEmployeeId.HasValue && task.AssignedEmployeeId != prevAssignee)
+                await _notificationManager.NotifyAsync(task.AssignedEmployeeId, Entities.NotificationType.GorevAtandi,
+                    "Size bir görev atandı", task.Title, $"/Tasks/Detail/{task.Id}", severity: "info", actorEmployeeId: ctx.EmployeeId);
+
             return MapToDto(task);
         }
 

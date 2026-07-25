@@ -147,6 +147,24 @@
                     }
                 </ul>
                 <ul class="navbar-nav">
+                    @if (__hasEmp)
+                    {
+                        <li class="nav-item dropdown">
+                            <a class="nav-link position-relative" href="#" id="notifBell" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Bildirimler">
+                                <i class="fas fa-bell"></i>
+                                <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none">0</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow" style="width:340px;max-height:460px;overflow:auto">
+                                <li class="dropdown-header d-flex justify-content-between align-items-center">
+                                    <span><i class="fas fa-bell me-1"></i>Bildirimler</span>
+                                    <a href="#" class="small text-decoration-none" onclick="markAllNotifRead();return false;">Tümünü okundu</a>
+                                </li>
+                                <li><hr class="dropdown-divider my-1" /></li>
+                                <li id="notifEmpty" class="text-center text-muted small py-3">Bildirim yok</li>
+                                <li><div id="notifList"></div></li>
+                            </ul>
+                        </li>
+                    }
                     @if (__isAdmin)
                     {
                         var actingName = User.FindFirst("ActingAsName")?.Value;
@@ -201,6 +219,97 @@
         window.AM = { role: '@amRole', empId: @amEmpId, isManager: @amIsManager };
     </script>
     <script src="~/js/site.js"></script>
+
+    @* ===== In-app bildirim (polling + toast + ses) ===== *@
+    @if (__hasEmp)
+    {
+        <span id="notifAf" style="display:none">@Html.AntiForgeryToken()</span>
+        <script>
+        (function () {
+            var lastMaxId = 0, audioCtx = null, soundOn = true, started = false;
+            function afToken() { return document.querySelector('#notifAf input[name="__RequestVerificationToken"]').value; }
+            // Ses: ilk kullanıcı etkileşiminden sonra AudioContext açılır (autoplay politikası)
+            document.addEventListener('click', function initAudio() {
+                try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+            }, { once: true });
+            function ding() {
+                if (!soundOn || !audioCtx) return;
+                try {
+                    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+                    o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.05;
+                    o.connect(g); g.connect(audioCtx.destination);
+                    var t = audioCtx.currentTime;
+                    o.start(); o.frequency.setValueAtTime(660, t + 0.12);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32); o.stop(t + 0.33);
+                } catch (e) {}
+            }
+            function esc(s) { return (s || '').replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+            function render(data) {
+                var badge = document.getElementById('notifBadge');
+                var n = data.unreadCount || 0;
+                if (badge) { badge.textContent = n > 99 ? '99+' : n; badge.style.display = n > 0 ? '' : 'none'; }
+                var list = document.getElementById('notifList'), empty = document.getElementById('notifEmpty');
+                var items = data.recent || [];
+                if (!items.length) { if (empty) empty.style.display = ''; if (list) list.innerHTML = ''; return; }
+                if (empty) empty.style.display = 'none';
+                var html = '';
+                items.forEach(function (x) {
+                    var bg = x.isRead ? '' : 'background:rgba(13,110,253,.06);';
+                    html += '<a href="#" onclick="notifClick(' + x.id + ',' + JSON.stringify(x.link || '') + ');return false;" ' +
+                        'class="dropdown-item d-flex gap-2 py-2 border-bottom" style="white-space:normal;' + bg + '">' +
+                        '<span class="text-' + (x.severity || 'info') + '"><i class="fas ' + (x.icon || 'fa-bell') + '"></i></span>' +
+                        '<span class="flex-fill"><span class="fw-semibold small">' + esc(x.title) + '</span>' +
+                        '<span class="d-block text-muted small">' + esc(x.message) + '</span>' +
+                        '<span class="d-block text-muted" style="font-size:.7rem">' + esc(x.timeAgo) + '</span></span>' +
+                        (x.isRead ? '' : '<span class="badge bg-primary align-self-start" style="width:8px;height:8px;padding:0;border-radius:50%"></span>') +
+                        '</a>';
+                });
+                if (list) list.innerHTML = html;
+            }
+            function load(showToast) {
+                fetch('/Notifications/Summary', { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) {
+                        if (!data) return;
+                        if (data.__abp && data.result !== undefined) data = data.result; // ABP zarfını aç
+                        if (!data) return;
+                        render(data);
+                        var items = data.recent || [];
+                        if (showToast && started) {
+                            var fresh = items.filter(function (x) { return x.id > lastMaxId && !x.isRead; });
+                            if (fresh.length) {
+                                ding();
+                                fresh.slice(0, 3).forEach(function (x) {
+                                    if (window.abp && abp.notify) abp.notify.info(esc(x.message || x.title), esc(x.title));
+                                });
+                            }
+                        }
+                        if (items.length && items[0].id > lastMaxId) lastMaxId = items[0].id;
+                        started = true;
+                    }).catch(function () {});
+            }
+            window.notifClick = function (id, link) {
+                fetch('/Notifications/MarkRead', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': afToken() },
+                    body: 'id=' + id + '&__RequestVerificationToken=' + encodeURIComponent(afToken())
+                }).then(function () { if (link) window.location = link; else load(false); });
+            };
+            window.markAllNotifRead = function () {
+                fetch('/Notifications/MarkAllRead', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': afToken() },
+                    body: '__RequestVerificationToken=' + encodeURIComponent(afToken())
+                }).then(function () { load(false); });
+            };
+            document.addEventListener('DOMContentLoaded', function () {
+                load(false);
+                setInterval(function () { load(true); }, 25000);
+            });
+        })();
+        </script>
+    }
+
     @if (TempData["Success"] != null || TempData["Error"] != null || TempData["Uyari"] != null)
     {
         <script>

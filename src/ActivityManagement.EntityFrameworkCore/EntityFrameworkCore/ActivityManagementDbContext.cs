@@ -33,6 +33,7 @@ namespace ActivityManagement.EntityFrameworkCore
         public DbSet<ServiceRequest> ServiceRequests { get; set; }
         public DbSet<IntegrationSettings> IntegrationSettings { get; set; }
         public DbSet<IntegrationSource> IntegrationSources { get; set; }
+        public DbSet<Notification> AppNotifications { get; set; }
 
         public ActivityManagementDbContext(DbContextOptions<ActivityManagementDbContext> options)
             : base(options)
@@ -359,6 +360,17 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.Property(s => s.Filter).HasMaxLength(1024);
                 b.Property(s => s.LastResult).HasMaxLength(1024);
                 b.HasIndex(s => s.Source).IsUnique();
+            });
+
+            modelBuilder.Entity<Notification>(b =>
+            {
+                b.ToTable("Notifications");
+                b.Property(n => n.Title).HasMaxLength(256);
+                b.Property(n => n.Message).HasMaxLength(1024);
+                b.Property(n => n.Link).HasMaxLength(512);
+                b.Property(n => n.Icon).HasMaxLength(64);
+                b.Property(n => n.Severity).HasMaxLength(16);
+                b.HasIndex(n => new { n.RecipientEmployeeId, n.IsRead });
             });
 
             modelBuilder.Entity<RoutineTask>(b =>

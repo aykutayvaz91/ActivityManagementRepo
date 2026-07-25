@@ -46,6 +46,7 @@ namespace ActivityManagement.Web.BackgroundJobs
             var taskRepo = sp.GetRequiredService<IRepository<TaskItem, long>>();
             var empRepo = sp.GetRequiredService<IRepository<Employee, long>>();
             var sender = sp.GetRequiredService<IAppEmailSender>();
+            var notifier = sp.GetRequiredService<ActivityManagement.Notifications.INotificationManager>();
 
             using var uow = uowManager.Begin();
             var tomorrow = DateTime.Today.AddDays(1);
@@ -60,6 +61,11 @@ namespace ActivityManagement.Web.BackgroundJobs
 
             foreach (var t in dueTasks)
             {
+                // In-app bildirim (personel kaydı olan atanana)
+                await notifier.NotifyAsync(t.AssignedEmployeeId, Entities.NotificationType.SlaYaklasti,
+                    "SLA yaklaşıyor", $"{t.Title} — son teslim {t.DueDate.Value:dd.MM.yyyy}",
+                    $"/Tasks/Detail/{t.Id}", severity: "warning");
+
                 var emp = await empRepo.GetAll().AsNoTracking()
                     .FirstOrDefaultAsync(e => e.Id == t.AssignedEmployeeId.Value);
                 if (emp != null && !string.IsNullOrWhiteSpace(emp.Email))
@@ -69,6 +75,21 @@ namespace ActivityManagement.Web.BackgroundJobs
                         $"<p>Merhaba {emp.FullName},</p><p><b>{System.Net.WebUtility.HtmlEncode(t.Title)}</b> görevinin son teslim tarihi <b>yarın ({t.DueDate.Value:dd.MM.yyyy})</b>.</p>");
                 }
             }
+
+            // Talepler: SLA'sı yarın olan, kapanmamış, atanan talepler → in-app bildirim
+            var reqRepo = sp.GetRequiredService<IRepository<ServiceRequest, long>>();
+            var dueReqs = await reqRepo.GetAll()
+                .Where(r => r.DueDate.HasValue && r.DueDate.Value >= tomorrow && r.DueDate.Value < dayAfter
+                            && r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal
+                            && r.AssignedEmployeeId != null)
+                .ToListAsync();
+            foreach (var r in dueReqs)
+            {
+                await notifier.NotifyAsync(r.AssignedEmployeeId, Entities.NotificationType.SlaYaklasti,
+                    "Talep SLA yaklaşıyor", $"{r.Title} — hedef {r.DueDate.Value:dd.MM.yyyy}",
+                    $"/Requests/Detail/{r.Id}", severity: "warning");
+            }
+
             await uow.CompleteAsync();
         }
     }
