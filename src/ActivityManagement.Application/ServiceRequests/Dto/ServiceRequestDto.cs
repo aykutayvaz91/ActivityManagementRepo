@@ -91,7 +91,7 @@ namespace ActivityManagement.ServiceRequests.Dto
         public string Filter { get; set; }
     }
 
-    // Faz 2: Portaldan gelen normalize talep (webhook alıcısı / sync client kullanır). Idempotent upsert.
+    // Faz 2: Portaldan gelen normalize talep (webhook alıcısı / sync kullanır). Idempotent upsert.
     public class PortalRequestDto
     {
         public RequestSource Source { get; set; }
@@ -102,10 +102,18 @@ namespace ActivityManagement.ServiceRequests.Dto
         public string RequesterName { get; set; }
         public string RequesterEmail { get; set; }
         public string ExtraInfo { get; set; }
-        public int? PriorityScore { get; set; }
+
+        // Sunucu tarafında eşlenecek ham alanlar:
+        public string AssigneeEmail { get; set; }   // → Employee (e-posta ile)
+        public string GroupName { get; set; }        // → Team (ad ile)
+        public string StatusText { get; set; }       // → RequestStatus (metin eşleme)
+        public string PriorityText { get; set; }     // → PriorityScore (metin eşleme)
+
+        public int? PriorityScore { get; set; }      // sayısal verilirse öncelikli
         public DateTime? ReceivedDate { get; set; }
         public DateTime? DueDate { get; set; }
-        // Portal tarafında kapandıysa durum güncellemesi için (opsiyonel).
+        public DateTime? ResolvedDate { get; set; }
+        // Enum doğrudan verilirse StatusText yerine kullanılır (webhook doğrudan gönderebilir).
         public RequestStatus? Status { get; set; }
     }
 }

@@ -42,6 +42,7 @@ namespace ActivityManagement.Web.Controllers
         private readonly ActivityManagement.Activities.IActivityTypeAppService _activityTypeAppService;
         private readonly ActivityManagement.Theming.IThemeSettingsAppService _themeAppService;
         private readonly ActivityManagement.Authorization.IAccessControlAppService _accessControlAppService;
+        private readonly ActivityManagement.SystemSettings.IIntegrationSettingsAppService _integrationAppService;
         private readonly Microsoft.AspNetCore.Hosting.IWebHostEnvironment _env;
 
         public AdminController(
@@ -57,6 +58,7 @@ namespace ActivityManagement.Web.Controllers
             ActivityManagement.Activities.IActivityTypeAppService activityTypeAppService,
             ActivityManagement.Theming.IThemeSettingsAppService themeAppService,
             ActivityManagement.Authorization.IAccessControlAppService accessControlAppService,
+            ActivityManagement.SystemSettings.IIntegrationSettingsAppService integrationAppService,
             Microsoft.AspNetCore.Hosting.IWebHostEnvironment env)
         {
             _employeeAppService = employeeAppService;
@@ -71,7 +73,45 @@ namespace ActivityManagement.Web.Controllers
             _activityTypeAppService = activityTypeAppService;
             _themeAppService = themeAppService;
             _accessControlAppService = accessControlAppService;
+            _integrationAppService = integrationAppService;
             _env = env;
+        }
+
+        // FAZ 2 — Entegrasyon Ayarları (webhook + pull kaynakları) — sadece Admin
+        public async Task<IActionResult> Integration()
+        {
+            if (!IsAdmin()) return AccessDeniedRedirect();
+            var dto = await _integrationAppService.GetAsync();
+            return View(dto);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveIntegrationGeneral(string inboundApiKey, bool syncEnabled, int intervalMinutes, bool clearInboundKey = false)
+        {
+            if (!IsAdmin()) return AccessDeniedRedirect();
+            try
+            {
+                await _integrationAppService.SaveGeneralAsync(inboundApiKey, syncEnabled, intervalMinutes, clearInboundKey);
+                TempData["Success"] = "Entegrasyon genel ayarları kaydedildi.";
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction("Integration");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveIntegrationSource(int id, bool enabled, string baseUrl, string apiKey,
+            string authHeader, string authScheme, string filter, int initialLookbackDays)
+        {
+            if (!IsAdmin()) return AccessDeniedRedirect();
+            try
+            {
+                await _integrationAppService.SaveSourceAsync(id, enabled, baseUrl, apiKey, authHeader, authScheme, filter, initialLookbackDays);
+                TempData["Success"] = "Kaynak ayarı kaydedildi.";
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction("Integration");
         }
 
         // V4/R2: Rol × Sayfa Erişim Matrisi (Admin)

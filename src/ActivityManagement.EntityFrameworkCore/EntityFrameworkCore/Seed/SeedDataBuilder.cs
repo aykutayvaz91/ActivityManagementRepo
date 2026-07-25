@@ -23,6 +23,7 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
             SeedWorkflowStatuses();   // Kanban/Pano kolonları — TaskStatus enum ile eşleşen 5 durum
             SeedActivityTypes();      // Dinamik faaliyet tipleri (Destek, Bakım, ...)
             SeedRolesAndAccess();     // Rol tanımları + Rol×Sayfa erişim matrisi (mevcut yetkiler)
+            SeedIntegration();        // Entegrasyon ayarları + kaynak satırları (Sunucu/Destek, kapalı)
             // NOT: Dummy görev/proje ve faaliyet tohumlaması kapatıldı. Sistem gerçek
             // kullanım için boş başlar; görevler kategori-tabanlı olarak elle oluşturulur.
             // SeedWorkItems();   // devre dışı — xlsx dummy iş kalemleri/görevler
@@ -100,6 +101,34 @@ namespace ActivityManagement.EntityFrameworkCore.Seed
                         RoleName = role,
                         PageKey = page.Key,
                         Allowed = kv.Value.Contains(page.Key)
+                    });
+                }
+            }
+            _context.SaveChanges();
+        }
+
+        // Entegrasyon: tek satırlık genel ayar + her kaynak için birer satır (varsayılan KAPALI).
+        // Idempotent: eksik olanları ekler, mevcutlara dokunmaz.
+        private void SeedIntegration()
+        {
+            if (!_context.IntegrationSettings.Any())
+                _context.IntegrationSettings.Add(new IntegrationSettings { TenantId = 1, SyncEnabled = false, IntervalMinutes = 10 });
+
+            foreach (var src in new[] { RequestSource.SunucuKurulum, RequestSource.DisDestek })
+            {
+                if (!_context.IntegrationSources.Any(s => s.Source == src))
+                {
+                    _context.IntegrationSources.Add(new IntegrationSource
+                    {
+                        TenantId = 1,
+                        Source = src,
+                        Enabled = false,
+                        AuthHeader = "Authorization",
+                        AuthScheme = "Bearer",
+                        InitialLookbackDays = 7,
+                        BaseUrl = src == RequestSource.SunucuKurulum
+                            ? "https://psm.tdv.org/api/kurulum-talepleri"
+                            : "https://destek.cmit.com.tr/api/talepler"
                     });
                 }
             }

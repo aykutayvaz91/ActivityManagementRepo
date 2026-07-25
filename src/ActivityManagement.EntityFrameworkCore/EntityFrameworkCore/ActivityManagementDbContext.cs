@@ -31,6 +31,8 @@ namespace ActivityManagement.EntityFrameworkCore
         public DbSet<AppRoleDef> AppRoles { get; set; }
         public DbSet<RolePageAccess> RolePageAccesses { get; set; }
         public DbSet<ServiceRequest> ServiceRequests { get; set; }
+        public DbSet<IntegrationSettings> IntegrationSettings { get; set; }
+        public DbSet<IntegrationSource> IntegrationSources { get; set; }
 
         public ActivityManagementDbContext(DbContextOptions<ActivityManagementDbContext> options)
             : base(options)
@@ -339,6 +341,24 @@ namespace ActivityManagement.EntityFrameworkCore
                  .HasForeignKey(s => s.ProjectId)
                  .IsRequired(false)
                  .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<IntegrationSettings>(b =>
+            {
+                b.ToTable("IntegrationSettings");
+                b.Property(s => s.InboundApiKey).HasMaxLength(256);
+            });
+
+            modelBuilder.Entity<IntegrationSource>(b =>
+            {
+                b.ToTable("IntegrationSources");
+                b.Property(s => s.BaseUrl).HasMaxLength(512);
+                b.Property(s => s.ApiKey).HasMaxLength(512);
+                b.Property(s => s.AuthHeader).HasMaxLength(64);
+                b.Property(s => s.AuthScheme).HasMaxLength(32);
+                b.Property(s => s.Filter).HasMaxLength(1024);
+                b.Property(s => s.LastResult).HasMaxLength(1024);
+                b.HasIndex(s => s.Source).IsUnique();
             });
 
             modelBuilder.Entity<RoutineTask>(b =>

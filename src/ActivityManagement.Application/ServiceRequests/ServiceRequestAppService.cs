@@ -21,17 +21,20 @@ namespace ActivityManagement.ServiceRequests
         private readonly IRepository<ServiceRequest, long> _requestRepository;
         private readonly IRepository<ActivityLog, long> _logRepository;
         private readonly IRepository<Employee, long> _employeeRepository;
+        private readonly IRepository<Team, long> _teamRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public ServiceRequestAppService(
             IRepository<ServiceRequest, long> requestRepository,
             IRepository<ActivityLog, long> logRepository,
             IRepository<Employee, long> employeeRepository,
+            IRepository<Team, long> teamRepository,
             IHttpContextAccessor httpContextAccessor)
         {
             _requestRepository = requestRepository;
             _logRepository = logRepository;
             _employeeRepository = employeeRepository;
+            _teamRepository = teamRepository;
             _httpContextAccessor = httpContextAccessor;
         }
 
@@ -326,21 +329,33 @@ namespace ActivityManagement.ServiceRequests
                     .FirstOrDefaultAsync(r => r.Source == input.Source && r.ExternalRef == extRef);
             }
 
-            if (entity == null)
+            // Ham alanları çöz: e-posta → personel, grup → takım, durum/öncelik metni → enum.
+            long? resolvedEmpId = await ResolveEmployeeByEmailAsync(input.AssigneeEmail);
+            long? resolvedTeamId = resolvedEmpId.HasValue
+                ? await _employeeRepository.GetAll().AsNoTracking().Where(e => e.Id == resolvedEmpId.Value).Select(e => e.TeamId).FirstOrDefaultAsync()
+                : await ResolveTeamByNameAsync(input.GroupName);
+            RequestStatus? mappedStatus = input.Status ?? MapStatusText(input.StatusText);
+            int? mappedScore = input.PriorityScore ?? MapPriorityScore(input.PriorityText);
+
+            bool isNew = entity == null;
+            if (isNew)
             {
                 entity = new ServiceRequest
                 {
                     TenantId = AbpSession.TenantId ?? 1,
                     Source = input.Source,
                     ExternalRef = string.IsNullOrWhiteSpace(input.ExternalRef) ? null : input.ExternalRef.Trim(),
-                    Status = RequestStatus.Yeni,
+                    Status = mappedStatus ?? (resolvedEmpId.HasValue ? RequestStatus.Atandi : RequestStatus.Yeni),
                     CompletionPercentage = 0,
-                    PriorityScore = ClampScore(input.PriorityScore ?? 5)
+                    PriorityScore = ClampScore(mappedScore ?? 5),
+                    Priority = ScoreToPriority(mappedScore ?? 5),
+                    AssignedEmployeeId = resolvedEmpId,   // ilk içe aktarımda portal ataması uygulanır
+                    TeamId = resolvedTeamId
                 };
                 await _requestRepository.InsertAsync(entity);
             }
 
-            // Alanları güncelle (atama/durum yerelde korunur; portal yalnız kaynak alanları besler).
+            // Kaynak alanları her zaman güncelle (portal bunların sahibi).
             entity.ExternalUrl = input.ExternalUrl ?? entity.ExternalUrl;
             entity.Title = input.Title;
             entity.Description = input.Description ?? entity.Description;
@@ -349,19 +364,71 @@ namespace ActivityManagement.ServiceRequests
             entity.ExtraInfo = input.ExtraInfo ?? entity.ExtraInfo;
             entity.ReceivedDate = input.ReceivedDate ?? entity.ReceivedDate ?? DateTime.Now;
             entity.DueDate = input.DueDate ?? entity.DueDate;
-            if (input.PriorityScore.HasValue) entity.PriorityScore = ClampScore(input.PriorityScore.Value);
-            // Portal tarafı kapanış bildirdiyse ve yerelde hâlâ açıksa güncelle.
-            if (input.Status.HasValue &&
-                (input.Status == RequestStatus.Kapandi || input.Status == RequestStatus.Iptal) &&
+            if (mappedScore.HasValue) entity.PriorityScore = ClampScore(mappedScore.Value);
+            if (!entity.TeamId.HasValue && resolvedTeamId.HasValue) entity.TeamId = resolvedTeamId;
+
+            // Atama/durum YERELDE korunur (güncellemede portal ezmez). İstisna: portal kapanış/iptal bildirdiyse kapat.
+            if (mappedStatus.HasValue &&
+                (mappedStatus == RequestStatus.Kapandi || mappedStatus == RequestStatus.Iptal) &&
                 entity.Status != RequestStatus.Kapandi && entity.Status != RequestStatus.Iptal)
             {
-                entity.Status = input.Status.Value;
+                entity.Status = mappedStatus.Value;
+                entity.CompletionPercentage = mappedStatus == RequestStatus.Kapandi ? 100 : entity.CompletionPercentage;
+                entity.ResolvedDate = input.ResolvedDate ?? entity.ResolvedDate ?? DateTime.Now;
                 entity.ClosedDate = DateTime.Now;
             }
 
             await CurrentUnitOfWork.SaveChangesAsync();
             return entity.Id;
         }
+
+        private async Task<long?> ResolveEmployeeByEmailAsync(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return null;
+            var e = email.Trim();
+            return await _employeeRepository.GetAll().AsNoTracking()
+                .Where(x => x.Email != null && x.Email.ToLower() == e.ToLower())
+                .Select(x => (long?)x.Id).FirstOrDefaultAsync();
+        }
+
+        private async Task<long?> ResolveTeamByNameAsync(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            var n = name.Trim();
+            return await _teamRepository.GetAll().AsNoTracking()
+                .Where(t => t.Name == n)
+                .Select(t => (long?)t.Id).FirstOrDefaultAsync();
+        }
+
+        // Portal durum metnini bizim RequestStatus'a eşler (TR/EN varyantları).
+        private static RequestStatus? MapStatusText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            var t = text.Trim().ToLowerInvariant();
+            if (t.Contains("iptal") || t.Contains("red") || t.Contains("cancel")) return RequestStatus.Iptal;
+            if (t.Contains("kapat") || t.Contains("kapan") || t.Contains("tamamlan") || t.Contains("closed") || t.Contains("complete") || t.Contains("done")) return RequestStatus.Kapandi;
+            if (t.Contains("çöz") || t.Contains("coz") || t.Contains("resolve")) return RequestStatus.Cozuldu;
+            if (t.Contains("bekle") || t.Contains("pending") || t.Contains("hold")) return RequestStatus.Beklemede;
+            if (t.Contains("kurulum") || t.Contains("işlem") || t.Contains("islem") || t.Contains("devam") || t.Contains("progress")) return RequestStatus.DevamEdiyor;
+            if (t.Contains("atan") || t.Contains("assign")) return RequestStatus.Atandi;
+            if (t.Contains("yeni") || t.Contains("açık") || t.Contains("acik") || t.Contains("open")) return RequestStatus.Yeni;
+            return null;
+        }
+
+        // Portal öncelik metnini 1-10 skora eşler.
+        private static int? MapPriorityScore(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            var t = text.Trim().ToLowerInvariant();
+            if (t.Contains("krit") || t.Contains("acil") || t.Contains("critical") || t.Contains("urgent")) return 9;
+            if (t.Contains("yüksek") || t.Contains("yuksek") || t.Contains("high")) return 7;
+            if (t.Contains("düşük") || t.Contains("dusuk") || t.Contains("low")) return 3;
+            if (t.Contains("orta") || t.Contains("normal") || t.Contains("medium")) return 5;
+            return null;
+        }
+
+        private static TaskPriority ScoreToPriority(int score) =>
+            score >= 9 ? TaskPriority.Kritik : score >= 7 ? TaskPriority.Yuksek : score >= 4 ? TaskPriority.Normal : TaskPriority.Dusuk;
 
         // --- yardımcılar ---
 

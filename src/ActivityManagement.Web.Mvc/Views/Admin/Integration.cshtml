@@ -1,0 +1,141 @@
+@using ActivityManagement.Entities
+@model ActivityManagement.SystemSettings.Dto.IntegrationSettingsDto
+@{
+    ViewData["Title"] = "Entegrasyon Ayarları";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/Admin">Admin Panel</a></li>
+            <li class="breadcrumb-item active">Entegrasyon Ayarları</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="alert alert-info small">
+    <i class="fas fa-circle-info me-1"></i>
+    <strong>Talep entegrasyonu.</strong> İki yol vardır: (1) <b>Gelen (Webhook)</b> — portallar bize POST atar;
+    (2) <b>Giden (Pull)</b> — biz portalların API'sini periyodik çekeriz. İkisi de burada yönetilir; <b>varsayılan kapalıdır</b>.
+    Portal ekiplerine iletilecek talimatlar: <code>destek-entegrasyon.md</code> / <code>psm-entegrasyon.md</code>.
+</div>
+
+@* ===== GELEN (Webhook) + Genel ===== *@
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white"><h6 class="mb-0"><i class="fas fa-inbox me-2"></i>Gelen (Webhook) + Genel Ayar</h6></div>
+    <div class="card-body">
+        <form asp-action="SaveIntegrationGeneral" method="post">
+            @Html.AntiForgeryToken()
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label">Webhook Adresi <small class="text-muted">(portallara bunu verin)</small></label>
+                    <input class="form-control" value="@Model.WebhookUrl" readonly onclick="this.select()" />
+                    <small class="text-muted">Portallar yeni/güncel talebi bu adrese <code>POST</code> eder; <code>X-Api-Key</code> header'ı ile.</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">
+                        Gelen API Anahtarı
+                        @if (Model.HasInboundKey) { <small class="text-success">(kayıtlı — boş bırakırsanız değişmez)</small> }
+                    </label>
+                    <input name="inboundApiKey" class="form-control" type="password" placeholder="••••••••" autocomplete="new-password" />
+                    <small class="text-muted">Boş kalırsa webhook <b>kapalı</b> (503) olur.</small>
+                    @if (Model.HasInboundKey)
+                    {
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" name="clearInboundKey" value="true" id="clearKey" />
+                            <label class="form-check-label small text-danger" for="clearKey">Anahtarı temizle (webhook'u kapat)</label>
+                        </div>
+                    }
+                </div>
+
+                <div class="col-md-4">
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" name="syncEnabled" value="true" id="syncEnabled" @(Model.SyncEnabled ? "checked" : "") />
+                        <input type="hidden" name="syncEnabled" value="false" />
+                        <label class="form-check-label" for="syncEnabled">Giden (Pull) senkronu etkin</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Senkron Aralığı (dakika)</label>
+                    <input name="intervalMinutes" class="form-control" type="number" min="1" max="1440" value="@Model.IntervalMinutes" />
+                </div>
+            </div>
+            <hr />
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Genel Ayarı Kaydet</button>
+        </form>
+    </div>
+</div>
+
+@* ===== GİDEN (Pull) kaynakları ===== *@
+<h6 class="text-muted mb-2"><i class="fas fa-cloud-arrow-down me-1"></i>Giden (Pull) Kaynakları</h6>
+<div class="row g-3">
+    @foreach (var s in Model.Sources)
+    {
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="fas @(s.Source == RequestSource.SunucuKurulum ? "fa-server" : "fa-headset") me-1"></i>
+                        @s.SourceText
+                    </span>
+                    <span class="badge bg-@(s.Enabled ? "success" : "secondary")">@(s.Enabled ? "Etkin" : "Kapalı")</span>
+                </div>
+                <div class="card-body">
+                    <form asp-action="SaveIntegrationSource" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@s.Id" />
+                        <div class="mb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="enabled" value="true" id="en_@s.Id" @(s.Enabled ? "checked" : "") />
+                                <input type="hidden" name="enabled" value="false" />
+                                <label class="form-check-label" for="en_@s.Id">Bu kaynağı çek</label>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Okuma API Adresi (BaseUrl)</label>
+                            <input name="baseUrl" class="form-control form-control-sm" value="@s.BaseUrl" placeholder="https://.../api/talepler" />
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <label class="form-label small">
+                                    API Anahtarı (giden token)
+                                    @if (s.HasApiKey) { <span class="text-success">(kayıtlı)</span> }
+                                </label>
+                                <input name="apiKey" class="form-control form-control-sm" type="password" placeholder="••••••••" autocomplete="new-password" />
+                            </div>
+                            <div class="col-7">
+                                <label class="form-label small">Auth Header</label>
+                                <input name="authHeader" class="form-control form-control-sm" value="@s.AuthHeader" placeholder="Authorization" />
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label small">Şema</label>
+                                <input name="authScheme" class="form-control form-control-sm" value="@s.AuthScheme" placeholder="Bearer" />
+                            </div>
+                            <div class="col-8">
+                                <label class="form-label small">Filtre <small class="text-muted">(ör. group=...)</small></label>
+                                <input name="filter" class="form-control form-control-sm" value="@s.Filter" />
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small">İlk geri bakış (gün)</label>
+                                <input name="initialLookbackDays" class="form-control form-control-sm" type="number" min="0" max="365" value="@s.InitialLookbackDays" />
+                            </div>
+                        </div>
+                        <hr class="my-2" />
+                        <div class="small text-muted mb-2">
+                            <div><i class="fas fa-clock me-1"></i>Son çalışma: @(s.LastRunUtc?.ToString("dd.MM.yyyy HH:mm") ?? "-")</div>
+                            <div><i class="fas fa-water me-1"></i>Watermark (UTC): @(s.LastSyncUtc?.ToString("dd.MM.yyyy HH:mm") ?? "-")</div>
+                            <div>
+                                <i class="fas fa-circle-info me-1"></i>Son sonuç:
+                                @if (string.IsNullOrEmpty(s.LastResult)) { <span>-</span> }
+                                else if (s.LastResult.StartsWith("HATA")) { <span class="text-danger">@s.LastResult</span> }
+                                else { <span class="text-success">@s.LastResult</span> }
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-save me-1"></i>Kaydet</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+</div>

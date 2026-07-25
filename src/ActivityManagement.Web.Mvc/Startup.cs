@@ -65,6 +65,10 @@ namespace ActivityManagement.Web
             // Günlük SLA hatırlatma servisi (SMTP yapılandırılmamışsa no-op)
             services.AddHostedService<ActivityManagement.Web.BackgroundJobs.SlaReminderHostedService>();
 
+            // FAZ 2 — Talep PULL senkron servisi (Admin → Entegrasyon; varsayılan kapalı, no-op)
+            services.AddHttpClient();
+            services.AddHostedService<ActivityManagement.Web.BackgroundJobs.RequestSyncHostedService>();
+
             var authBuilder = services.AddAuthentication(options =>
             {
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
