@@ -30,6 +30,7 @@ else
                     <th>Atanan</th>
                     <th class="text-center">Önem</th>
                     <th class="text-center">Durum</th>
+                    <th class="text-center">Efor</th>
                     <th class="text-center">SLA</th>
                     <th style="min-width:110px">İlerleme</th>
                     <th class="text-end">İşlem</th>
@@ -51,15 +52,26 @@ else
                         </td>
                         <td>
                             <a href="/Requests/Detail/@r.Id" class="fw-semibold text-decoration-none">@r.Title</a>
-                            @if (r.TotalHours > 0)
-                            {
-                                <small class="text-muted d-block"><i class="fas fa-clock me-1"></i>@r.TotalHours.ToString("0.##") saat efor</small>
-                            }
                         </td>
                         <td><small>@(r.RequesterName ?? "-")</small></td>
                         <td><small>@(r.AssignedEmployeeName ?? "<atanmadı>")</small></td>
                         <td class="text-center"><span class="badge bg-light text-dark border">@r.PriorityScore</span></td>
                         <td class="text-center"><span class="badge bg-@statusColor(r.Status)">@r.StatusText</span></td>
+                        <td class="text-center">
+                            @{ var reqDone = r.Status == RequestStatus.Cozuldu || r.Status == RequestStatus.Kapandi; }
+                            @if (r.TotalHours > 0)
+                            {
+                                <span class="badge bg-success" title="Girilen toplam efor"><i class="fas fa-clock me-1"></i>@r.TotalHours.ToString("0.##") sa</span>
+                            }
+                            else if (reqDone)
+                            {
+                                <span class="badge bg-danger" title="Kapandı/çözüldü ama efor girilmemiş — rapor için efor girilmeli">Efor yok</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">—</span>
+                            }
+                        </td>
                         <td class="text-center">
                             <small class="@(r.IsOverdue ? "text-danger fw-bold" : "text-muted")">
                                 @(r.DueDate.HasValue ? r.DueDate.Value.ToString("dd.MM.yyyy") : "-")

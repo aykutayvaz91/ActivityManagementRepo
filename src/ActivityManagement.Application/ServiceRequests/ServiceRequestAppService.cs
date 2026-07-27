@@ -418,13 +418,15 @@ namespace ActivityManagement.ServiceRequests
             bool isNew = entity == null;
             if (isNew)
             {
+                var initStatus = mappedStatus ?? (resolvedEmpId.HasValue ? RequestStatus.Atandi : RequestStatus.Yeni);
                 entity = new ServiceRequest
                 {
                     TenantId = AbpSession.TenantId ?? 1,
                     Source = input.Source,
                     ExternalRef = string.IsNullOrWhiteSpace(input.ExternalRef) ? null : input.ExternalRef.Trim(),
-                    Status = mappedStatus ?? (resolvedEmpId.HasValue ? RequestStatus.Atandi : RequestStatus.Yeni),
-                    CompletionPercentage = 0,
+                    Status = initStatus,
+                    // Portal zaten kapalı/çözüldü gönderdiyse ilerleme %100 (aksi halde statüye göre taban)
+                    CompletionPercentage = ProgressForStatus(initStatus, 0),
                     PriorityScore = ClampScore(mappedScore ?? 5),
                     Priority = ScoreToPriority(mappedScore ?? 5),
                     // Sunucu Kurulum talepleri varsayılan "Kurulum" (portal tip göndermediyse); sonra elle değiştirilebilir
