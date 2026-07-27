@@ -57,7 +57,7 @@
                 </dl>
                 @if (!string.IsNullOrWhiteSpace(Model.Description))
                 {
-                    <hr /><div class="small">@Html.Raw(System.Net.WebUtility.HtmlEncode(Model.Description).Replace("\n", "<br/>"))</div>
+                    <hr /><div class="small req-desc">@Html.Raw(ActivityManagement.Web.Helpers.SafeHtml.RenderDescription(Model.Description))</div>
                 }
             </div>
         </div>

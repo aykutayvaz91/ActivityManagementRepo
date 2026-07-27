@@ -315,9 +315,13 @@ namespace ActivityManagement.ServiceRequests
                 .FirstOrDefaultAsync(x => x.Id == input.ServiceRequestId.Value);
             if (r == null) throw new UserFriendlyException("Talep bulunamadı.");
 
-            // Efor yalnız talebin ATANAN kişisi tarafından, kendi adına girilir.
-            if (!(r.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue && r.AssignedEmployeeId == ctx.EmployeeId))
-                throw new UserFriendlyException("Efor yalnızca talebin atanan kişisi tarafından girilebilir.");
+            // Efor: atanan/2. sorumlu VEYA kapsamındaki yönetici (Admin/Manager/TakımLideri) kendi adına girer.
+            bool canLog = IsManagerForRequest(r, ctx)
+                || (ctx.EmployeeId.HasValue && (r.AssignedEmployeeId == ctx.EmployeeId || r.SecondaryEmployeeId == ctx.EmployeeId));
+            if (!canLog)
+                throw new UserFriendlyException("Bu talebe efor girme yetkiniz yok.");
+            if (!ctx.EmployeeId.HasValue)
+                throw new UserFriendlyException("Efor girmek için personel kaydınız bulunmuyor.");
             if (input.HoursSpent <= 0)
                 throw new UserFriendlyException("Harcanan süre 0'dan büyük olmalıdır.");
 
@@ -569,7 +573,9 @@ namespace ActivityManagement.ServiceRequests
             dto.IsOpen = r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal;
             dto.IsOverdue = dto.IsOpen && r.DueDate.HasValue && r.DueDate.Value < DateTime.Now;
             dto.CanManage = IsManagerForRequest(r, ctx);
-            dto.CanLogEffort = r.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue && r.AssignedEmployeeId == ctx.EmployeeId;
+            // Efor: atanan/2. sorumlu VEYA kapsamındaki yönetici (Admin/Manager/TakımLideri) girebilir.
+            dto.CanLogEffort = dto.CanManage
+                || (ctx.EmployeeId.HasValue && (r.AssignedEmployeeId == ctx.EmployeeId || r.SecondaryEmployeeId == ctx.EmployeeId));
             return dto;
         }
 

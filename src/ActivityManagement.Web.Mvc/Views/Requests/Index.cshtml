@@ -29,30 +29,30 @@
 
 <ul class="nav nav-tabs mb-3" id="reqTabs">
     <li class="nav-item">
-        <a class="nav-link active" data-bs-toggle="tab" href="#tab-sunucu">
-            <i class="fas fa-server me-1"></i>Sunucu Talepleri
-            <span class="badge bg-secondary ms-1">@sunucu.Count(x => x.IsOpen)</span>
-            <small class="text-muted d-none d-md-inline">(psm.tdv.org)</small>
-        </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#tab-destek">
+        <a class="nav-link active" data-bs-toggle="tab" href="#tab-destek">
             <i class="fas fa-headset me-1"></i>Destek Talepleri
             <span class="badge bg-secondary ms-1">@destek.Count(x => x.IsOpen)</span>
             <small class="text-muted d-none d-md-inline">(destek.cmit.com.tr)</small>
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-sunucu">
+            <i class="fas fa-server me-1"></i>Sunucu Talepleri
+            <span class="badge bg-secondary ms-1">@sunucu.Count(x => x.IsOpen)</span>
+            <small class="text-muted d-none d-md-inline">(psm.tdv.org)</small>
+        </a>
+    </li>
 </ul>
 
 <div class="tab-content">
-    <div class="tab-pane fade show active" id="tab-sunucu">
-        <div class="card shadow-sm"><div class="card-body p-2">
-            @await Html.PartialAsync("_RequestTable", sunucu)
-        </div></div>
-    </div>
-    <div class="tab-pane fade" id="tab-destek">
+    <div class="tab-pane fade show active" id="tab-destek">
         <div class="card shadow-sm"><div class="card-body p-2">
             @await Html.PartialAsync("_RequestTable", destek)
+        </div></div>
+    </div>
+    <div class="tab-pane fade" id="tab-sunucu">
+        <div class="card shadow-sm"><div class="card-body p-2">
+            @await Html.PartialAsync("_RequestTable", sunucu)
         </div></div>
     </div>
 </div>
