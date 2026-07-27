@@ -26,6 +26,7 @@ namespace ActivityManagement.Web.Controllers
         private readonly IProjectAppService _projectAppService;
         private readonly ICategoryAppService _categoryAppService;
         private readonly ITeamAppService _teamAppService;
+        private readonly ActivityManagement.Responsibilities.ISubCategoryResponsibilityAppService _subCatRespAppService;
         private readonly IWebHostEnvironment _env;
 
         public TasksController(
@@ -34,6 +35,7 @@ namespace ActivityManagement.Web.Controllers
             IProjectAppService projectAppService,
             ICategoryAppService categoryAppService,
             ITeamAppService teamAppService,
+            ActivityManagement.Responsibilities.ISubCategoryResponsibilityAppService subCatRespAppService,
             IWebHostEnvironment env)
         {
             _taskAppService = taskAppService;
@@ -41,7 +43,25 @@ namespace ActivityManagement.Web.Controllers
             _projectAppService = projectAppService;
             _categoryAppService = categoryAppService;
             _teamAppService = teamAppService;
+            _subCatRespAppService = subCatRespAppService;
             _env = env;
+        }
+
+        // Alt kategori → (asıl, yedek) sorumlu haritası (sorumluluk matrisi). Görev oluştururken 1./2. sorumlu ön-seçimi.
+        private async Task<System.Collections.Generic.Dictionary<long, long?[]>> BuildSubCatRespMapAsync()
+        {
+            var map = new System.Collections.Generic.Dictionary<long, long?[]>(); // [0]=asıl, [1]=yedek
+            try
+            {
+                foreach (var r in await _subCatRespAppService.GetAllAsync())
+                {
+                    if (!map.TryGetValue(r.SubCategoryId, out var pair)) { pair = new long?[2]; map[r.SubCategoryId] = pair; }
+                    if (r.ResponsibilityType == ActivityManagement.Entities.ResponsibilityType.Primary) pair[0] = r.EmployeeId;
+                    else pair[1] = r.EmployeeId;
+                }
+            }
+            catch { }
+            return map;
         }
 
         // Görevler: sadece Admin. Sol kategori/alt kategori ağacı, sağda seçilen (alt)kategorinin görevleri.
@@ -212,6 +232,9 @@ namespace ActivityManagement.Web.Controllers
             ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
             ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
             await LoadCategoriesViewBagAsync();
+            // Sorumluluk matrisi (alt kategori → asıl/yedek sorumlu) — 1./2. sorumlu ön-seçimi (view'da JS + burada sunucu)
+            var respMap = await BuildSubCatRespMapAsync();
+            ViewBag.SubCatResp = respMap;
             // Görevlerim ağacında seçili kategori/alt kategori forma otomatik gelsin
             ViewBag.PreCategoryId = categoryId;
             var dto = new CreateUpdateTaskItemDto
@@ -238,6 +261,13 @@ namespace ActivityManagement.Web.Controllers
                     ViewBag.FromProject = true;
                     ViewBag.ProjectName = proj.Name;
                 }
+            }
+
+            // Alt kategori tree'den seçili geldiyse (proje değil): sorumluluk matrisinden 1./2. sorumluyu ön-doldur
+            if (!projectId.HasValue && dto.SubCategoryId.HasValue && respMap.TryGetValue(dto.SubCategoryId.Value, out var pair))
+            {
+                dto.AssignedEmployeeId = dto.AssignedEmployeeId ?? pair[0];
+                dto.SecondaryEmployeeId = dto.SecondaryEmployeeId ?? pair[1];
             }
 
             // Görev grubu ön-seçimi: hedef kişinin (atanan ya da giriş yapan) birimi otomatik seçili gelsin
