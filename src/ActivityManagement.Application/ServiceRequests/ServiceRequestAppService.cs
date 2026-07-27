@@ -157,13 +157,12 @@ namespace ActivityManagement.ServiceRequests
                 query = query.Where(r => r.AssignedEmployeeId == ctx.EmployeeId.Value ||
                                          r.SecondaryEmployeeId == ctx.EmployeeId.Value);
 
-            // Görünürlük: Admin-self tümünü; diğerleri kendi TAKIMININ talepleri + kendine atananları.
+            // Görünürlük: Admin/Manager (SeesAllTeams) TÜM talepleri (havuz dahil) görür → atama yapar.
+            // Diğer personel YALNIZ kendine (1./2. sorumlu) atanan talepleri görür — "eşleşme ile personele göster".
+            // (Talep hacmi yüksek olduğundan takım-geneli değil, kişisel kapsam uygulanır.)
             if (input.MineOnly != true && !SeesAllTeams() && ctx.EmployeeId.HasValue)
             {
-                var myTeamId = await _employeeRepository.GetAll().AsNoTracking()
-                    .Where(e => e.Id == ctx.EmployeeId.Value).Select(e => e.TeamId).FirstOrDefaultAsync();
                 query = query.Where(r =>
-                    (myTeamId != null && r.TeamId == myTeamId) ||
                     r.AssignedEmployeeId == ctx.EmployeeId.Value ||
                     r.SecondaryEmployeeId == ctx.EmployeeId.Value);
             }
