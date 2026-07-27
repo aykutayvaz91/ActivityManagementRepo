@@ -12,7 +12,8 @@ obj/
 *.suo
 
 # Claude / oturum & hesap klasörleri (uygulama dışı)
-.claude/
+.claude/*
+!.claude/skills/
 acc1/
 acc2/
 
