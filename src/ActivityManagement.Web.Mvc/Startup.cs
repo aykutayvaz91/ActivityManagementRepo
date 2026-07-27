@@ -158,6 +158,21 @@ namespace ActivityManagement.Web
 
             app.UseAbp();
 
+            // HTTP → HTTPS yönlendirme (yalnız public tdv.org host'u; localhost:8090 test/izleme etkilenmez).
+            // In-process ANCM istemci şemasını doğru ilettiği için IsHttps güvenilir → yönlendirme döngüsü olmaz.
+            app.Use(async (context, next) =>
+            {
+                var req = context.Request;
+                var host = req.Host.Host;
+                if (!req.IsHttps && host != null && host.EndsWith("tdv.org", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    var target = "https://" + req.Host.Value + req.PathBase + req.Path + req.QueryString;
+                    context.Response.Redirect(target, permanent: true);
+                    return;
+                }
+                await next();
+            });
+
             // Hatalarda sayfa patlamasın: kullanıcı dostu hata sayfası + dosyaya loglama (/Home/Error).
             app.UseExceptionHandler("/Home/Error");
 
