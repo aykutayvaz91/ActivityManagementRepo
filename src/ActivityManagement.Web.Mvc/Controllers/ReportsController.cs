@@ -21,8 +21,10 @@ namespace ActivityManagement.Web.Controllers
             _employeeAppService = employeeAppService;
         }
 
-        private bool IsAdmin() => User.IsInRole("Admin");
-        private bool IsManager() => User.IsInRole("Admin") || User.IsInRole("TakımLideri");
+        // Manager, rapor/görünürlükte Admin gibi TÜM takım ve kişileri kapsar (yalnız admin-panel ayarlarını yapamaz).
+        private bool SeesAll() => User.IsInRole("Admin") || User.IsInRole("Manager");
+        // Ekip raporu çekebilen / başkasının raporunu seçebilen roller: Admin, Manager, TakımLideri.
+        private bool IsManager() => SeesAll() || User.IsInRole("TakımLideri");
         private long? CurrentEmployeeId()
         {
             var c = User.FindFirst("EmployeeId")?.Value;
@@ -38,8 +40,8 @@ namespace ActivityManagement.Web.Controllers
         private async Task<System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>> ScopedEmployeesAsync()
         {
             var all = (await _employeeAppService.GetAllListAsync()).Items;
-            if (IsAdmin()) return all.ToList();
-            if (IsManager()) { var t = await CurrentTeamIdAsync(); return all.Where(e => e.TeamId == t).ToList(); }
+            if (SeesAll()) return all.ToList();                                   // Admin/Manager → tüm personel
+            if (IsManager()) { var t = await CurrentTeamIdAsync(); return all.Where(e => e.TeamId == t).ToList(); } // TakımLideri → kendi takımı
             var myId = CurrentEmployeeId();
             return all.Where(e => e.Id == myId).ToList();
         }
@@ -61,7 +63,7 @@ namespace ActivityManagement.Web.Controllers
             if (!employeeId.HasValue) return View("PersonalForm");
 
             // Yetki doğrulama (URL ile kapsam dışı kişi çekmeyi engelle)
-            if (!IsAdmin() && scoped.All(e => e.Id != employeeId.Value))
+            if (!SeesAll() && scoped.All(e => e.Id != employeeId.Value))
             {
                 TempData["Uyari"] = "Bu personelin raporunu görüntüleme yetkiniz yok.";
                 return View("PersonalForm");
@@ -92,7 +94,7 @@ namespace ActivityManagement.Web.Controllers
             {
                 StartDate = startDate ?? DateTime.Today.AddDays(-30),
                 EndDate = endDate ?? DateTime.Today,
-                TeamId = IsAdmin() ? null : await CurrentTeamIdAsync() // Lider yalnızca kendi takımı
+                TeamId = SeesAll() ? null : await CurrentTeamIdAsync() // Admin/Manager → tüm takımlar; Lider → kendi takımı
             };
 
             var report = await _reportAppService.GetTeamReportAsync(input);
@@ -108,7 +110,7 @@ namespace ActivityManagement.Web.Controllers
                 TempData["Uyari"] = "Lütfen önce bir personel seçin.";
                 return RedirectToAction("Personal");
             }
-            if (!IsAdmin())
+            if (!SeesAll())
             {
                 var scoped = await ScopedEmployeesAsync();
                 if (scoped.All(e => e.Id != employeeId)) return AccessDeniedRedirect("/Reports/Personal");
@@ -153,7 +155,7 @@ namespace ActivityManagement.Web.Controllers
             {
                 StartDate = startDate ?? DateTime.Today.AddDays(-30),
                 EndDate = endDate ?? DateTime.Today,
-                TeamId = IsAdmin() ? null : await CurrentTeamIdAsync()
+                TeamId = SeesAll() ? null : await CurrentTeamIdAsync()
             };
             var r = await _reportAppService.GetTeamReportAsync(input);
 
