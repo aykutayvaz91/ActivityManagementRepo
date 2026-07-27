@@ -205,6 +205,10 @@
                         <div id="commentEditor" style="height:120px; background:#fff"></div>
                         <div class="d-flex align-items-center justify-content-between mt-2 flex-wrap gap-2">
                             <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <div class="input-group input-group-sm" style="width:160px">
+                                    <span class="input-group-text"><i class="fas fa-calendar-day"></i></span>
+                                    <input type="date" name="effortDate" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" title="Efor tarihi — bu tarihe işlenir (aynı göreve farklı günler için ayrı efor girebilirsiniz)" />
+                                </div>
                                 <div class="input-group input-group-sm" style="width:170px">
                                     <span class="input-group-text"><i class="fas fa-clock"></i></span>
                                     <input type="number" name="hoursSpent" class="form-control" step="0.5" min="0" max="24" placeholder="Efor (saat)" title="Bu iş için harcanan süre — boş bırakırsanız sadece not olarak eklenir" />

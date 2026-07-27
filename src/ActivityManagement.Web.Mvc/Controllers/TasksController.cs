@@ -402,7 +402,7 @@ namespace ActivityManagement.Web.Controllers
 
         [HttpPost]
         [RequestSizeLimit(52428800)] // 50 MB
-        public async Task<IActionResult> AddComment(long taskId, string comment, bool isInternal = false, List<IFormFile> files = null, decimal? hoursSpent = null)
+        public async Task<IActionResult> AddComment(long taskId, string comment, bool isInternal = false, List<IFormFile> files = null, decimal? hoursSpent = null, string effortDate = null)
         {
             try
             {
@@ -441,13 +441,15 @@ namespace ActivityManagement.Web.Controllers
                 if (hasEffort)
                 {
                     var desc = StripHtml(comment);
+                    // Efor girilen tarih (form) — boş/geçersizse bugün. Aynı göreve farklı günler için ayrı efor girilebilir.
+                    var effDate = DateTime.TryParse(effortDate, out var ed) ? ed.Date : DateTime.Today;
                     await _taskAppService.LogEffortAsync(new ActivityManagement.Activities.Dto.CreateActivityLogDto
                     {
                         TaskItemId = taskId,
                         HoursSpent = hoursSpent.Value,
                         Description = string.IsNullOrWhiteSpace(desc) ? "Görev eforu" : desc,
                         ActivityType = "Görev",
-                        ActivityDate = DateTime.Today
+                        ActivityDate = effDate
                     });
                     TempData["Success"] = $"Kaydedildi ({hoursSpent.Value:0.##} saat efor işlendi).";
                 }
