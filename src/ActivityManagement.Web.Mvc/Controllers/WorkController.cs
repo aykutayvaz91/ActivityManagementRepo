@@ -71,15 +71,19 @@ namespace ActivityManagement.Web.Controllers
                     });
                 }
 
-                // 2) Açık taleplerim (bana atanan)
-                var reqs = await _requestAppService.GetAllAsync(new GetServiceRequestsInput { MineOnly = true, OnlyOpen = true });
+                // 2) Taleplerim (bana atanan): AÇIK olanlar + KAPALI olup EFORU GİRİLMEMİŞ olanlar.
+                //    (Kapalı talep raporlama için efor bekliyorsa İşlerim'de görünür; efor girilince listeden düşer.)
+                var reqs = (await _requestAppService.GetAllAsync(new GetServiceRequestsInput { MineOnly = true }))
+                    .Where(r => r.IsOpen || r.TotalHours <= 0);
                 foreach (var r in reqs)
                 {
+                    bool eforBekliyor = !r.IsOpen && r.TotalHours <= 0; // kapalı ama efor yok
                     rows.Add(new WorkItemRow
                     {
                         Kind = "Talep", KindIcon = "fa-inbox", KindColor = "info",
                         Id = r.Id, Title = r.Title, Link = $"/Requests/Detail/{r.Id}",
-                        StatusText = r.StatusText, StatusColor = StatusColorForRequest(r.Status),
+                        StatusText = eforBekliyor ? (r.StatusText + " · efor bekliyor") : r.StatusText,
+                        StatusColor = eforBekliyor ? "danger" : StatusColorForRequest(r.Status),
                         Context = r.SourceText + (string.IsNullOrEmpty(r.ProjectName) ? "" : " · " + r.ProjectName),
                         DueDate = r.DueDate, PriorityScore = r.PriorityScore, Percentage = r.CompletionPercentage,
                         IsOverdue = r.IsOverdue
