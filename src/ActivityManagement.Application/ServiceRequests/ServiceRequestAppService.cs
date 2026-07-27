@@ -448,6 +448,8 @@ namespace ActivityManagement.ServiceRequests
             entity.ReceivedDate = input.ReceivedDate ?? entity.ReceivedDate ?? DateTime.Now;
             entity.DueDate = input.DueDate ?? entity.DueDate;
             if (mappedScore.HasValue) entity.PriorityScore = ClampScore(mappedScore.Value);
+            // Atanan boşsa ve portal artık eşleşen kişi veriyorsa doldur (manuel atamayı EZMEZ; yalnız null'ı doldurur).
+            if (!entity.AssignedEmployeeId.HasValue && resolvedEmpId.HasValue) entity.AssignedEmployeeId = resolvedEmpId;
             if (!entity.TeamId.HasValue && resolvedTeamId.HasValue) entity.TeamId = resolvedTeamId;
 
             // Atama/durum YERELDE korunur (güncellemede portal ezmez). İstisna: portal kapanış/iptal bildirdiyse kapat.
@@ -468,13 +470,34 @@ namespace ActivityManagement.ServiceRequests
         private static string Trunc(string s, int max)
             => string.IsNullOrEmpty(s) || s.Length <= max ? s : s.Substring(0, max);
 
+        // Portal e-postasını personele eşler. Önce TAM eşleşme; bulunamazsa DOMAIN'İ gözardı edip
+        // yerel-parça (ön ek) ile eşler: aykut.ayvaz@tdv.org (PSM) ↔ aykut.ayvaz@cmit.com.tr (bizde).
         private async Task<long?> ResolveEmployeeByEmailAsync(string email)
         {
             if (string.IsNullOrWhiteSpace(email)) return null;
-            var e = email.Trim();
-            return await _employeeRepository.GetAll().AsNoTracking()
-                .Where(x => x.Email != null && x.Email.ToLower() == e.ToLower())
-                .Select(x => (long?)x.Id).FirstOrDefaultAsync();
+            var e = email.Trim().ToLowerInvariant();
+            var local = EmailLocalPart(e);
+            var emps = await _employeeRepository.GetAll().AsNoTracking()
+                .Where(x => x.Email != null)
+                .Select(x => new { x.Id, x.Email }).ToListAsync();
+            // 1) Tam e-posta eşleşmesi
+            var exact = emps.FirstOrDefault(x => string.Equals(x.Email, e, StringComparison.OrdinalIgnoreCase));
+            if (exact != null) return exact.Id;
+            // 2) Yerel-parça (ön ek) eşleşmesi — domain farkı gözardı
+            if (!string.IsNullOrEmpty(local))
+            {
+                var byLocal = emps.FirstOrDefault(x => EmailLocalPart(x.Email) == local);
+                if (byLocal != null) return byLocal.Id;
+            }
+            return null;
+        }
+
+        private static string EmailLocalPart(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return "";
+            var s = email.Trim().ToLowerInvariant();
+            var at = s.IndexOf('@');
+            return at > 0 ? s.Substring(0, at) : s;
         }
 
         private async Task<long?> ResolveTeamByNameAsync(string name)
