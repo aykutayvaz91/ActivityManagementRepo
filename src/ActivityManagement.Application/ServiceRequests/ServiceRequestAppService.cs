@@ -389,6 +389,16 @@ namespace ActivityManagement.ServiceRequests
             if (input == null || string.IsNullOrWhiteSpace(input.Title))
                 throw new UserFriendlyException("Geçersiz talep verisi (başlık zorunlu).");
 
+            // Portal alanlarını kolon sınırlarına kırp (aksi halde "String or binary data would be truncated"
+            // tüm senkron partisini düşürür). Description nvarchar(max) → kırpılmaz.
+            input.Title = Trunc(input.Title, 512);
+            input.ExternalRef = Trunc(input.ExternalRef, 128);
+            input.ExternalUrl = Trunc(input.ExternalUrl, 1024);
+            input.RequesterName = Trunc(input.RequesterName, 256);
+            input.RequesterEmail = Trunc(input.RequesterEmail, 256);
+            input.ExtraInfo = Trunc(input.ExtraInfo, 2000);
+            input.ActivityType = Trunc(input.ActivityType, 64);
+
             ServiceRequest entity = null;
             if (!string.IsNullOrWhiteSpace(input.ExternalRef))
             {
@@ -452,6 +462,9 @@ namespace ActivityManagement.ServiceRequests
             await CurrentUnitOfWork.SaveChangesAsync();
             return entity.Id;
         }
+
+        private static string Trunc(string s, int max)
+            => string.IsNullOrEmpty(s) || s.Length <= max ? s : s.Substring(0, max);
 
         private async Task<long?> ResolveEmployeeByEmailAsync(string email)
         {

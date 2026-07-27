@@ -307,7 +307,7 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.ToTable("ServiceRequests");
                 b.Property(s => s.Title).IsRequired().HasMaxLength(512);
                 b.Property(s => s.ActivityType).HasMaxLength(64);
-                b.Property(s => s.Description).HasMaxLength(4000);
+                b.Property(s => s.Description).HasColumnType("nvarchar(max)"); // portal HTML açıklaması uzun olabilir
                 b.Property(s => s.ExternalRef).HasMaxLength(128);
                 b.Property(s => s.ExternalUrl).HasMaxLength(1024);
                 b.Property(s => s.RequesterName).HasMaxLength(256);
