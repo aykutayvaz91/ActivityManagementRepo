@@ -155,11 +155,35 @@ namespace ActivityManagement.Web.BackgroundJobs
             }
         }
 
+        // Tüm sayfaları çeker (sayfalama). Dedup: aynı externalRef/id ikinci kez gelirse durur (portal
+        // `page`'i yok sayıp aynı sayfayı döndürse bile sonsuz döngü olmaz). Son sayfa: 0 kayıt / yeni-yok / <50.
         private async Task<List<WireItem>> FetchAsync(string baseUrl, string apiKey, string authHeader, string authScheme, string filter, DateTime sinceUtc)
+        {
+            var all = new List<WireItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int page = 1; page <= 50; page++)
+            {
+                var pageItems = await FetchPageAsync(baseUrl, apiKey, authHeader, authScheme, filter, sinceUtc, page);
+                if (pageItems.Count == 0) break;
+                int fresh = 0;
+                foreach (var it in pageItems)
+                {
+                    var key = !string.IsNullOrWhiteSpace(it.ExternalRef) ? it.ExternalRef
+                            : (it.Id.HasValue ? it.Id.Value.ToString() : null);
+                    if (string.IsNullOrWhiteSpace(key) || seen.Add(key)) { all.Add(it); fresh++; }
+                }
+                if (fresh == 0) break;           // portal page'i yok saydı / yeni kayıt yok
+                if (pageItems.Count < 50) break; // son sayfa (PageSize=50)
+            }
+            return all;
+        }
+
+        private async Task<List<WireItem>> FetchPageAsync(string baseUrl, string apiKey, string authHeader, string authScheme, string filter, DateTime sinceUtc, int page)
         {
             var sb = new StringBuilder(baseUrl);
             sb.Append(baseUrl.Contains("?") ? "&" : "?");
             sb.Append("updatedSince=").Append(Uri.EscapeDataString(sinceUtc.ToString("yyyy-MM-ddTHH:mm:ssZ")));
+            sb.Append("&page=").Append(page);
             if (!string.IsNullOrWhiteSpace(filter)) sb.Append("&").Append(filter.TrimStart('&', '?'));
 
             using var req = new HttpRequestMessage(HttpMethod.Get, sb.ToString());
@@ -177,12 +201,12 @@ namespace ActivityManagement.Web.BackgroundJobs
             var json = await resp.Content.ReadAsStringAsync();
             if (string.IsNullOrWhiteSpace(json)) return new List<WireItem>();
 
-            // Yanıt {items:[...]} zarfı VEYA doğrudan [...] dizisi olabilir.
+            // Yanıt {items:[...]} / {data:[...]} zarfı VEYA doğrudan [...] dizisi olabilir.
             var trimmed = json.TrimStart();
             if (trimmed.StartsWith("["))
                 return JsonSerializer.Deserialize<List<WireItem>>(json, JsonOpts) ?? new List<WireItem>();
             var env = JsonSerializer.Deserialize<WireResponse>(json, JsonOpts);
-            return env?.Items ?? new List<WireItem>();
+            return env?.Effective ?? new List<WireItem>();
         }
 
         private static PortalRequestDto MapWire(WireItem w, RequestSource source)
@@ -248,9 +272,17 @@ namespace ActivityManagement.Web.BackgroundJobs
         }
 
         // --- portal JSON şeması (docs §F ile uyumlu) ---
-        private class WireResponse { public List<WireItem> Items { get; set; } public string NextPage { get; set; } }
+        // Zarf: items VEYA data dizisi; nextPage her tipte olabilir (string/sayı/null) → JsonElement? ile tolere edilir.
+        private class WireResponse
+        {
+            public List<WireItem> Items { get; set; }
+            public List<WireItem> Data { get; set; }
+            public System.Text.Json.JsonElement? NextPage { get; set; }
+            public List<WireItem> Effective => Items ?? Data;
+        }
         private class WireItem
         {
+            public int? Id { get; set; }               // PSM sayısal id (externalRef yoksa anahtar)
             public string ExternalRef { get; set; }
             public string Url { get; set; }
             public string Title { get; set; }
