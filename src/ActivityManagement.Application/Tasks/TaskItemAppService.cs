@@ -281,18 +281,12 @@ namespace ActivityManagement.Tasks
             if (input.PriorityScore > 10) input.PriorityScore = 10;
             input.Priority = PriorityFromScore(input.PriorityScore);
 
-            // Atayan Kişi (AssignedBy) otomasyonu:
-            //  - Uzman/kullanıcı kendine görev açıyorsa: atanan ve atayan = kendisi
-            //  - Takım Lideri/Admin atıyorsa: atayan alanı boşsa işlemi yapan yönetici seçilir
+            // Atayan Kişi (AssignedBy) = HER ZAMAN işlemi yapan (oturum açan) kişi. Kendine ya da başkasına
+            // atansın, atayan daima oturum sahibidir (login-as'te temsil edilen kişi). Form değeri kullanılmaz.
+            input.AssignedByEmployeeId = ctx.EmployeeId;
+            // Uzman/kullanıcı kendine görev açar (atanan alanı yok) → atanan = kendisi.
             if (!IsManager(ctx.Role))
-            {
                 input.AssignedEmployeeId = ctx.EmployeeId;
-                input.AssignedByEmployeeId = ctx.EmployeeId;
-            }
-            else if (!input.AssignedByEmployeeId.HasValue)
-            {
-                input.AssignedByEmployeeId = ctx.EmployeeId;
-            }
 
             // Proje görevi: kategori projeden kilitli miras (override), sorumlular ve SLA girilmemişse projeden dolar
             if (input.ProjectId.HasValue)

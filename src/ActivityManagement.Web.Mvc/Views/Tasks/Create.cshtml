@@ -149,17 +149,9 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label asp-for="AssignedByEmployeeId" class="form-label">Atayan Kişi</label>
-                                <select asp-for="AssignedByEmployeeId" class="form-select">
-                                    <option value="">Seçiniz...</option>
-                                    @if (employees != null)
-                                    {
-                                        foreach (var e in employees)
-                                        {
-                                            <option value="@e.Id">@e.FullName</option>
-                                        }
-                                    }
-                                </select>
+                                <label class="form-label">Atayan Kişi</label>
+                                <input class="form-control" value="@(User.FindFirst("ActingAsName")?.Value ?? "Siz")" disabled />
+                                <small class="text-muted"><i class="fas fa-circle-info me-1"></i>Otomatik: görevi oluşturan (oturum açan) kişi.</small>
                             </div>
                         }
 
