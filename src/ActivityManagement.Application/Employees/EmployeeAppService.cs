@@ -91,9 +91,14 @@ namespace ActivityManagement.Employees
             // Admin-self: config-admin kendi kimliğinde VEYA AdminOwnEmployeeId claim'i olmayan (Google) admin → tümünü görür.
             bool adminSelf = isAdmin && (!empId.HasValue || !ownId.HasValue || empId == ownId);
             if (adminSelf || !empId.HasValue) return (false, null);
-            var teamId = await _employeeRepository.GetAll()
-                .Where(x => x.Id == empId.Value).Select(x => x.TeamId).FirstOrDefaultAsync();
-            return (true, teamId);
+            // İşlem yapılan/temsil edilen kişinin (login-as dahil) gerçek rolüne bak:
+            // Manager/Admin ise TÜM takımları görür (rol claim'i Admin kalsa da, o kişi Manager'sa Manager gibi görür).
+            var emp = await _employeeRepository.GetAll()
+                .Where(x => x.Id == empId.Value).Select(x => new { x.TeamId, x.AppRole }).FirstOrDefaultAsync();
+            if (emp != null && (string.Equals(emp.AppRole, "Manager", StringComparison.OrdinalIgnoreCase)
+                             || string.Equals(emp.AppRole, "Admin", StringComparison.OrdinalIgnoreCase)))
+                return (false, null);
+            return (true, emp?.TeamId);
         }
 
         public async Task<PagedResultDto<EmployeeDto>> GetAllAsync(GetEmployeesInput input)

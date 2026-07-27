@@ -120,8 +120,31 @@ namespace ActivityManagement.Tasks
         // Tüm takımları görebilir mi (kapsam uygulanmaz): admin-self VEYA Manager.
         private bool SeesAllTeams()
         {
-            var role = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
-            return IsAdminSelfContext() || string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
+            var user = _httpContextAccessor.HttpContext?.User;
+            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            if (IsAdminSelfContext() || string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase)) return true;
+            // Login-as (admin başka kişiye geçmiş; rol claim'i Admin kalır): temsil edilen kişi Manager/Admin ise tümünü görür.
+            if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
+                var effRole = CurrentEmployeeAppRole(empId);
+                if (string.Equals(effRole, "Manager", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(effRole, "Admin", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
+        // Login-as ile temsil edilen kişinin gerçek AppRole'ü (istek başına cache'li).
+        private bool _empRoleLoaded;
+        private string _currentEmpRole;
+        private string CurrentEmployeeAppRole(long? employeeId)
+        {
+            if (_empRoleLoaded) return _currentEmpRole;
+            _empRoleLoaded = true;
+            if (employeeId.HasValue)
+                _currentEmpRole = _employeeRepository.GetAll()
+                    .Where(e => e.Id == employeeId.Value).Select(e => e.AppRole).FirstOrDefault();
+            return _currentEmpRole;
         }
 
         // Admin-self mi (Sistem Yöneticisi kendi kimliği)? Login-as ile başka kişiye geçmişse false → kapsam uygulanır.
