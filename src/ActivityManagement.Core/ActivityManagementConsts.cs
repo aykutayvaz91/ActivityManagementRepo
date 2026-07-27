@@ -8,7 +8,7 @@ namespace ActivityManagement
         //   Her küçük değişiklikte MINOR artar:            1.9.2 → 1.9.3 → 1.9.4 → 1.9.5
         //   5'ten sonra (veya büyük değişiklikte) MAJOR atlanır, MINOR .1'e döner:  1.9.5 → 1.10.1
         //   Komple tasarım/altyapı değişiminde ilk sayı artar:  → 2.1.1
-        public const string AppVersion = "1.13.5";
+        public const string AppVersion = "1.14.1";
 
         public const string ConnectionStringName = "Default";
 

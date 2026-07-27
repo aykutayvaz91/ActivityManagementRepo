@@ -24,6 +24,10 @@ namespace ActivityManagement.Entities
         public string AuthHeader { get; set; } = "Authorization";
         public string AuthScheme { get; set; } = "Bearer";
 
+        // İkinci kimlik/aktör header'ı (PSM: "X-User-Email"). Doluysa her isteğe "X-User-Email: <UserEmail>" eklenir.
+        // Boşsa gönderilmez (destek portalı kullanmaz).
+        public string UserEmail { get; set; }
+
         // Ek sorgu parametreleri (grup/atanan filtresi vb.). Örn: "group=Sistem ve Altyapı Operasyon".
         public string Filter { get; set; }
 

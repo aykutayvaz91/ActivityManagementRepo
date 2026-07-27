@@ -112,6 +112,10 @@
                                 <label class="form-label small">Şema</label>
                                 <input name="authScheme" class="form-control form-control-sm" value="@s.AuthScheme" placeholder="Bearer" />
                             </div>
+                            <div class="col-12">
+                                <label class="form-label small">Aktör E-posta <small class="text-muted">(PSM: X-User-Email header'ı; boşsa gönderilmez)</small></label>
+                                <input name="userEmail" class="form-control form-control-sm" value="@s.UserEmail" placeholder="kullanici@ornek.com" />
+                            </div>
                             <div class="col-8">
                                 <label class="form-label small">Filtre <small class="text-muted">(ör. group=...)</small></label>
                                 <input name="filter" class="form-control form-control-sm" value="@s.Filter" />

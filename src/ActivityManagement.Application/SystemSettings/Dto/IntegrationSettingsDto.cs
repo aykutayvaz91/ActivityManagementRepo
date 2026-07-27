@@ -27,6 +27,7 @@ namespace ActivityManagement.SystemSettings.Dto
         public bool HasApiKey { get; set; }      // anahtar ekranda gösterilmez, sadece "kayıtlı mı"
         public string AuthHeader { get; set; }
         public string AuthScheme { get; set; }
+        public string UserEmail { get; set; }   // PSM X-User-Email aktör hesabı (varsa)
         public string Filter { get; set; }
         public int InitialLookbackDays { get; set; }
         public DateTime? LastSyncUtc { get; set; }

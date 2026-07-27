@@ -83,7 +83,7 @@ namespace ActivityManagement.Web.BackgroundJobs
         private async Task SyncSourceAsync(int sourceId)
         {
             // Kaynak yapılandırmasını oku
-            string baseUrl, apiKey, authHeader, authScheme, filter;
+            string baseUrl, apiKey, authHeader, authScheme, filter, userEmail;
             RequestSource source;
             DateTime sinceUtc;
             using (var scope = _serviceProvider.CreateScope())
@@ -100,6 +100,7 @@ namespace ActivityManagement.Web.BackgroundJobs
 
                 authHeader = string.IsNullOrWhiteSpace(src.AuthHeader) ? "Authorization" : src.AuthHeader;
                 authScheme = src.AuthScheme ?? "";
+                userEmail = src.UserEmail;
                 filter = src.Filter;
                 sinceUtc = src.LastSyncUtc ?? DateTime.UtcNow.AddDays(-Math.Max(0, src.InitialLookbackDays));
             }
@@ -110,7 +111,7 @@ namespace ActivityManagement.Web.BackgroundJobs
             try
             {
                 // HTTP çek (UoW dışı)
-                var items = await FetchAsync(baseUrl, apiKey, authHeader, authScheme, filter, sinceUtc);
+                var items = await FetchAsync(baseUrl, apiKey, authHeader, authScheme, userEmail, filter, sinceUtc);
 
                 // Upsert (UoW içinde)
                 using var scope = _serviceProvider.CreateScope();
@@ -157,13 +158,13 @@ namespace ActivityManagement.Web.BackgroundJobs
 
         // Tüm sayfaları çeker (sayfalama). Dedup: aynı externalRef/id ikinci kez gelirse durur (portal
         // `page`'i yok sayıp aynı sayfayı döndürse bile sonsuz döngü olmaz). Son sayfa: 0 kayıt / yeni-yok / <50.
-        private async Task<List<WireItem>> FetchAsync(string baseUrl, string apiKey, string authHeader, string authScheme, string filter, DateTime sinceUtc)
+        private async Task<List<WireItem>> FetchAsync(string baseUrl, string apiKey, string authHeader, string authScheme, string userEmail, string filter, DateTime sinceUtc)
         {
             var all = new List<WireItem>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             for (int page = 1; page <= 50; page++)
             {
-                var pageItems = await FetchPageAsync(baseUrl, apiKey, authHeader, authScheme, filter, sinceUtc, page);
+                var pageItems = await FetchPageAsync(baseUrl, apiKey, authHeader, authScheme, userEmail, filter, sinceUtc, page);
                 if (pageItems.Count == 0) break;
                 int fresh = 0;
                 foreach (var it in pageItems)
@@ -178,11 +179,13 @@ namespace ActivityManagement.Web.BackgroundJobs
             return all;
         }
 
-        private async Task<List<WireItem>> FetchPageAsync(string baseUrl, string apiKey, string authHeader, string authScheme, string filter, DateTime sinceUtc, int page)
+        private async Task<List<WireItem>> FetchPageAsync(string baseUrl, string apiKey, string authHeader, string authScheme, string userEmail, string filter, DateTime sinceUtc, int page)
         {
             var sb = new StringBuilder(baseUrl);
             sb.Append(baseUrl.Contains("?") ? "&" : "?");
             sb.Append("updatedSince=").Append(Uri.EscapeDataString(sinceUtc.ToString("yyyy-MM-ddTHH:mm:ssZ")));
+            // PSM tarih filtresi 'from' (created) — updatedSince'i yok sayarsa 'from' devreye girer (ikisi de gönderilir).
+            sb.Append("&from=").Append(Uri.EscapeDataString(sinceUtc.ToString("yyyy-MM-dd")));
             sb.Append("&page=").Append(page);
             if (!string.IsNullOrWhiteSpace(filter)) sb.Append("&").Append(filter.TrimStart('&', '?'));
 
@@ -193,6 +196,9 @@ namespace ActivityManagement.Web.BackgroundJobs
                 var val = string.IsNullOrWhiteSpace(authScheme) ? apiKey : authScheme.Trim() + " " + apiKey;
                 req.Headers.TryAddWithoutValidation(authHeader, val);
             }
+            // İkinci kimlik/aktör header'ı (PSM: X-User-Email). Doluysa gönderilir.
+            if (!string.IsNullOrWhiteSpace(userEmail))
+                req.Headers.TryAddWithoutValidation("X-User-Email", userEmail.Trim());
 
             var client = _httpClientFactory.CreateClient("PortalSync");
             client.Timeout = TimeSpan.FromSeconds(30);
@@ -216,13 +222,16 @@ namespace ActivityManagement.Web.BackgroundJobs
             return new PortalRequestDto
             {
                 Source = source,
-                ExternalRef = w.ExternalRef,
+                // PSM sayısal 'id' → externalRef (yoksa)
+                ExternalRef = !string.IsNullOrWhiteSpace(w.ExternalRef) ? w.ExternalRef : (w.Id.HasValue ? w.Id.Value.ToString() : null),
                 ExternalUrl = w.Url,
                 Title = w.Title,
                 Description = w.Description,
-                RequesterName = w.RequesterName,
-                RequesterEmail = w.RequesterEmail,
-                AssigneeEmail = w.AssigneeEmail,
+                // destek: requesterName/Email ; PSM: requestedByName/Email
+                RequesterName = w.RequesterName ?? w.RequestedByName,
+                RequesterEmail = w.RequesterEmail ?? w.RequestedByEmail,
+                // destek: assigneeEmail ; PSM: assignedToEmail
+                AssigneeEmail = w.AssigneeEmail ?? w.AssignedToEmail,
                 GroupName = w.Group,
                 StatusText = w.Status,
                 PriorityText = w.Priority,
@@ -243,6 +252,19 @@ namespace ActivityManagement.Web.BackgroundJobs
             Add("Kategori", w.Category);
             Add("Sorun Tipi", w.ProblemType);
             Add("Atayan", w.AssignedByEmail);
+            // PSM (Sunucu Kurulum) alanları
+            Add("Atanan Kişi", w.AssignedToName);
+            Add("Hostname", w.Hostname);
+            Add("IP", w.IpAddress);
+            Add("İşletim Sistemi", w.OsRequested);
+            Add("Barındırma", w.HostingType);
+            Add("Ortam", w.EnvironmentName);
+            Add("Lokasyon", w.LocationName);
+            var hw = new System.Collections.Generic.List<string>();
+            if (w.CpuCores.HasValue) hw.Add(w.CpuCores.Value + " vCPU");
+            if (w.RamGb.HasValue) hw.Add(w.RamGb.Value + " GB RAM");
+            if (w.DiskGb.HasValue) hw.Add(w.DiskGb.Value + " GB Disk");
+            if (hw.Count > 0) parts.Add("Donanım: " + string.Join(" / ", hw));
             if (w.Installed != null && w.Installed.Count > 0)
                 parts.Add("Kurulan: " + string.Join(", ", w.Installed.Select(kv => $"{kv.Key}={ValStr(kv.Value)}")));
             if (w.Requested != null && w.Requested.Count > 0)
@@ -283,6 +305,22 @@ namespace ActivityManagement.Web.BackgroundJobs
         private class WireItem
         {
             public int? Id { get; set; }               // PSM sayısal id (externalRef yoksa anahtar)
+            // --- PSM (Sunucu Kurulum) alanları ---
+            public string RequestedByEmail { get; set; }
+            public string RequestedByName { get; set; }
+            public string AssignedToEmail { get; set; }
+            public string AssignedToName { get; set; }
+            public string StatusLabel { get; set; }
+            public string HostingType { get; set; }
+            public string OsRequested { get; set; }
+            public int? CpuCores { get; set; }
+            public int? RamGb { get; set; }
+            public int? DiskGb { get; set; }
+            public string EnvironmentName { get; set; }
+            public string LocationName { get; set; }
+            public string Hostname { get; set; }
+            public string IpAddress { get; set; }
+            // --- destek (Dış Destek) / ortak alanlar ---
             public string ExternalRef { get; set; }
             public string Url { get; set; }
             public string Title { get; set; }
