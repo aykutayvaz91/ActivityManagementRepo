@@ -134,35 +134,6 @@
             </div>
         }
 
-        @* (C13) Portal talebine yorum ekle (write-back açıksa). Açık yorum → müşteriye e-posta; dahili not → yalnız temsilci. *@
-        @if (Model.IsPortal && Model.SourceWriteBackEnabled && (Model.CanManage || Model.CanLogEffort))
-        {
-            <div class="card shadow-sm mb-3">
-                <div class="card-header"><i class="fas fa-reply me-2"></i>Yorum / Not Ekle <small class="text-muted">(@Model.SourceText)</small></div>
-                <div class="card-body">
-                    <form method="post" action="/Requests/AddComment" id="wbCommentForm">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" value="@Model.Id" />
-                        <input type="hidden" name="returnUrl" value="/Requests/Detail/@Model.Id" />
-                        <input type="hidden" name="body" id="wbCommentHtml" />
-                        <div id="wbCommentEditor" style="height:120px; background:#fff"></div>
-                        <div class="mt-2">
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="isInternal" value="true" id="wbIc" checked />
-                                <label class="form-check-label small" for="wbIc"><span class="badge bg-warning text-dark">İç not</span> Dahili — <strong>son kullanıcıya gitmez</strong> (yalnız temsilciler görür)</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="isInternal" value="false" id="wbDis" />
-                                <label class="form-check-label small" for="wbDis"><span class="badge bg-success">Dış not</span> Müşteriye açık — <strong>talep edene e-posta gönderilir</strong></label>
-                            </div>
-                        </div>
-                        <div class="small text-muted my-2"><i class="fas fa-image me-1"></i>Ctrl+V ile ekran görüntüsü yapıştırabilirsiniz; kalın/italik/liste desteklenir. <em>(Görseller bizim sistemde saklanır; @Model.SourceText portalına metin ve biçimlendirme iletilir.)</em></div>
-                        <button class="btn btn-primary btn-sm" id="wbSubmit"><i class="fas fa-paper-plane me-1"></i>Gönder</button>
-                    </form>
-                </div>
-            </div>
-        }
-
         @if (Model.CanManage)
         {
             <div class="card shadow-sm mb-3">
@@ -298,6 +269,43 @@
                 }
             </div>
         </div>
+
+        @* (C13) Yorum / Not — efor alanının yanında. Portal talebinde herkese (yönetici/atanan) görünür.
+           İç not: write-back kapalıysa yalnız yerel; açıksa portala dahili. Dış not: write-back gerektirir → müşteriye e-posta. *@
+        @if (Model.IsPortal && (Model.CanManage || Model.CanLogEffort))
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header"><i class="fas fa-reply me-2"></i>Yorum / Not Ekle <small class="text-muted">(@Model.SourceText)</small></div>
+                <div class="card-body">
+                    <form method="post" action="/Requests/AddComment" id="wbCommentForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <input type="hidden" name="returnUrl" value="/Requests/Detail/@Model.Id" />
+                        <input type="hidden" name="body" id="wbCommentHtml" />
+                        <div id="wbCommentEditor" style="height:120px; background:#fff"></div>
+                        <div class="mt-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="isInternal" value="true" id="wbIc" checked />
+                                <label class="form-check-label small" for="wbIc"><span class="badge bg-warning text-dark">İç not</span> Dahili — <strong>son kullanıcıya gitmez</strong>@(Model.SourceWriteBackEnabled ? " (portala dahili iletilir)" : " (yalnız bizim sistemde)")</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="isInternal" value="false" id="wbDis" @(Model.SourceWriteBackEnabled ? "" : "disabled") />
+                                <label class="form-check-label small @(Model.SourceWriteBackEnabled ? "" : "text-muted")" for="wbDis"><span class="badge bg-success">Dış not</span> Müşteriye açık — <strong>talep edene e-posta gönderilir</strong></label>
+                            </div>
+                        </div>
+                        @if (Model.SourceWriteBackEnabled)
+                        {
+                            <div class="small text-muted my-2"><i class="fas fa-image me-1"></i>Ctrl+V ile ekran görüntüsü; kalın/italik/liste desteklenir. <em>(Görseller bizde saklanır; @Model.SourceText portalına metin/biçim iletilir.)</em></div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-light border py-1 px-2 small my-2"><i class="fas fa-circle-info me-1"></i><strong>Dış not</strong> (portala + müşteriye) için write-back kapalı. İç not olarak kaydedebilirsiniz; <strong>Admin → Entegrasyon</strong>'dan write-back açılınca dış not da gönderilir.</div>
+                        }
+                        <button class="btn btn-primary btn-sm" id="wbSubmit"><i class="fas fa-paper-plane me-1"></i>Gönder</button>
+                    </form>
+                </div>
+            </div>
+        }
     </div>
 </div>
 

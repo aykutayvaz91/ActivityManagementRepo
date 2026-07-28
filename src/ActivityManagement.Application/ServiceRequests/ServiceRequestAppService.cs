@@ -403,8 +403,11 @@ namespace ActivityManagement.ServiceRequests
             return await GetAsync(r.Id);
         }
 
-        // (C13) Yerelde talebe yorum ekler → portala POST → dönen id ile yerelde de saklar (sonraki detay
-        // senkronunda kopyalanmaz). Yalnız write-back AÇIK portal talebinde; yetki: yönetici veya atanan/2. sorumlu.
+        // (C13) Yerelde talebe yorum ekler.
+        //  - DIŞ not (isInternal=false): write-back AÇIK olmalı → portala POST → müşteriye e-posta.
+        //  - İÇ not (isInternal=true): write-back AÇIK ise portala dahili not olarak POST edilir; KAPALI ise
+        //    YALNIZ YEREL saklanır (bizim özel notumuz). Dönen id ile yerel ayna (sonraki senkronda kopyalanmaz).
+        // Yalnız portal talebinde; yetki: yönetici veya atanan/2. sorumlu.
         public async Task AddCommentAsync(long id, string body, bool isInternal)
         {
             if (string.IsNullOrWhiteSpace(body)) throw new UserFriendlyException("Yorum boş olamaz.");
@@ -414,18 +417,27 @@ namespace ActivityManagement.ServiceRequests
             if (string.IsNullOrWhiteSpace(r.ExternalRef))
                 throw new UserFriendlyException("Yorum gönderimi yalnızca portal talepleri için geçerlidir.");
 
-            var writeBack = await _sourceRepository.GetAll().AsNoTracking().AnyAsync(s => s.Source == r.Source && s.WriteBackEnabled);
-            if (!writeBack)
-                throw new UserFriendlyException("Bu kaynak için portala yorum gönderimi (write-back) etkin değil.");
-
             bool canManage = IsManagerForRequest(r, ctx);
             bool isAssignee = ctx.EmployeeId.HasValue && (r.AssignedEmployeeId == ctx.EmployeeId || r.SecondaryEmployeeId == ctx.EmployeeId);
             if (!canManage && !isAssignee)
                 throw new UserFriendlyException("Bu talebe yorum ekleme yetkiniz yok.");
 
-            var newId = await PushCommentToPortalAsync(r, body.Trim(), isInternal);
+            var writeBack = await _sourceRepository.GetAll().AsNoTracking().AnyAsync(s => s.Source == r.Source && s.WriteBackEnabled);
 
-            // Yerel ayna: dönen id ile sakla (yoksa geçici bir id — sonraki detay senkronunda gerçeğiyle dedup edilir).
+            string newId = null;
+            if (writeBack)
+            {
+                // Portala POST (iç → dahili, dış → müşteriye açık). Portal reddederse istisna → yerel de eklenmez.
+                newId = await PushCommentToPortalAsync(r, body.Trim(), isInternal);
+            }
+            else
+            {
+                // Write-back kapalı: DIŞ not gönderilemez; İÇ not yalnız yerelde saklanır.
+                if (!isInternal)
+                    throw new UserFriendlyException("Dış not (müşteriye açık) göndermek için bu kaynakta write-back açık olmalı (Admin → Entegrasyon). İç not olarak kaydedebilirsiniz.");
+            }
+
+            // Yerel ayna: dönen id varsa onunla (sonraki detay senkronunda kopyalanmaz), yoksa yerel-özel not (id=null).
             r.Comments.Add(new ServiceRequestComment
             {
                 TenantId = r.TenantId, ServiceRequestId = r.Id,
