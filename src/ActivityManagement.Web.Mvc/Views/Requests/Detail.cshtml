@@ -18,6 +18,15 @@
         s == RequestStatus.Cozuldu ? "success" : s == RequestStatus.Kapandi ? "dark" : "danger";
 }
 
+@* Yorum/açıklama taşma düzeltmesi: uzun kelime/URL kır, görseli sığdır *@
+<style>
+    .req-desc, .portal-comment-body { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
+    .req-desc img, .portal-comment-body img { max-width: 100%; height: auto; border-radius: 4px; }
+    .req-desc pre, .portal-comment-body pre { white-space: pre-wrap; overflow-x: auto; }
+    .req-desc table, .portal-comment-body table { max-width: 100%; }
+    #wbCommentEditor .ql-editor { min-height: 90px; }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4><i class="fas fa-inbox text-primary me-2"></i>@Model.Title</h4>
     <a href="/Requests" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Talepler</a>
@@ -131,17 +140,24 @@
             <div class="card shadow-sm mb-3">
                 <div class="card-header"><i class="fas fa-reply me-2"></i>Yorum / Not Ekle <small class="text-muted">(@Model.SourceText)</small></div>
                 <div class="card-body">
-                    <form method="post" action="/Requests/AddComment">
+                    <form method="post" action="/Requests/AddComment" id="wbCommentForm">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@Model.Id" />
                         <input type="hidden" name="returnUrl" value="/Requests/Detail/@Model.Id" />
-                        <textarea name="body" class="form-control form-control-sm mb-2" rows="3" placeholder="Yorumunuz..." required></textarea>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" name="isInternal" value="true" id="isInternal" />
-                            <label class="form-check-label small" for="isInternal">Dahili not (müşteriye <strong>e-posta gitmez</strong>)</label>
+                        <input type="hidden" name="body" id="wbCommentHtml" />
+                        <div id="wbCommentEditor" style="height:120px; background:#fff"></div>
+                        <div class="mt-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="isInternal" value="true" id="wbIc" checked />
+                                <label class="form-check-label small" for="wbIc"><span class="badge bg-warning text-dark">İç not</span> Dahili — <strong>son kullanıcıya gitmez</strong> (yalnız temsilciler görür)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="isInternal" value="false" id="wbDis" />
+                                <label class="form-check-label small" for="wbDis"><span class="badge bg-success">Dış not</span> Müşteriye açık — <strong>talep edene e-posta gönderilir</strong></label>
+                            </div>
                         </div>
-                        <div class="small text-muted mb-2">İşaretlenmezse yorum <strong>talep edene e-posta</strong> ile iletilir.</div>
-                        <button class="btn btn-primary btn-sm"><i class="fas fa-paper-plane me-1"></i>Gönder</button>
+                        <div class="small text-muted my-2"><i class="fas fa-image me-1"></i>Ctrl+V ile ekran görüntüsü yapıştırabilirsiniz; kalın/italik/liste desteklenir. <em>(Görseller bizim sistemde saklanır; @Model.SourceText portalına metin ve biçimlendirme iletilir.)</em></div>
+                        <button class="btn btn-primary btn-sm" id="wbSubmit"><i class="fas fa-paper-plane me-1"></i>Gönder</button>
                     </form>
                 </div>
             </div>
@@ -194,7 +210,7 @@
                                 </span>
                                 <small class="text-muted">@(c.CommentDate?.ToString("dd.MM.yyyy HH:mm") ?? "-")</small>
                             </div>
-                            <div class="small req-desc mt-1">@Html.Raw(ActivityManagement.Web.Helpers.SafeHtml.RenderDescription(c.Body))</div>
+                            <div class="small req-desc portal-comment-body mt-1">@Html.Raw(ActivityManagement.Web.Helpers.SafeHtml.RenderDescription(c.Body))</div>
                         </div>
                     }
                 </div>
@@ -284,3 +300,31 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    @* Yorum write-back için Rich Text editör (Quill) — görev yorumuyla aynı; Ctrl+V ekran görüntüsü desteklenir *@
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <script>
+        (function () {
+            var el = document.getElementById('wbCommentEditor');
+            if (!el || typeof Quill === 'undefined') return;
+            var quill = new Quill('#wbCommentEditor', {
+                theme: 'snow',
+                placeholder: 'Yorum / not... (Ctrl+V ile ekran görüntüsü yapıştırabilirsiniz)',
+                modules: { toolbar: [['bold', 'italic', 'underline'], ['link', 'image'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['clean']] }
+            });
+            var form = document.getElementById('wbCommentForm');
+            form.addEventListener('submit', function (e) {
+                var isEmpty = quill.getText().trim() === '' && quill.root.querySelectorAll('img').length === 0;
+                if (isEmpty) { e.preventDefault(); alert('Yorum boş olamaz.'); return false; }
+                document.getElementById('wbCommentHtml').value = quill.root.innerHTML;
+                // Dış not seçiliyse müşteriye e-posta gideceği için onay iste
+                var dis = document.getElementById('wbDis');
+                if (dis && dis.checked && !confirm('Bu DIŞ NOT olarak gönderilecek ve talep edene e-posta gidecek. Onaylıyor musunuz?')) {
+                    e.preventDefault(); return false;
+                }
+            });
+        })();
+    </script>
+}

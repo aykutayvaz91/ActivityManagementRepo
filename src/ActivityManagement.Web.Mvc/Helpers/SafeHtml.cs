@@ -15,8 +15,9 @@ namespace ActivityManagement.Web.Helpers
         private static readonly Regex DangerTags = new Regex(@"<\s*/?\s*(script|style|iframe|object|embed|form|input|button|textarea|select|option|link|meta|base|svg|math|applet|frame|frameset|title)\b[^>]*>", O);
         // on* olay öznitelikleri (onclick=...)
         private static readonly Regex EventAttrs = new Regex(@"\son\w+\s*=\s*(""[^""]*""|'[^']*'|[^\s>]+)", O);
-        // href/src içinde javascript:/vbscript:/data: şemaları
-        private static readonly Regex BadScheme = new Regex(@"(href|src|xlink:href)\s*=\s*(['""]?)\s*(?:javascript|vbscript|data)\s*:", O);
+        // href/src içinde javascript:/vbscript: HER ZAMAN; data: yalnız data:image/ DEĞİLSE engellenir
+        // (base64 ekran görüntüsü <img src="data:image/png;base64,..."> korunur; data:text/html vb. temizlenir).
+        private static readonly Regex BadScheme = new Regex(@"(href|src|xlink:href)\s*=\s*(['""]?)\s*(?:javascript\s*:|vbscript\s*:|data\s*:(?!\s*image/))", O);
         // İçerik HTML mi (bir tag açılışı var mı)
         private static readonly Regex LooksLikeHtml = new Regex(@"<\s*[a-zA-Z!/]", O);
 
