@@ -88,6 +88,8 @@ namespace ActivityManagement.SystemSettings
                     AuthHeader = x.AuthHeader,
                     AuthScheme = x.AuthScheme,
                     UserEmail = x.UserEmail,
+                    DetailSyncEnabled = x.DetailSyncEnabled,
+                    WriteBackEnabled = x.WriteBackEnabled,
                     Filter = x.Filter,
                     InitialLookbackDays = x.InitialLookbackDays,
                     LastSyncUtc = x.LastSyncUtc,
@@ -111,7 +113,7 @@ namespace ActivityManagement.SystemSettings
 
         public async Task SaveSourceAsync(int id, bool enabled, string baseUrl, string apiKey,
                                           string authHeader, string authScheme, string filter, int initialLookbackDays,
-                                          string userEmail = null)
+                                          string userEmail = null, bool detailSyncEnabled = false, bool writeBackEnabled = false)
         {
             EnsureAdmin();
             var s = await _sourceRepo.GetAsync(id);
@@ -121,6 +123,8 @@ namespace ActivityManagement.SystemSettings
             s.AuthHeader = string.IsNullOrWhiteSpace(authHeader) ? "Authorization" : authHeader.Trim();
             s.AuthScheme = authScheme?.Trim() ?? "";
             s.UserEmail = string.IsNullOrWhiteSpace(userEmail) ? null : userEmail.Trim();
+            s.DetailSyncEnabled = detailSyncEnabled;
+            s.WriteBackEnabled = writeBackEnabled;
             s.Filter = filter?.Trim();
             s.InitialLookbackDays = initialLookbackDays < 0 ? 0 : (initialLookbackDays > 365 ? 365 : initialLookbackDays);
             await CurrentUnitOfWork.SaveChangesAsync();

@@ -11,7 +11,7 @@ namespace ActivityManagement.SystemSettings
         Task SaveGeneralAsync(string inboundApiKey, bool syncEnabled, int intervalMinutes, bool clearInboundKey = false);
         Task SaveSourceAsync(int id, bool enabled, string baseUrl, string apiKey,
                              string authHeader, string authScheme, string filter, int initialLookbackDays,
-                             string userEmail = null);
+                             string userEmail = null, bool detailSyncEnabled = false, bool writeBackEnabled = false);
 
         // Webhook alıcısı için (yetki denetimi YOK — anonim endpoint kullanır).
         // GÜVENLİK: dynamic API'ye AÇILMAZ (anahtarı sızdırmasın) — yalnız IntegrationController içinden çağrılır.

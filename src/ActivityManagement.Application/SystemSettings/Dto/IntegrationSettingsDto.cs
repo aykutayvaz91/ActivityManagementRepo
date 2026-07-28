@@ -28,6 +28,8 @@ namespace ActivityManagement.SystemSettings.Dto
         public string AuthHeader { get; set; }
         public string AuthScheme { get; set; }
         public string UserEmail { get; set; }   // PSM X-User-Email aktör hesabı (varsa)
+        public bool DetailSyncEnabled { get; set; }   // V2: talep detayı (yorum/dosya/durum) çek
+        public bool WriteBackEnabled { get; set; }    // V2: yerelde durum/yorum → portala POST (DIŞA DÖNÜK, müşteriye e-posta)
         public string Filter { get; set; }
         public int InitialLookbackDays { get; set; }
         public DateTime? LastSyncUtc { get; set; }

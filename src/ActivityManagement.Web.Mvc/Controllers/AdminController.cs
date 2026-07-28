@@ -102,12 +102,13 @@ namespace ActivityManagement.Web.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveIntegrationSource(int id, bool enabled, string baseUrl, string apiKey,
-            string authHeader, string authScheme, string filter, int initialLookbackDays, string userEmail = null)
+            string authHeader, string authScheme, string filter, int initialLookbackDays, string userEmail = null,
+            bool detailSyncEnabled = false, bool writeBackEnabled = false)
         {
             if (!IsAdmin()) return AccessDeniedRedirect();
             try
             {
-                await _integrationAppService.SaveSourceAsync(id, enabled, baseUrl, apiKey, authHeader, authScheme, filter, initialLookbackDays, userEmail);
+                await _integrationAppService.SaveSourceAsync(id, enabled, baseUrl, apiKey, authHeader, authScheme, filter, initialLookbackDays, userEmail, detailSyncEnabled, writeBackEnabled);
                 TempData["Success"] = "Kaynak ayarı kaydedildi.";
             }
             catch (Abp.UI.UserFriendlyException ex) { TempData["Error"] = ex.Message; }

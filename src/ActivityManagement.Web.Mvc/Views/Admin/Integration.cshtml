@@ -125,6 +125,36 @@
                                 <input name="initialLookbackDays" class="form-control form-control-sm" type="number" min="0" max="365" value="@s.InitialLookbackDays" />
                             </div>
                         </div>
+
+                        <hr class="my-2" />
+                        <div class="small fw-bold text-muted mb-1"><i class="fas fa-arrows-rotate me-1"></i>V2 — Çift Yönlü (portal detay + geri yazma)</div>
+                        <div class="mb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="detailSyncEnabled" value="true" id="ds_@s.Id" @(s.DetailSyncEnabled ? "checked" : "") />
+                                <input type="hidden" name="detailSyncEnabled" value="false" />
+                                <label class="form-check-label small" for="ds_@s.Id">Talep <strong>detayını</strong> çek (yorum + dosya + güncel durum)</label>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="writeBackEnabled" value="true" id="wb_@s.Id" @(s.WriteBackEnabled ? "checked" : "") />
+                                <input type="hidden" name="writeBackEnabled" value="false" />
+                                <label class="form-check-label small" for="wb_@s.Id">
+                                    <strong>Geri yazma (write-back)</strong> — yerelde durum/yorum → portala POST
+                                </label>
+                            </div>
+                            @if (s.WriteBackEnabled)
+                            {
+                                <div class="alert alert-warning py-1 px-2 small mt-1 mb-0">
+                                    <i class="fas fa-triangle-exclamation me-1"></i><strong>AÇIK:</strong> Durum değişikliği / açık yorum <strong>talep edene e-posta</strong> gönderir (Çözüldü'de anket).
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="small text-muted mt-1"><i class="fas fa-circle-info me-1"></i>Açılırsa durum/açık yorum müşteriye e-posta tetikler. Dahili not e-posta göndermez.</div>
+                            }
+                        </div>
+
                         <hr class="my-2" />
                         <div class="small text-muted mb-2">
                             <div><i class="fas fa-clock me-1"></i>Son çalışma: @(s.LastRunUtc?.ToString("dd.MM.yyyy HH:mm") ?? "-")</div>
