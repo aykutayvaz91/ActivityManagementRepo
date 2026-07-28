@@ -206,6 +206,8 @@ namespace ActivityManagement.ServiceRequests
         {
             var ctx = CurrentContext();
             var r = await WithIncludes(_requestRepository.GetAll().AsNoTracking())
+                .Include(x => x.Comments)      // detayda portal yorumları + dosya ekleri (listelerde yüklenmez)
+                .Include(x => x.Attachments)
                 .FirstOrDefaultAsync(x => x.Id == id);
             if (r == null) throw new UserFriendlyException("Talep bulunamadı.");
             return MapRequest(r, ctx);
@@ -575,6 +577,57 @@ namespace ActivityManagement.ServiceRequests
         private static string Trunc(string s, int max)
             => string.IsNullOrEmpty(s) || s.Length <= max ? s : s.Substring(0, max);
 
+        // (C12) Portal DETAY aynası: talebin yorum + dosya + durumunu içe aktarır. Dedup: ExternalCommentId/
+        // ExternalAttachmentId. Durum PORTAL AUTHORITATIVE (yerelde kapalıysa geri açmaz). Talep yoksa atlanır.
+        public async Task IngestPortalDetailAsync(PortalRequestDetailDto detail)
+        {
+            if (detail == null || string.IsNullOrWhiteSpace(detail.ExternalRef)) return;
+            var extRef = detail.ExternalRef.Trim();
+            var entity = await _requestRepository.GetAll()
+                .Include(r => r.Comments).Include(r => r.Attachments)
+                .FirstOrDefaultAsync(r => r.Source == detail.Source && r.ExternalRef == extRef);
+            if (entity == null) return; // talep henüz senkronlanmamış → atla (bir sonraki liste pull'unda gelir)
+
+            // Durum aynası (Çözüldü/Kapandı/İptal + ara durumlar; yerelde kapalıysa dokunma)
+            var mapped = MapStatusText(detail.StatusText);
+            if (mapped.HasValue && entity.Status != mapped.Value
+                && entity.Status != RequestStatus.Kapandi && entity.Status != RequestStatus.Iptal)
+            {
+                entity.Status = mapped.Value;
+                entity.CompletionPercentage = ProgressForStatus(mapped.Value, entity.CompletionPercentage);
+            }
+
+            // Yorumlar (dedup ExternalCommentId)
+            var seenC = new System.Collections.Generic.HashSet<string>(
+                entity.Comments.Where(c => c.ExternalCommentId != null).Select(c => c.ExternalCommentId),
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var c in detail.Comments ?? new System.Collections.Generic.List<PortalCommentDto>())
+            {
+                if (string.IsNullOrWhiteSpace(c.Id) || !seenC.Add(c.Id)) continue;
+                entity.Comments.Add(new ServiceRequestComment
+                {
+                    TenantId = entity.TenantId, ServiceRequestId = entity.Id, ExternalCommentId = c.Id,
+                    AuthorName = Trunc(c.Author, 256), AuthorEmail = Trunc(c.AuthorEmail, 256),
+                    CommentDate = c.Date, Body = c.Body, IsInternal = c.IsInternal
+                });
+            }
+            // Dosya ekleri (dedup ExternalAttachmentId)
+            var seenA = new System.Collections.Generic.HashSet<string>(
+                entity.Attachments.Where(a => a.ExternalAttachmentId != null).Select(a => a.ExternalAttachmentId),
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var a in detail.Attachments ?? new System.Collections.Generic.List<PortalAttachmentDto>())
+            {
+                if (string.IsNullOrWhiteSpace(a.Id) || !seenA.Add(a.Id)) continue;
+                entity.Attachments.Add(new ServiceRequestAttachment
+                {
+                    TenantId = entity.TenantId, ServiceRequestId = entity.Id, ExternalAttachmentId = a.Id,
+                    FileName = Trunc(a.Name, 512), Url = Trunc(a.Url, 1024), SizeBytes = a.SizeBytes,
+                    ContentType = Trunc(a.ContentType, 256), UploadedAt = a.UploadedAt
+                });
+            }
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+
         // Portal e-postasını personele eşler. Önce TAM eşleşme; bulunamazsa DOMAIN'İ gözardı edip
         // yerel-parça (ön ek) ile eşler: aykut.ayvaz@tdv.org (PSM) ↔ aykut.ayvaz@cmit.com.tr (bizde).
         private async Task<long?> ResolveEmployeeByEmailAsync(string email)
@@ -718,6 +771,19 @@ namespace ActivityManagement.ServiceRequests
             // Efor: atanan/2. sorumlu VEYA kapsamındaki yönetici (Admin/Manager/TakımLideri) girebilir.
             dto.CanLogEffort = dto.CanManage
                 || (ctx.EmployeeId.HasValue && (r.AssignedEmployeeId == ctx.EmployeeId || r.SecondaryEmployeeId == ctx.EmployeeId));
+
+            // Portal aynası (yalnız GetAsync'te Include edilir; listelerde boş kalır)
+            if (r.Comments != null && r.Comments.Count > 0)
+                dto.Comments = r.Comments.OrderBy(c => c.CommentDate).Select(c => new RequestCommentDto
+                {
+                    AuthorName = c.AuthorName, AuthorEmail = c.AuthorEmail, CommentDate = c.CommentDate,
+                    Body = c.Body, IsInternal = c.IsInternal
+                }).ToList();
+            if (r.Attachments != null && r.Attachments.Count > 0)
+                dto.Attachments = r.Attachments.OrderBy(a => a.UploadedAt).Select(a => new RequestAttachmentDto
+                {
+                    FileName = a.FileName, Url = a.Url, SizeBytes = a.SizeBytes, ContentType = a.ContentType, UploadedAt = a.UploadedAt
+                }).ToList();
             return dto;
         }
 

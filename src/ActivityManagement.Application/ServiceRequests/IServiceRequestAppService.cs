@@ -30,5 +30,9 @@ namespace ActivityManagement.ServiceRequests
         // GÜVENLİK: dynamic API'ye AÇILMAZ — yalnız sunucu-içi (IntegrationController token'lı / HostedService) çağırır.
         [Abp.Application.Services.RemoteService(false)]
         Task<long> UpsertFromPortalAsync(PortalRequestDto input);
+
+        // (C12) Portal DETAY aynası: talebin yorum + dosya + durumunu içe aktarır (dedup). Sunucu-içi çağrı.
+        [Abp.Application.Services.RemoteService(false)]
+        Task IngestPortalDetailAsync(PortalRequestDetailDto detail);
     }
 }

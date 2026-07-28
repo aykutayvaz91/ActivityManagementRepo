@@ -113,27 +113,44 @@ namespace ActivityManagement.Web.BackgroundJobs
                 // HTTP çek (UoW dışı)
                 var items = await FetchAsync(baseUrl, apiKey, authHeader, authScheme, userEmail, filter, sinceUtc);
 
-                // Upsert (UoW içinde)
-                using var scope = _serviceProvider.CreateScope();
-                var sp = scope.ServiceProvider;
-                var uowManager = sp.GetRequiredService<IUnitOfWorkManager>();
-                var reqSvc = sp.GetRequiredService<IServiceRequestAppService>();
-                var sourceRepo = sp.GetRequiredService<IRepository<IntegrationSource, int>>();
-                using var uow = uowManager.Begin();
-                foreach (var wire in items)
+                // Upsert — KÜÇÜK BATCH'ler halinde commit. Eskiden tüm kayıtlar tek UoW/transaction'da
+                // commit ediliyordu; AG senkron replica commit gecikmesiyle büyük backfill'de "Execution
+                // Timeout" (Error -2) alınıyor ve watermark ilerlemediği için her turda baştan denenip
+                // kalıcı timeout oluşuyordu. Upsert (Source,ExternalRef) idempotent olduğundan batch'li
+                // commit güvenli: yarıda kesilse bile commit'lenen batch'ler kalıcı, kalanlar bir sonraki
+                // turda tekrar (ucuz) upsert edilir.
+                const int CommitBatchSize = 25;
+                for (int i = 0; i < items.Count; i += CommitBatchSize)
                 {
-                    var dto = MapWire(wire, source);
-                    if (dto == null || string.IsNullOrWhiteSpace(dto.Title)) continue;
-                    await reqSvc.UpsertFromPortalAsync(dto);
-                    count++;
+                    using var scope = _serviceProvider.CreateScope();
+                    var sp = scope.ServiceProvider;
+                    var uowManager = sp.GetRequiredService<IUnitOfWorkManager>();
+                    var reqSvc = sp.GetRequiredService<IServiceRequestAppService>();
+                    using var uow = uowManager.Begin();
+                    foreach (var wire in items.Skip(i).Take(CommitBatchSize))
+                    {
+                        var dto = MapWire(wire, source);
+                        if (dto == null || string.IsNullOrWhiteSpace(dto.Title)) continue;
+                        await reqSvc.UpsertFromPortalAsync(dto);
+                        count++;
+                    }
+                    await uow.CompleteAsync();
                 }
-                // Watermark + durum güncelle
-                var src = await sourceRepo.GetAsync(sourceId);
-                src.LastSyncUtc = runStartUtc;
-                src.LastRunUtc = DateTime.Now;
-                src.LastResult = $"OK: {count} kayıt";
-                await uow.CompleteAsync();
-                result = src.LastResult;
+
+                // Watermark + durum (tüm batch'ler commit oldu → watermark güvenle ilerletilir)
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var sp = scope.ServiceProvider;
+                    var uowManager = sp.GetRequiredService<IUnitOfWorkManager>();
+                    var sourceRepo = sp.GetRequiredService<IRepository<IntegrationSource, int>>();
+                    using var uow = uowManager.Begin();
+                    var src = await sourceRepo.GetAsync(sourceId);
+                    src.LastSyncUtc = runStartUtc;
+                    src.LastRunUtc = DateTime.Now;
+                    src.LastResult = $"OK: {count} kayıt";
+                    await uow.CompleteAsync();
+                    result = src.LastResult;
+                }
             }
             catch (Exception ex)
             {

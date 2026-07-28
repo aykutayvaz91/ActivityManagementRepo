@@ -123,6 +123,62 @@
                 </div>
             </div>
         }
+
+        @* (C12) Portal aynası: yorumlar (salt-okunur; @Model.SourceText portalından senkron) *@
+        @if (Model.Comments != null && Model.Comments.Any())
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-comments me-2"></i>Portal Yorumları</span>
+                    <span class="badge bg-secondary">@Model.Comments.Count</span>
+                </div>
+                <div class="card-body">
+                    @foreach (var c in Model.Comments)
+                    {
+                        <div class="border-bottom pb-2 mb-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="small fw-bold">@(string.IsNullOrWhiteSpace(c.AuthorName) ? (c.AuthorEmail ?? "-") : c.AuthorName)
+                                    @if (c.IsInternal) { <span class="badge bg-warning text-dark ms-1">iç not</span> }
+                                </span>
+                                <small class="text-muted">@(c.CommentDate?.ToString("dd.MM.yyyy HH:mm") ?? "-")</small>
+                            </div>
+                            <div class="small req-desc mt-1">@Html.Raw(ActivityManagement.Web.Helpers.SafeHtml.RenderDescription(c.Body))</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* (C12) Portal dosya ekleri (salt-okunur bağlantı) *@
+        @if (Model.Attachments != null && Model.Attachments.Any())
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-paperclip me-2"></i>Portal Dosya Ekleri</span>
+                    <span class="badge bg-secondary">@Model.Attachments.Count</span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var a in Model.Attachments)
+                    {
+                        var kb = a.SizeBytes > 0 ? $"{(a.SizeBytes / 1024.0):0.#} KB" : "";
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                            <span class="small text-truncate" style="max-width:75%">
+                                <i class="fas fa-file me-1 text-muted"></i>
+                                @if (!string.IsNullOrWhiteSpace(a.Url))
+                                {
+                                    <a href="@a.Url" target="_blank" rel="noopener">@(a.FileName ?? "dosya")</a>
+                                }
+                                else
+                                {
+                                    @(a.FileName ?? "dosya")
+                                }
+                            </span>
+                            <small class="text-muted">@kb</small>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
     </div>
 
     <div class="col-lg-5">

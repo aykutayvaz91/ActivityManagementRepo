@@ -59,6 +59,56 @@ namespace ActivityManagement.ServiceRequests.Dto
         // Görsel yardımcılar
         public bool IsOpen { get; set; }
         public bool IsOverdue { get; set; }
+
+        // Portal aynası (salt-okunur) — GetAsync/Detail'de doldurulur
+        public System.Collections.Generic.List<RequestCommentDto> Comments { get; set; } = new();
+        public System.Collections.Generic.List<RequestAttachmentDto> Attachments { get; set; } = new();
+    }
+
+    public class RequestCommentDto
+    {
+        public string AuthorName { get; set; }
+        public string AuthorEmail { get; set; }
+        public DateTime? CommentDate { get; set; }
+        public string Body { get; set; }
+        public bool IsInternal { get; set; }
+    }
+
+    public class RequestAttachmentDto
+    {
+        public string FileName { get; set; }
+        public string Url { get; set; }
+        public long SizeBytes { get; set; }
+        public string ContentType { get; set; }
+        public DateTime? UploadedAt { get; set; }
+    }
+
+    // Portal DETAY yanıtı (GET /api/talepler/{id}) — yorum + dosya + durum. Ingest için.
+    public class PortalRequestDetailDto
+    {
+        public RequestSource Source { get; set; }
+        public string ExternalRef { get; set; }
+        public string StatusText { get; set; }
+        public System.Collections.Generic.List<PortalCommentDto> Comments { get; set; } = new();
+        public System.Collections.Generic.List<PortalAttachmentDto> Attachments { get; set; } = new();
+    }
+    public class PortalCommentDto
+    {
+        public string Id { get; set; }
+        public string Author { get; set; }
+        public string AuthorEmail { get; set; }
+        public DateTime? Date { get; set; }
+        public string Body { get; set; }
+        public bool IsInternal { get; set; }
+    }
+    public class PortalAttachmentDto
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Url { get; set; }
+        public long SizeBytes { get; set; }
+        public string ContentType { get; set; }
+        public DateTime? UploadedAt { get; set; }
     }
 
     // Manuel oluşturma/düzenleme (portal entegrasyonu gelmeden de talep girilebilir).

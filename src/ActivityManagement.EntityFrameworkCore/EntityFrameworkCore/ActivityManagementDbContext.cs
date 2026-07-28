@@ -31,6 +31,8 @@ namespace ActivityManagement.EntityFrameworkCore
         public DbSet<AppRoleDef> AppRoles { get; set; }
         public DbSet<RolePageAccess> RolePageAccesses { get; set; }
         public DbSet<ServiceRequest> ServiceRequests { get; set; }
+        public DbSet<ServiceRequestComment> ServiceRequestComments { get; set; }
+        public DbSet<ServiceRequestAttachment> ServiceRequestAttachments { get; set; }
         public DbSet<IntegrationSettings> IntegrationSettings { get; set; }
         public DbSet<IntegrationSource> IntegrationSources { get; set; }
         public DbSet<Notification> AppNotifications { get; set; }
@@ -313,8 +315,11 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.Property(s => s.RequesterName).HasMaxLength(256);
                 b.Property(s => s.RequesterEmail).HasMaxLength(256);
                 b.Property(s => s.ExtraInfo).HasMaxLength(2000);
-                // (Source, ExternalRef) idempotent upsert için indekslenir (ExternalRef null olabilir → filtered unique)
-                b.HasIndex(s => new { s.Source, s.ExternalRef });
+                // (B8) (Source, ExternalRef) idempotent upsert için FILTERED UNIQUE — yarış/çift kayıt engeli.
+                // ExternalRef null (manuel talep) ve soft-deleted satırlar hariç (silinmiş satır re-import'u bloklamasın).
+                b.HasIndex(s => new { s.Source, s.ExternalRef })
+                 .IsUnique()
+                 .HasFilter("[ExternalRef] IS NOT NULL AND [IsDeleted] = 0");
                 b.HasOne(s => s.AssignedEmployee)
                  .WithMany()
                  .HasForeignKey(s => s.AssignedEmployeeId)
@@ -345,6 +350,34 @@ namespace ActivityManagement.EntityFrameworkCore
                  .HasForeignKey(s => s.ProjectId)
                  .IsRequired(false)
                  .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // (C12) Talep portal yorumları — aynası; (ServiceRequestId, ExternalCommentId) dedup unique.
+            modelBuilder.Entity<ServiceRequestComment>(b =>
+            {
+                b.ToTable("ServiceRequestComments");
+                b.Property(c => c.ExternalCommentId).HasMaxLength(128);
+                b.Property(c => c.AuthorName).HasMaxLength(256);
+                b.Property(c => c.AuthorEmail).HasMaxLength(256);
+                b.Property(c => c.Body).HasColumnType("nvarchar(max)");
+                b.HasIndex(c => new { c.ServiceRequestId, c.ExternalCommentId })
+                 .IsUnique().HasFilter("[ExternalCommentId] IS NOT NULL");
+                b.HasOne(c => c.ServiceRequest).WithMany(r => r.Comments)
+                 .HasForeignKey(c => c.ServiceRequestId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // (C12) Talep portal dosya ekleri — aynası; (ServiceRequestId, ExternalAttachmentId) dedup unique.
+            modelBuilder.Entity<ServiceRequestAttachment>(b =>
+            {
+                b.ToTable("ServiceRequestAttachments");
+                b.Property(a => a.ExternalAttachmentId).HasMaxLength(128);
+                b.Property(a => a.FileName).HasMaxLength(512);
+                b.Property(a => a.Url).HasMaxLength(1024);
+                b.Property(a => a.ContentType).HasMaxLength(256);
+                b.HasIndex(a => new { a.ServiceRequestId, a.ExternalAttachmentId })
+                 .IsUnique().HasFilter("[ExternalAttachmentId] IS NOT NULL");
+                b.HasOne(a => a.ServiceRequest).WithMany(r => r.Attachments)
+                 .HasForeignKey(a => a.ServiceRequestId).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<IntegrationSettings>(b =>

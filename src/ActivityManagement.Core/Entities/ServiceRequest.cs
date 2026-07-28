@@ -82,5 +82,9 @@ namespace ActivityManagement.Entities
         public int CompletionPercentage { get; set; }
 
         public virtual ICollection<ActivityLog> Logs { get; set; } = new List<ActivityLog>();
+
+        // Portal aynası (salt-okunur): talebin yorumları + dosya ekleri
+        public virtual ICollection<ServiceRequestComment> Comments { get; set; } = new List<ServiceRequestComment>();
+        public virtual ICollection<ServiceRequestAttachment> Attachments { get; set; } = new List<ServiceRequestAttachment>();
     }
 }
