@@ -438,19 +438,20 @@ namespace ActivityManagement.ServiceRequests
 
         // --- (C13) portal write-back istemcisi (giden POST) ---
 
-        // Bizim durum → portal durum metni (docs §6). Portal reddederse UpdateStatus hata verir; eşleme buna göre ayarlanır.
+        // Bizim durum → destek durum KODU (kullanıcı listesi: open/in_progress/pending/resolved/rejected/closed).
+        // Bizim model daha kaba: Atandı→in_progress; Beklemede→pending (transferred_to_dev/waiting_* ayrımı bizde yok).
         private static string StatusToPortalText(RequestStatus s)
         {
             switch (s)
             {
-                case RequestStatus.Yeni: return "Yeni";
-                case RequestStatus.Atandi: return "Atandı";
-                case RequestStatus.DevamEdiyor: return "İşlemde";
-                case RequestStatus.Beklemede: return "Beklemede";
-                case RequestStatus.Cozuldu: return "Çözüldü";
-                case RequestStatus.Kapandi: return "Kapatıldı";
-                case RequestStatus.Iptal: return "İptal";
-                default: return s.ToString();
+                case RequestStatus.Yeni: return "open";
+                case RequestStatus.Atandi: return "in_progress";
+                case RequestStatus.DevamEdiyor: return "in_progress";
+                case RequestStatus.Beklemede: return "pending";
+                case RequestStatus.Cozuldu: return "resolved";
+                case RequestStatus.Kapandi: return "closed";
+                case RequestStatus.Iptal: return "rejected";
+                default: return "in_progress";
             }
         }
 
@@ -861,15 +862,32 @@ namespace ActivityManagement.ServiceRequests
                 .Select(t => (long?)t.Id).FirstOrDefaultAsync();
         }
 
-        // Portal durum metnini bizim RequestStatus'a eşler (TR/EN varyantları).
+        // Portal durum metnini bizim RequestStatus'a eşler. Destek (Cortex) kodları/adları BİREBİR (kullanıcı listesi),
+        // ardından genel TR/EN substring (PSM + varyantlar). Kod ya da ad gelebilir → ikisi de kapsanır.
         private static RequestStatus? MapStatusText(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
             var t = text.Trim().ToLowerInvariant();
-            if (t.Contains("iptal") || t.Contains("red") || t.Contains("cancel")) return RequestStatus.Iptal;
+
+            // Destek durum KODLARI + adları (id: 2 open … 6 closed)
+            switch (t)
+            {
+                case "open": case "açık": case "acik": return RequestStatus.Yeni;
+                case "in_progress": case "işlemde": case "islemde": return RequestStatus.DevamEdiyor;
+                case "pending": case "beklemede": return RequestStatus.Beklemede;
+                case "transferred_to_dev": case "yazılım departmanına aktarıldı": case "yazilim departmanina aktarildi": return RequestStatus.Beklemede;
+                case "waiting_for_customer": case "müşteriden yanıt bekleniyor": case "musteriden yanit bekleniyor": return RequestStatus.Beklemede;
+                case "waiting_for_vendor": case "firmadan yanıt bekleniyor": case "firmadan yanit bekleniyor": return RequestStatus.Beklemede;
+                case "resolved": case "çözüldü": case "cozuldu": return RequestStatus.Cozuldu;
+                case "rejected": case "uygun görülmedi": case "uygun gorulmedi": return RequestStatus.Iptal;
+                case "closed": case "kapatıldı": case "kapatildi": case "kapandı": case "kapandi": return RequestStatus.Kapandi;
+            }
+
+            // Genel substring (PSM / diğer varyantlar / eski davranış)
+            if (t.Contains("iptal") || t.Contains("cancel") || t.Contains("reject")) return RequestStatus.Iptal;
             if (t.Contains("kapat") || t.Contains("kapan") || t.Contains("tamamlan") || t.Contains("closed") || t.Contains("complete") || t.Contains("done")) return RequestStatus.Kapandi;
             if (t.Contains("çöz") || t.Contains("coz") || t.Contains("resolve")) return RequestStatus.Cozuldu;
-            if (t.Contains("bekle") || t.Contains("pending") || t.Contains("hold")) return RequestStatus.Beklemede;
+            if (t.Contains("bekle") || t.Contains("pending") || t.Contains("hold") || t.Contains("waiting")) return RequestStatus.Beklemede;
             if (t.Contains("kurulum") || t.Contains("işlem") || t.Contains("islem") || t.Contains("devam") || t.Contains("progress")) return RequestStatus.DevamEdiyor;
             if (t.Contains("atan") || t.Contains("assign")) return RequestStatus.Atandi;
             if (t.Contains("yeni") || t.Contains("açık") || t.Contains("acik") || t.Contains("open")) return RequestStatus.Yeni;
