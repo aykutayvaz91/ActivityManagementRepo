@@ -193,15 +193,30 @@ namespace ActivityManagement.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateStatus(long id, RequestStatus status, int percentage, string returnUrl = null)
+        public async Task<IActionResult> UpdateStatus(long id, RequestStatus status, int percentage, string note = null, string returnUrl = null)
         {
             try
             {
-                await _requestAppService.UpdateStatusAsync(id, status, percentage);
+                await _requestAppService.UpdateStatusAsync(id, status, percentage, note);
                 TempData["Success"] = "Durum güncellendi.";
             }
             catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
             catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Requests/UpdateStatus"); TempData["Uyari"] = "Durum güncellenemedi."; }
+            return SafeBack(returnUrl);
+        }
+
+        // (C13) Portal talebine yorum ekle → portala POST. isInternal=false müşteriye e-posta tetikler.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddComment(long id, string body, bool isInternal = false, string returnUrl = null)
+        {
+            try
+            {
+                await _requestAppService.AddCommentAsync(id, body, isInternal);
+                TempData["Success"] = isInternal ? "Dahili not eklendi." : "Yorum eklendi (müşteriye iletildi).";
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
+            catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Requests/AddComment"); TempData["Uyari"] = "Yorum eklenemedi."; }
             return SafeBack(returnUrl);
         }
 

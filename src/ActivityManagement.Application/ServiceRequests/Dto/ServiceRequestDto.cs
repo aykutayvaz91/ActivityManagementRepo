@@ -60,6 +60,10 @@ namespace ActivityManagement.ServiceRequests.Dto
         public bool IsOpen { get; set; }
         public bool IsOverdue { get; set; }
 
+        // (C13) Bu talebin kaynağı write-back (portala yazma) destekliyor mu → portal talebinde durum/yorum düzenleme UI'si.
+        public bool SourceWriteBackEnabled { get; set; }
+        public bool IsPortal => !string.IsNullOrWhiteSpace(ExternalRef);
+
         // Portal aynası (salt-okunur) — GetAsync/Detail'de doldurulur
         public System.Collections.Generic.List<RequestCommentDto> Comments { get; set; } = new();
         public System.Collections.Generic.List<RequestAttachmentDto> Attachments { get; set; } = new();

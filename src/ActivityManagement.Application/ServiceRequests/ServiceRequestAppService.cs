@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Abp.Domain.Repositories;
 using Abp.Linq.Extensions;
@@ -217,7 +219,12 @@ namespace ActivityManagement.ServiceRequests
                 .Include(x => x.Attachments)
                 .FirstOrDefaultAsync(x => x.Id == id);
             if (r == null) throw new UserFriendlyException("Talep bulunamadı.");
-            return MapRequest(r, ctx);
+            var dto = MapRequest(r, ctx);
+            // (C13) Portal talebinde durum/yorum write-back UI'si için kaynağın write-back durumu
+            if (dto.IsPortal)
+                dto.SourceWriteBackEnabled = await _sourceRepository.GetAll().AsNoTracking()
+                    .AnyAsync(s => s.Source == r.Source && s.WriteBackEnabled);
+            return dto;
         }
 
         // (A3) Talepler ana ekranı — VERİMLİ: sekme başına SINIRLI (cap) liste + gerçek SQL sayaçları.
@@ -361,20 +368,32 @@ namespace ActivityManagement.ServiceRequests
             return await GetAsync(r.Id);
         }
 
-        public async Task<ServiceRequestDto> UpdateStatusAsync(long id, RequestStatus status, int percentage)
+        public async Task<ServiceRequestDto> UpdateStatusAsync(long id, RequestStatus status, int percentage, string note = null)
         {
             var ctx = CurrentContext();
             var r = await _requestRepository.GetAsync(id);
 
-            // Portal talebi (ExternalRef dolu): durum PORTAL yönetir, yerelde değiştirilemez (sync bozulmasın; bizde yalnız efor).
-            if (!string.IsNullOrWhiteSpace(r.ExternalRef))
-                throw new UserFriendlyException("Bu talebin durumu destek portalından güncellenir. Burada yalnızca efor girebilirsiniz.");
+            bool isPortal = !string.IsNullOrWhiteSpace(r.ExternalRef);
+            bool writeBack = false;
+            if (isPortal)
+            {
+                // Portal talebi: yalnız write-back AÇIK kaynakta yerelden değiştirilebilir (komut → portala POST → sonraki
+                // senkronda teyit). Kapalıysa durum yalnız portaldan çekilir (bizde efor).
+                writeBack = await _sourceRepository.GetAll().AsNoTracking().AnyAsync(s => s.Source == r.Source && s.WriteBackEnabled);
+                if (!writeBack)
+                    throw new UserFriendlyException("Bu talebin durumu destek portalından güncellenir. Burada yalnızca efor girebilirsiniz.");
+            }
 
             bool canManage = IsManagerForRequest(r, ctx);
             bool isAssignee = ctx.EmployeeId.HasValue &&
                 (r.AssignedEmployeeId == ctx.EmployeeId || r.SecondaryEmployeeId == ctx.EmployeeId); // 1. VEYA 2. sorumlu (UI ile uyumlu)
             if (!canManage && !isAssignee)
                 throw new UserFriendlyException("Bu talebin durumunu güncelleme yetkiniz yok.");
+
+            // Portal + write-back: ÖNCE portala POST (komut deseni). Portal reddederse yerelde DEĞİŞTİRME
+            // (portal tek doğruluk kaynağı; başarısız komutu yerelde uygulayıp sonraki senkronda geri almaktansa hiç uygulama).
+            if (isPortal && writeBack)
+                await PushStatusToPortalAsync(r, status, note);
 
             r.Status = status;
             r.CompletionPercentage = ProgressForStatus(status, percentage > 0 ? percentage : r.CompletionPercentage);
@@ -383,6 +402,131 @@ namespace ActivityManagement.ServiceRequests
             await CurrentUnitOfWork.SaveChangesAsync();
             return await GetAsync(r.Id);
         }
+
+        // (C13) Yerelde talebe yorum ekler → portala POST → dönen id ile yerelde de saklar (sonraki detay
+        // senkronunda kopyalanmaz). Yalnız write-back AÇIK portal talebinde; yetki: yönetici veya atanan/2. sorumlu.
+        public async Task AddCommentAsync(long id, string body, bool isInternal)
+        {
+            if (string.IsNullOrWhiteSpace(body)) throw new UserFriendlyException("Yorum boş olamaz.");
+            var ctx = CurrentContext();
+            var r = await _requestRepository.GetAll().Include(x => x.Comments).FirstOrDefaultAsync(x => x.Id == id);
+            if (r == null) throw new UserFriendlyException("Talep bulunamadı.");
+            if (string.IsNullOrWhiteSpace(r.ExternalRef))
+                throw new UserFriendlyException("Yorum gönderimi yalnızca portal talepleri için geçerlidir.");
+
+            var writeBack = await _sourceRepository.GetAll().AsNoTracking().AnyAsync(s => s.Source == r.Source && s.WriteBackEnabled);
+            if (!writeBack)
+                throw new UserFriendlyException("Bu kaynak için portala yorum gönderimi (write-back) etkin değil.");
+
+            bool canManage = IsManagerForRequest(r, ctx);
+            bool isAssignee = ctx.EmployeeId.HasValue && (r.AssignedEmployeeId == ctx.EmployeeId || r.SecondaryEmployeeId == ctx.EmployeeId);
+            if (!canManage && !isAssignee)
+                throw new UserFriendlyException("Bu talebe yorum ekleme yetkiniz yok.");
+
+            var newId = await PushCommentToPortalAsync(r, body.Trim(), isInternal);
+
+            // Yerel ayna: dönen id ile sakla (yoksa geçici bir id — sonraki detay senkronunda gerçeğiyle dedup edilir).
+            r.Comments.Add(new ServiceRequestComment
+            {
+                TenantId = r.TenantId, ServiceRequestId = r.Id,
+                ExternalCommentId = string.IsNullOrWhiteSpace(newId) ? null : newId,
+                AuthorName = Trunc(ctx.Email, 256), AuthorEmail = Trunc(ctx.Email, 256),
+                CommentDate = DateTime.Now, Body = body.Trim(), IsInternal = isInternal
+            });
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+
+        // --- (C13) portal write-back istemcisi (giden POST) ---
+
+        // Bizim durum → portal durum metni (docs §6). Portal reddederse UpdateStatus hata verir; eşleme buna göre ayarlanır.
+        private static string StatusToPortalText(RequestStatus s)
+        {
+            switch (s)
+            {
+                case RequestStatus.Yeni: return "Yeni";
+                case RequestStatus.Atandi: return "Atandı";
+                case RequestStatus.DevamEdiyor: return "İşlemde";
+                case RequestStatus.Beklemede: return "Beklemede";
+                case RequestStatus.Cozuldu: return "Çözüldü";
+                case RequestStatus.Kapandi: return "Kapatıldı";
+                case RequestStatus.Iptal: return "İptal";
+                default: return s.ToString();
+            }
+        }
+
+        private async Task<(string baseUrl, string apiKey, string authHeader, string authScheme, string userEmail, bool writeBack)>
+            GetSourceAuthAsync(RequestSource source)
+        {
+            var src = await _sourceRepository.GetAll().AsNoTracking().FirstOrDefaultAsync(s => s.Source == source);
+            if (src == null) return (null, null, "Authorization", "", null, false);
+            return (src.BaseUrl,
+                    ActivityManagement.Security.DpapiProtector.Unprotect(src.ApiKey),
+                    string.IsNullOrWhiteSpace(src.AuthHeader) ? "Authorization" : src.AuthHeader,
+                    src.AuthScheme ?? "",
+                    src.UserEmail,
+                    src.WriteBackEnabled);
+        }
+
+        private void ApplyAuth(HttpRequestMessage req, string apiKey, string authHeader, string authScheme, string userEmail, string actorEmail)
+        {
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                var val = string.IsNullOrWhiteSpace(authScheme) ? apiKey : authScheme.Trim() + " " + apiKey;
+                req.Headers.TryAddWithoutValidation(authHeader, val);
+            }
+            // X-User-Email: işlemi yapan aktör (varsa oturumdaki kullanıcı, yoksa kaynağın servis e-postası)
+            var actor = !string.IsNullOrWhiteSpace(actorEmail) ? actorEmail : userEmail;
+            if (!string.IsNullOrWhiteSpace(actor))
+                req.Headers.TryAddWithoutValidation("X-User-Email", actor.Trim());
+        }
+
+        private static string PortalBasePath(string baseUrl)
+            => baseUrl.Contains("?") ? baseUrl.Substring(0, baseUrl.IndexOf('?')) : baseUrl;
+
+        private async Task PushStatusToPortalAsync(ServiceRequest r, RequestStatus status, string note)
+        {
+            var (baseUrl, apiKey, authHeader, authScheme, userEmail, writeBack) = await GetSourceAuthAsync(r.Source);
+            if (!writeBack || string.IsNullOrWhiteSpace(baseUrl))
+                throw new UserFriendlyException("Bu kaynak için portala yazma (write-back) etkin değil.");
+            var url = PortalBasePath(baseUrl).TrimEnd('/') + "/" + Uri.EscapeDataString(r.ExternalRef) + "/durum";
+            var payload = JsonSerializer.Serialize(new { status = StatusToPortalText(status), note = note });
+            using var req = new HttpRequestMessage(HttpMethod.Post, url)
+            { Content = new StringContent(payload, Encoding.UTF8, "application/json") };
+            ApplyAuth(req, apiKey, authHeader, authScheme, userEmail, CurrentContext().Email);
+            var client = _httpClientFactory.CreateClient("PortalSync");
+            client.Timeout = TimeSpan.FromSeconds(30);
+            using var resp = await client.SendAsync(req);
+            if (!resp.IsSuccessStatusCode)
+                throw new UserFriendlyException($"Portal durum güncellemesini reddetti (HTTP {(int)resp.StatusCode}). Durum yerelde de değiştirilmedi.");
+        }
+
+        private async Task<string> PushCommentToPortalAsync(ServiceRequest r, string body, bool isInternal)
+        {
+            var (baseUrl, apiKey, authHeader, authScheme, userEmail, writeBack) = await GetSourceAuthAsync(r.Source);
+            if (!writeBack || string.IsNullOrWhiteSpace(baseUrl))
+                throw new UserFriendlyException("Bu kaynak için portala yazma (write-back) etkin değil.");
+            var url = PortalBasePath(baseUrl).TrimEnd('/') + "/" + Uri.EscapeDataString(r.ExternalRef) + "/yorumlar";
+            var payload = JsonSerializer.Serialize(new { body = body, isInternal = isInternal });
+            using var req = new HttpRequestMessage(HttpMethod.Post, url)
+            { Content = new StringContent(payload, Encoding.UTF8, "application/json") };
+            ApplyAuth(req, apiKey, authHeader, authScheme, userEmail, CurrentContext().Email);
+            var client = _httpClientFactory.CreateClient("PortalSync");
+            client.Timeout = TimeSpan.FromSeconds(30);
+            using var resp = await client.SendAsync(req);
+            if (!resp.IsSuccessStatusCode)
+                throw new UserFriendlyException($"Portal yorumu reddetti (HTTP {(int)resp.StatusCode}).");
+            var respJson = await resp.Content.ReadAsStringAsync();
+            try
+            {
+                var doc = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(respJson, JsonOptsIgnoreCase);
+                if (doc != null && doc.TryGetValue("id", out var idv))
+                    return idv.ValueKind == JsonValueKind.String ? idv.GetString() : idv.ToString();
+            }
+            catch { }
+            return null;
+        }
+
+        private static readonly JsonSerializerOptions JsonOptsIgnoreCase = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
         // --- efor ---
 
