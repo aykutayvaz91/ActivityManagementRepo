@@ -922,7 +922,9 @@ namespace ActivityManagement.ServiceRequests
         private static RequestStatus? MapStatusText(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
-            var t = text.Trim().ToLowerInvariant();
+            // Türkçe 'İ' (U+0130) ToLowerInvariant'ta birleşik nokta üretip eşleşmeyi bozuyor ("İşlemde"/"İptal")
+            // → önce düz 'i'ye çevir.
+            var t = text.Trim().Replace('İ', 'i').ToLowerInvariant();
 
             // Destek durum KODLARI + adları (id: 2 open … 6 closed)
             switch (t)
