@@ -143,6 +143,26 @@ namespace ActivityManagement.Web.Controllers
             }
         }
 
+        // (C12) Portal dosya ekini token'lı olarak sunucu-içi indirip tarayıcıya akıtır (token sızmaz).
+        public async Task<IActionResult> Attachment(long id, long attId)
+        {
+            var g = EnsurePageAccess("Requests"); if (g != null) return g;
+            try
+            {
+                var file = await _requestAppService.DownloadPortalAttachmentAsync(id, attId);
+                if (file?.Content == null || file.Content.Length == 0)
+                { TempData["Uyari"] = "Dosya indirilemedi."; return RedirectToAction("Detail", new { id }); }
+                return File(file.Content, file.ContentType ?? "application/octet-stream", file.FileName ?? "dosya");
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; return RedirectToAction("Detail", new { id }); }
+            catch (Exception ex)
+            {
+                ActivityManagement.Logging.ErrorLog.Write(ex, "Requests/Attachment");
+                TempData["Uyari"] = "Dosya indirilirken bir sorun oluştu.";
+                return RedirectToAction("Detail", new { id });
+            }
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(CreateUpdateServiceRequestDto input)

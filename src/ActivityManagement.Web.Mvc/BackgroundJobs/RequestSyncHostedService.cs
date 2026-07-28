@@ -86,6 +86,7 @@ namespace ActivityManagement.Web.BackgroundJobs
             string baseUrl, apiKey, authHeader, authScheme, filter, userEmail;
             RequestSource source;
             DateTime sinceUtc;
+            bool detailSyncEnabled;
             using (var scope = _serviceProvider.CreateScope())
             {
                 var sp = scope.ServiceProvider;
@@ -102,6 +103,7 @@ namespace ActivityManagement.Web.BackgroundJobs
                 authScheme = src.AuthScheme ?? "";
                 userEmail = src.UserEmail;
                 filter = src.Filter;
+                detailSyncEnabled = src.DetailSyncEnabled;
                 sinceUtc = src.LastSyncUtc ?? DateTime.UtcNow.AddDays(-Math.Max(0, src.InitialLookbackDays));
             }
 
@@ -150,6 +152,35 @@ namespace ActivityManagement.Web.BackgroundJobs
                     src.LastResult = $"OK: {count} kayıt";
                     await uow.CompleteAsync();
                     result = src.LastResult;
+                }
+
+                // (V2) Talep DETAYI: yorum + dosya + güncel durum aynası — yalnız portalın detay ucu açık
+                // kaynaklarda (DetailSyncEnabled). Best-effort: bir talebin detayı alınamazsa atlanır (loglanır),
+                // liste senkronu ve watermark etkilenmez. Liste zaten updatedSince ile süzülü → sınırlı sayıda detay.
+                if (detailSyncEnabled)
+                {
+                    foreach (var wire in items)
+                    {
+                        var extRef = !string.IsNullOrWhiteSpace(wire.ExternalRef) ? wire.ExternalRef
+                                   : (wire.Id.HasValue ? wire.Id.Value.ToString() : null);
+                        if (string.IsNullOrWhiteSpace(extRef)) continue;
+                        try
+                        {
+                            var detail = await FetchDetailAsync(baseUrl, apiKey, authHeader, authScheme, userEmail, source, extRef);
+                            if (detail == null) continue;
+                            using var scope = _serviceProvider.CreateScope();
+                            var sp = scope.ServiceProvider;
+                            var uowManager = sp.GetRequiredService<IUnitOfWorkManager>();
+                            var reqSvc = sp.GetRequiredService<IServiceRequestAppService>();
+                            using var uow = uowManager.Begin();
+                            await reqSvc.IngestPortalDetailAsync(detail);
+                            await uow.CompleteAsync();
+                        }
+                        catch (Exception dex)
+                        {
+                            ActivityManagement.Logging.ErrorLog.Write(dex, $"RequestSync/{source}/Detail/{extRef}");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -239,6 +270,58 @@ namespace ActivityManagement.Web.BackgroundJobs
                 return JsonSerializer.Deserialize<List<WireItem>>(json, JsonOpts) ?? new List<WireItem>();
             var env = JsonSerializer.Deserialize<WireResponse>(json, JsonOpts);
             return env?.Effective ?? new List<WireItem>();
+        }
+
+        // (V2) Talep detay ucu: GET {liste-yolu}/{externalRef} → yorum + dosya + güncel durum.
+        // baseUrl liste ucudur (örn .../api/talepler); detay = liste yolu + "/" + talepNo (destek & PSM aynı desen).
+        // 404 → detay yok (null döner, atlanır). Diğer HTTP hataları çağırana fırlar (best-effort loglanır).
+        private async Task<PortalRequestDetailDto> FetchDetailAsync(string baseUrl, string apiKey, string authHeader, string authScheme, string userEmail, RequestSource source, string externalRef)
+        {
+            var basePath = baseUrl.Contains("?") ? baseUrl.Substring(0, baseUrl.IndexOf('?')) : baseUrl;
+            var url = basePath.TrimEnd('/') + "/" + Uri.EscapeDataString(externalRef);
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.TryAddWithoutValidation("Accept", "application/json");
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                var val = string.IsNullOrWhiteSpace(authScheme) ? apiKey : authScheme.Trim() + " " + apiKey;
+                req.Headers.TryAddWithoutValidation(authHeader, val);
+            }
+            if (!string.IsNullOrWhiteSpace(userEmail))
+                req.Headers.TryAddWithoutValidation("X-User-Email", userEmail.Trim());
+
+            var client = _httpClientFactory.CreateClient("PortalSync");
+            client.Timeout = TimeSpan.FromSeconds(30);
+            using var resp = await client.SendAsync(req);
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(json)) return null;
+
+            var d = JsonSerializer.Deserialize<DetailWire>(json, JsonOpts);
+            if (d == null) return null;
+
+            var dto = new PortalRequestDetailDto
+            {
+                Source = source,
+                ExternalRef = !string.IsNullOrWhiteSpace(d.ExternalRef) ? d.ExternalRef : externalRef,
+                StatusText = d.Status
+            };
+            if (d.Comments != null)
+                foreach (var c in d.Comments)
+                    dto.Comments.Add(new PortalCommentDto
+                    {
+                        Id = c.Id, Author = c.Author, AuthorEmail = c.AuthorEmail,
+                        Date = c.Date, Body = c.Body, IsInternal = c.IsInternal
+                    });
+            if (d.Attachments != null)
+                foreach (var a in d.Attachments)
+                    dto.Attachments.Add(new PortalAttachmentDto
+                    {
+                        Id = a.Id, Name = a.Name, Url = a.Url, SizeBytes = a.SizeBytes,
+                        ContentType = a.ContentType, UploadedAt = a.UploadedAt
+                    });
+            return dto;
         }
 
         private static PortalRequestDto MapWire(WireItem w, RequestSource source)
@@ -372,6 +455,33 @@ namespace ActivityManagement.Web.BackgroundJobs
             public Dictionary<string, JsonElement> Requested { get; set; }
             public Dictionary<string, JsonElement> Installed { get; set; }
             public List<Dictionary<string, JsonElement>> Services { get; set; }
+        }
+
+        // (V2) Detay ucu yanıtı — yorum + dosya + durum (docs: GET /api/talepler/{no}).
+        private class DetailWire
+        {
+            public string ExternalRef { get; set; }
+            public string Status { get; set; }
+            public List<DetailComment> Comments { get; set; }
+            public List<DetailAttachment> Attachments { get; set; }
+        }
+        private class DetailComment
+        {
+            public string Id { get; set; }
+            public string Author { get; set; }
+            public string AuthorEmail { get; set; }
+            public DateTime? Date { get; set; }
+            public string Body { get; set; }
+            public bool IsInternal { get; set; }
+        }
+        private class DetailAttachment
+        {
+            public string Id { get; set; }
+            public string Name { get; set; }
+            public string Url { get; set; }
+            public long SizeBytes { get; set; }
+            public string ContentType { get; set; }
+            public DateTime? UploadedAt { get; set; }
         }
     }
 }

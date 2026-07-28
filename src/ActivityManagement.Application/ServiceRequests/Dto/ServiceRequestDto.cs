@@ -65,6 +65,7 @@ namespace ActivityManagement.ServiceRequests.Dto
         public System.Collections.Generic.List<RequestAttachmentDto> Attachments { get; set; } = new();
     }
 
+    [AutoMapFrom(typeof(ServiceRequestComment))]
     public class RequestCommentDto
     {
         public string AuthorName { get; set; }
@@ -74,13 +75,23 @@ namespace ActivityManagement.ServiceRequests.Dto
         public bool IsInternal { get; set; }
     }
 
+    [AutoMapFrom(typeof(ServiceRequestAttachment))]
     public class RequestAttachmentDto
     {
+        public long Id { get; set; }            // yerel ek kimliği — token'lı indirme proxy linki için
         public string FileName { get; set; }
         public string Url { get; set; }
         public long SizeBytes { get; set; }
         public string ContentType { get; set; }
         public DateTime? UploadedAt { get; set; }
+    }
+
+    // Token'lı portal dosyasını sunucu-içi indirip tarayıcıya akıtmak için (proxy).
+    public class PortalFileDto
+    {
+        public byte[] Content { get; set; }
+        public string ContentType { get; set; }
+        public string FileName { get; set; }
     }
 
     // Portal DETAY yanıtı (GET /api/talepler/{id}) — yorum + dosya + durum. Ingest için.

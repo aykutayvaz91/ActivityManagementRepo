@@ -31,6 +31,14 @@ namespace ActivityManagement.Entities
         // Ek sorgu parametreleri (grup/atanan filtresi vb.). Örn: "group=Sistem ve Altyapı Operasyon".
         public string Filter { get; set; }
 
+        // V2: Talep DETAYINI (yorum + dosya + güncel durum) çeker. Portalın detay ucu (GET .../{talepNo})
+        // açık olan kaynaklarda açılır. Kapalıysa yalnız liste (meta) senkronu yapılır.
+        public bool DetailSyncEnabled { get; set; } = false;
+
+        // V2: Çift yönlü — yerelde durum/yorum değişince portala POST (write-back). Portalın yazma uçları
+        // açık VE yönetici onayı olan kaynaklarda açılır. DIŞA-DÖNÜK (müşteriye e-posta tetikler) → varsayılan KAPALI.
+        public bool WriteBackEnabled { get; set; } = false;
+
         // İlk çalıştırmada / watermark yokken kaç gün geriye bakılacağı.
         public int InitialLookbackDays { get; set; } = 7;
 

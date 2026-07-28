@@ -34,5 +34,9 @@ namespace ActivityManagement.ServiceRequests
         // (C12) Portal DETAY aynası: talebin yorum + dosya + durumunu içe aktarır (dedup). Sunucu-içi çağrı.
         [Abp.Application.Services.RemoteService(false)]
         Task IngestPortalDetailAsync(PortalRequestDetailDto detail);
+
+        // (C12) Portal dosya ekini sunucu-içi indirir (token'lı). Controller stream eder → dynamic API'ye açılmaz.
+        [Abp.Application.Services.RemoteService(false)]
+        Task<PortalFileDto> DownloadPortalAttachmentAsync(long requestId, long attachmentId);
     }
 }

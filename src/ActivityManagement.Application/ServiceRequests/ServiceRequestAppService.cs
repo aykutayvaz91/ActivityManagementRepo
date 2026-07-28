@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Abp.Domain.Repositories;
@@ -22,23 +23,29 @@ namespace ActivityManagement.ServiceRequests
         private readonly IRepository<ActivityLog, long> _logRepository;
         private readonly IRepository<Employee, long> _employeeRepository;
         private readonly IRepository<Team, long> _teamRepository;
+        private readonly IRepository<IntegrationSource, int> _sourceRepository;
         private readonly ActivityManagement.Notifications.INotificationManager _notificationManager;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly System.Net.Http.IHttpClientFactory _httpClientFactory;
 
         public ServiceRequestAppService(
             IRepository<ServiceRequest, long> requestRepository,
             IRepository<ActivityLog, long> logRepository,
             IRepository<Employee, long> employeeRepository,
             IRepository<Team, long> teamRepository,
+            IRepository<IntegrationSource, int> sourceRepository,
             ActivityManagement.Notifications.INotificationManager notificationManager,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            System.Net.Http.IHttpClientFactory httpClientFactory)
         {
             _requestRepository = requestRepository;
             _logRepository = logRepository;
             _employeeRepository = employeeRepository;
             _teamRepository = teamRepository;
+            _sourceRepository = sourceRepository;
             _notificationManager = notificationManager;
             _httpContextAccessor = httpContextAccessor;
+            _httpClientFactory = httpClientFactory;
         }
 
         // --- bağlam / yetki yardımcıları (diğer AppService'lerle aynı desen) ---
@@ -577,6 +584,49 @@ namespace ActivityManagement.ServiceRequests
         private static string Trunc(string s, int max)
             => string.IsNullOrEmpty(s) || s.Length <= max ? s : s.Substring(0, max);
 
+        // (C12) Portal dosya ekini SUNUCU-İÇİ indirir (token tarayıcıya sızmaz). Görünürlük kontrolü yapılır;
+        // yalnız bu talebe kayıtlı ekin URL'si çekilir (SSRF yok — keyfi URL kabul edilmez). Kaynak yazma/okuma
+        // ucuyla AYNI kimlik (API anahtarı + varsa X-User-Email) kullanılır.
+        public async Task<PortalFileDto> DownloadPortalAttachmentAsync(long requestId, long attachmentId)
+        {
+            // 1) Görünürlük: kullanıcı bu talebi görebiliyor mu?
+            var r = await ApplyVisibilityScope(_requestRepository.GetAll().AsNoTracking())
+                .Include(x => x.Attachments)
+                .FirstOrDefaultAsync(x => x.Id == requestId);
+            if (r == null) throw new UserFriendlyException("Talep bulunamadı veya erişim yetkiniz yok.");
+
+            var att = r.Attachments?.FirstOrDefault(a => a.Id == attachmentId);
+            if (att == null || string.IsNullOrWhiteSpace(att.Url))
+                throw new UserFriendlyException("Dosya bulunamadı.");
+
+            // 2) Kaynak kimliği (token) — talebin geldiği portal
+            var src = await _sourceRepository.GetAll().AsNoTracking().FirstOrDefaultAsync(s => s.Source == r.Source);
+            if (src == null) throw new UserFriendlyException("Entegrasyon kaynağı bulunamadı.");
+            var apiKey = ActivityManagement.Security.DpapiProtector.Unprotect(src.ApiKey);
+            var authHeader = string.IsNullOrWhiteSpace(src.AuthHeader) ? "Authorization" : src.AuthHeader;
+            var authScheme = src.AuthScheme ?? "";
+
+            // 3) Sunucu-içi indir
+            using var req = new HttpRequestMessage(HttpMethod.Get, att.Url);
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                var val = string.IsNullOrWhiteSpace(authScheme) ? apiKey : authScheme.Trim() + " " + apiKey;
+                req.Headers.TryAddWithoutValidation(authHeader, val);
+            }
+            if (!string.IsNullOrWhiteSpace(src.UserEmail))
+                req.Headers.TryAddWithoutValidation("X-User-Email", src.UserEmail.Trim());
+
+            var client = _httpClientFactory.CreateClient("PortalSync");
+            client.Timeout = TimeSpan.FromSeconds(60);
+            using var resp = await client.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
+            var bytes = await resp.Content.ReadAsByteArrayAsync();
+            var contentType = resp.Content.Headers.ContentType?.ToString() ?? att.ContentType ?? "application/octet-stream";
+            var fileName = !string.IsNullOrWhiteSpace(att.FileName) ? att.FileName
+                          : (resp.Content.Headers.ContentDisposition?.FileNameStar ?? resp.Content.Headers.ContentDisposition?.FileName ?? "dosya");
+            return new PortalFileDto { Content = bytes, ContentType = contentType, FileName = fileName.Trim('"') };
+        }
+
         // (C12) Portal DETAY aynası: talebin yorum + dosya + durumunu içe aktarır. Dedup: ExternalCommentId/
         // ExternalAttachmentId. Durum PORTAL AUTHORITATIVE (yerelde kapalıysa geri açmaz). Talep yoksa atlanır.
         public async Task IngestPortalDetailAsync(PortalRequestDetailDto detail)
@@ -782,7 +832,7 @@ namespace ActivityManagement.ServiceRequests
             if (r.Attachments != null && r.Attachments.Count > 0)
                 dto.Attachments = r.Attachments.OrderBy(a => a.UploadedAt).Select(a => new RequestAttachmentDto
                 {
-                    FileName = a.FileName, Url = a.Url, SizeBytes = a.SizeBytes, ContentType = a.ContentType, UploadedAt = a.UploadedAt
+                    Id = a.Id, FileName = a.FileName, Url = a.Url, SizeBytes = a.SizeBytes, ContentType = a.ContentType, UploadedAt = a.UploadedAt
                 }).ToList();
             return dto;
         }
