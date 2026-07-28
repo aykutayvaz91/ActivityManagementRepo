@@ -276,7 +276,7 @@
             <div class="card shadow-sm mb-3">
                 <div class="card-header"><i class="fas fa-reply me-2"></i>Yorum / Not Ekle <small class="text-muted">(@Model.SourceText)</small></div>
                 <div class="card-body">
-                    <form method="post" action="/Requests/AddComment" id="wbCommentForm">
+                    <form method="post" action="/Requests/AddComment" id="wbCommentForm" enctype="multipart/form-data">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@Model.Id" />
                         <input type="hidden" name="returnUrl" value="/Requests/Detail/@Model.Id" />
@@ -294,7 +294,13 @@
                         </div>
                         @if (Model.SourceWriteBackEnabled)
                         {
-                            <div class="small text-muted my-2"><i class="fas fa-image me-1"></i>Ctrl+V ile ekran görüntüsü; kalın/italik/liste desteklenir. <em>(Görseller bizde saklanır; @Model.SourceText portalına metin/biçim iletilir.)</em></div>
+                            <div class="mt-2">
+                                <label class="btn btn-outline-secondary btn-sm mb-0">
+                                    <i class="fas fa-paperclip me-1"></i>Dosya ekle <input type="file" name="files" multiple hidden id="wbFiles" />
+                                </label>
+                                <small class="text-muted ms-1" id="wbFileNames"></small>
+                            </div>
+                            <div class="small text-muted my-2"><i class="fas fa-image me-1"></i>Ctrl+V ile ekran görüntüsü yapıştırabilir veya dosya ekleyebilirsiniz (@Model.SourceText portalına <strong>dosya olarak</strong> iletilir, azami 25 MB). Kalın/italik/liste desteklenir.</div>
                         }
                         else
                         {
@@ -321,10 +327,19 @@
                 placeholder: 'Yorum / not... (Ctrl+V ile ekran görüntüsü yapıştırabilirsiniz)',
                 modules: { toolbar: [['bold', 'italic', 'underline'], ['link', 'image'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['clean']] }
             });
+            // Seçilen dosya adlarını göster
+            var filesInput = document.getElementById('wbFiles');
+            if (filesInput) {
+                filesInput.addEventListener('change', function () {
+                    document.getElementById('wbFileNames').innerText = Array.from(this.files).map(function (f) { return f.name; }).join(', ');
+                });
+            }
             var form = document.getElementById('wbCommentForm');
             form.addEventListener('submit', function (e) {
-                var isEmpty = quill.getText().trim() === '' && quill.root.querySelectorAll('img').length === 0;
-                if (isEmpty) { e.preventDefault(); alert('Yorum boş olamaz.'); return false; }
+                var hasImg = quill.root.querySelectorAll('img').length > 0;
+                var hasFile = filesInput && filesInput.files && filesInput.files.length > 0;
+                var isEmpty = quill.getText().trim() === '' && !hasImg && !hasFile;
+                if (isEmpty) { e.preventDefault(); alert('Yorum veya dosya ekleyin.'); return false; }
                 document.getElementById('wbCommentHtml').value = quill.root.innerHTML;
                 // Dış not seçiliyse müşteriye e-posta gideceği için onay iste
                 var dis = document.getElementById('wbDis');

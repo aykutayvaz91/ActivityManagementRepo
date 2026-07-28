@@ -24,8 +24,10 @@ namespace ActivityManagement.ServiceRequests
         // Destek talebinde durumu destek'in 9'lu listesiyle güncelle (kod POST → portala; yerelde eşlenir). Write-back gerekir.
         Task<ServiceRequestDto> UpdatePortalStatusAsync(long id, string statusCode, string note = null);
 
-        // (C13) Portal talebine yorum ekle → portala POST + yerel ayna. isInternal=false müşteriye e-posta tetikler.
-        Task AddCommentAsync(long id, string body, bool isInternal);
+        // (C13/V3) Portal talebine yorum + opsiyonel dosya ekle → portala (multipart) POST + yerel ayna.
+        // isInternal=false müşteriye e-posta tetikler. byte[] içerdiği için dynamic API'ye açılmaz (controller çağırır).
+        [Abp.Application.Services.RemoteService(false)]
+        Task AddCommentAsync(long id, string body, bool isInternal, System.Collections.Generic.List<Dto.CommentUploadFile> files = null);
 
         // Efor: yalnız atanan kişi kendi adına girer (faaliyet kuralı).
         Task<ActivityLogDto> LogEffortAsync(CreateActivityLogDto input);

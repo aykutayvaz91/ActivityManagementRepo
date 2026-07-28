@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Abp.Domain.Repositories;
 using Abp.Linq.Extensions;
@@ -444,11 +445,11 @@ namespace ActivityManagement.ServiceRequests
         //  - İÇ not (isInternal=true): write-back AÇIK ise portala dahili not olarak POST edilir; KAPALI ise
         //    YALNIZ YEREL saklanır (bizim özel notumuz). Dönen id ile yerel ayna (sonraki senkronda kopyalanmaz).
         // Yalnız portal talebinde; yetki: yönetici veya atanan/2. sorumlu.
-        public async Task AddCommentAsync(long id, string body, bool isInternal)
+        public async Task AddCommentAsync(long id, string body, bool isInternal, List<CommentUploadFile> files = null)
         {
-            if (string.IsNullOrWhiteSpace(body)) throw new UserFriendlyException("Yorum boş olamaz.");
             var ctx = CurrentContext();
-            var r = await _requestRepository.GetAll().Include(x => x.Comments).FirstOrDefaultAsync(x => x.Id == id);
+            var r = await _requestRepository.GetAll().Include(x => x.Comments).Include(x => x.Attachments)
+                .FirstOrDefaultAsync(x => x.Id == id);
             if (r == null) throw new UserFriendlyException("Talep bulunamadı.");
             if (string.IsNullOrWhiteSpace(r.ExternalRef))
                 throw new UserFriendlyException("Yorum gönderimi yalnızca portal talepleri için geçerlidir.");
@@ -460,27 +461,55 @@ namespace ActivityManagement.ServiceRequests
 
             var writeBack = await _sourceRepository.GetAll().AsNoTracking().AnyAsync(s => s.Source == r.Source && s.WriteBackEnabled);
 
+            files ??= new List<CommentUploadFile>();
             string newId = null;
+            var returnedAtts = new List<PortalAttachmentDto>();
+            string localBody = body;
+
             if (writeBack)
             {
-                // Portala POST (iç → dahili, dış → müşteriye açık). Portal reddederse istisna → yerel de eklenmez.
-                newId = await PushCommentToPortalAsync(r, body.Trim(), isInternal);
+                // Ctrl+V ile gömülen base64 görselleri DOSYA'ya çıkar; gövde metne indirger (destek dosyaları ayrı alır).
+                var portalBody = ExtractInlineImages(body, files);
+                if (string.IsNullOrWhiteSpace(StripTags(portalBody)) && files.Count == 0)
+                    throw new UserFriendlyException("Yorum boş olamaz.");
+                localBody = portalBody;
+                (newId, returnedAtts) = await PushCommentToPortalAsync(r, portalBody?.Trim(), isInternal, files);
             }
             else
             {
-                // Write-back kapalı: DIŞ not gönderilemez; İÇ not yalnız yerelde saklanır.
+                // Write-back kapalı: DIŞ not gönderilemez; İÇ not yalnız yerelde saklanır (base64 görsel gövdede kalır → yerelde görünür).
                 if (!isInternal)
                     throw new UserFriendlyException("Dış not (müşteriye açık) göndermek için bu kaynakta write-back açık olmalı (Admin → Entegrasyon). İç not olarak kaydedebilirsiniz.");
+                if (string.IsNullOrWhiteSpace(StripTags(body)))
+                    throw new UserFriendlyException("Yorum boş olamaz.");
             }
 
-            // Yerel ayna: dönen id varsa onunla (sonraki detay senkronunda kopyalanmaz), yoksa yerel-özel not (id=null).
+            // Yerel yorum aynası
             r.Comments.Add(new ServiceRequestComment
             {
                 TenantId = r.TenantId, ServiceRequestId = r.Id,
                 ExternalCommentId = string.IsNullOrWhiteSpace(newId) ? null : newId,
                 AuthorName = Trunc(ctx.Email, 256), AuthorEmail = Trunc(ctx.Email, 256),
-                CommentDate = DateTime.Now, Body = body.Trim(), IsInternal = isInternal
+                CommentDate = DateTime.Now, Body = localBody?.Trim(), IsInternal = isInternal
             });
+
+            // Portalın döndürdüğü ekleri yerel aynaya (dedup ExternalAttachmentId) → "Portal Dosya Ekleri"nde görünür + indirilebilir
+            if (returnedAtts.Count > 0)
+            {
+                var seen = new System.Collections.Generic.HashSet<string>(
+                    r.Attachments.Where(a => a.ExternalAttachmentId != null).Select(a => a.ExternalAttachmentId),
+                    StringComparer.OrdinalIgnoreCase);
+                foreach (var a in returnedAtts)
+                {
+                    if (string.IsNullOrWhiteSpace(a.Id) || !seen.Add(a.Id)) continue;
+                    r.Attachments.Add(new ServiceRequestAttachment
+                    {
+                        TenantId = r.TenantId, ServiceRequestId = r.Id, ExternalAttachmentId = a.Id,
+                        FileName = Trunc(a.Name, 512), Url = Trunc(a.Url, 1024), SizeBytes = a.SizeBytes,
+                        ContentType = Trunc(a.ContentType, 256), UploadedAt = a.UploadedAt
+                    });
+                }
+            }
             await CurrentUnitOfWork.SaveChangesAsync();
         }
 
@@ -553,31 +582,98 @@ namespace ActivityManagement.ServiceRequests
                 throw new UserFriendlyException($"Portal durum güncellemesini reddetti (HTTP {(int)resp.StatusCode}). Durum yerelde de değiştirilmedi.");
         }
 
-        private async Task<string> PushCommentToPortalAsync(ServiceRequest r, string body, bool isInternal)
+        // (V3) Yorum + opsiyonel DOSYALAR portala. Dosya varsa multipart/form-data (destek Seçenek A), yoksa JSON.
+        // Dönüş: (oluşan yorum id'si, portalın döndürdüğü ekler [id/url/...]).
+        private async Task<(string commentId, List<PortalAttachmentDto> attachments)> PushCommentToPortalAsync(
+            ServiceRequest r, string body, bool isInternal, List<CommentUploadFile> files)
         {
             var (baseUrl, apiKey, authHeader, authScheme, userEmail, writeBack) = await GetSourceAuthAsync(r.Source);
             if (!writeBack || string.IsNullOrWhiteSpace(baseUrl))
                 throw new UserFriendlyException("Bu kaynak için portala yazma (write-back) etkin değil.");
             var url = PortalBasePath(baseUrl).TrimEnd('/') + "/" + Uri.EscapeDataString(r.ExternalRef) + "/yorumlar";
-            var payload = JsonSerializer.Serialize(new { body = body, isInternal = isInternal });
-            using var req = new HttpRequestMessage(HttpMethod.Post, url)
-            { Content = new StringContent(payload, Encoding.UTF8, "application/json") };
+
+            bool hasFiles = files != null && files.Exists(f => f?.Content != null && f.Content.Length > 0);
+            HttpContent content;
+            if (hasFiles)
+            {
+                var mp = new MultipartFormDataContent();
+                mp.Add(new StringContent(body ?? "", Encoding.UTF8), "body");
+                mp.Add(new StringContent(isInternal ? "true" : "false"), "isInternal");
+                foreach (var f in files)
+                {
+                    if (f?.Content == null || f.Content.Length == 0) continue;
+                    var fc = new ByteArrayContent(f.Content);
+                    if (!string.IsNullOrWhiteSpace(f.ContentType))
+                        try { fc.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(f.ContentType); } catch { }
+                    mp.Add(fc, "files", string.IsNullOrWhiteSpace(f.FileName) ? "dosya" : f.FileName);
+                }
+                content = mp;
+            }
+            else
+            {
+                content = new StringContent(JsonSerializer.Serialize(new { body, isInternal }), Encoding.UTF8, "application/json");
+            }
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
             ApplyAuth(req, apiKey, authHeader, authScheme, userEmail, CurrentContext().Email);
             var client = _httpClientFactory.CreateClient("PortalSync");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = TimeSpan.FromSeconds(hasFiles ? 120 : 30);
             using var resp = await client.SendAsync(req);
             if (!resp.IsSuccessStatusCode)
-                throw new UserFriendlyException($"Portal yorumu reddetti (HTTP {(int)resp.StatusCode}).");
+            {
+                var code = (int)resp.StatusCode;
+                var msg = code == 413 ? "Dosya çok büyük (portal limiti 25 MB)."
+                        : code == 415 ? "Desteklenmeyen dosya türü."
+                        : $"Portal yorumu reddetti (HTTP {code}).";
+                throw new UserFriendlyException(msg);
+            }
             var respJson = await resp.Content.ReadAsStringAsync();
+            string cid = null; var atts = new List<PortalAttachmentDto>();
             try
             {
-                var doc = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(respJson, JsonOptsIgnoreCase);
-                if (doc != null && doc.TryGetValue("id", out var idv))
-                    return idv.ValueKind == JsonValueKind.String ? idv.GetString() : idv.ToString();
+                var doc = JsonSerializer.Deserialize<CommentPostResponse>(respJson, JsonOptsIgnoreCase);
+                cid = doc?.Id;
+                if (doc?.Attachments != null) atts = doc.Attachments;
             }
             catch { }
-            return null;
+            return (cid, atts);
         }
+
+        private class CommentPostResponse
+        {
+            public string Id { get; set; }
+            public string ExternalRef { get; set; }
+            public DateTime? CreatedAt { get; set; }
+            public List<PortalAttachmentDto> Attachments { get; set; }
+        }
+
+        // Quill'in Ctrl+V ile gömdüğü base64 görselleri DOSYA'ya çıkarır ve gövdeden temizler (destek dosya olarak alır).
+        private static readonly Regex InlineImgRx = new Regex(
+            @"<img\b[^>]*?src\s*=\s*[""']data:(image/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)[""'][^>]*>",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+        private static string ExtractInlineImages(string html, List<CommentUploadFile> files)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return html;
+            int n = 0;
+            return InlineImgRx.Replace(html, m =>
+            {
+                try
+                {
+                    var mime = m.Groups[1].Value.Trim().ToLowerInvariant();
+                    var b64 = Regex.Replace(m.Groups[2].Value, @"\s", "");
+                    var bytes = Convert.FromBase64String(b64);
+                    var ext = mime.Contains("png") ? "png" : (mime.Contains("jpe") || mime.Contains("jpg")) ? "jpg"
+                            : mime.Contains("gif") ? "gif" : mime.Contains("webp") ? "webp" : "img";
+                    files.Add(new CommentUploadFile { Content = bytes, ContentType = mime, FileName = $"ekran-goruntusu-{++n}.{ext}" });
+                }
+                catch { }
+                return "";
+            });
+        }
+
+        private static string StripTags(string html)
+            => string.IsNullOrEmpty(html) ? "" : Regex.Replace(html, "<[^>]+>", "").Replace("&nbsp;", " ").Trim();
 
         private static readonly JsonSerializerOptions JsonOptsIgnoreCase = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -220,14 +221,32 @@ namespace ActivityManagement.Web.Controllers
             return SafeBack(returnUrl);
         }
 
-        // (C13) Portal talebine yorum ekle → portala POST. isInternal=false müşteriye e-posta tetikler.
+        // (C13/V3) Portal talebine yorum + opsiyonel dosya ekle → portala (multipart) POST. isInternal=false müşteriye e-posta.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddComment(long id, string body, bool isInternal = false, string returnUrl = null)
+        [Microsoft.AspNetCore.Mvc.RequestSizeLimit(60_000_000)]  // ekli dosyalar için (portal dosya başı 25 MB)
+        public async Task<IActionResult> AddComment(long id, string body, bool isInternal = false,
+            List<Microsoft.AspNetCore.Http.IFormFile> files = null, string returnUrl = null)
         {
             try
             {
-                await _requestAppService.AddCommentAsync(id, body, isInternal);
+                var uploads = new List<ActivityManagement.ServiceRequests.Dto.CommentUploadFile>();
+                if (files != null)
+                {
+                    foreach (var f in files)
+                    {
+                        if (f == null || f.Length <= 0) continue;
+                        using var ms = new System.IO.MemoryStream();
+                        await f.CopyToAsync(ms);
+                        uploads.Add(new ActivityManagement.ServiceRequests.Dto.CommentUploadFile
+                        {
+                            Content = ms.ToArray(),
+                            FileName = System.IO.Path.GetFileName(f.FileName),
+                            ContentType = f.ContentType
+                        });
+                    }
+                }
+                await _requestAppService.AddCommentAsync(id, body, isInternal, uploads);
                 TempData["Success"] = isInternal ? "Dahili not eklendi." : "Yorum eklendi (müşteriye iletildi).";
             }
             catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }

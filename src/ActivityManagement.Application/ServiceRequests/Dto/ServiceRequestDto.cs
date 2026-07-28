@@ -128,6 +128,14 @@ namespace ActivityManagement.ServiceRequests.Dto
         public string FileName { get; set; }
     }
 
+    // Yoruma eklenecek dosya (ekran görüntüsü / dosya) — portala multipart olarak yüklenir.
+    public class CommentUploadFile
+    {
+        public byte[] Content { get; set; }
+        public string FileName { get; set; }
+        public string ContentType { get; set; }
+    }
+
     // Portal DETAY yanıtı (GET /api/talepler/{id}) — yorum + dosya + durum. Ingest için.
     public class PortalRequestDetailDto
     {
