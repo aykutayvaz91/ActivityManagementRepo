@@ -403,6 +403,42 @@ namespace ActivityManagement.ServiceRequests
             return await GetAsync(r.Id);
         }
 
+        // (Durum) Destek talebinde durumu DESTEK'İN kendi 9'lu listesiyle günceller. statusCode (open/in_progress/...)
+        // portala POST edilir; yerelde bizim RequestStatus'a eşlenir + ham etiket (PortalStatusText) saklanır.
+        // Yalnız portal + write-back açık; yetki: yönetici veya atanan/2. sorumlu. Portal reddederse yerelde değişmez.
+        public async Task<ServiceRequestDto> UpdatePortalStatusAsync(long id, string statusCode, string note = null)
+        {
+            var ctx = CurrentContext();
+            var r = await _requestRepository.GetAsync(id);
+            if (string.IsNullOrWhiteSpace(r.ExternalRef))
+                throw new UserFriendlyException("Bu işlem yalnızca portal talepleri içindir.");
+            if (!PortalStatusCatalog.IsValid(statusCode))
+                throw new UserFriendlyException("Geçersiz durum seçildi.");
+
+            var writeBack = await _sourceRepository.GetAll().AsNoTracking().AnyAsync(s => s.Source == r.Source && s.WriteBackEnabled);
+            if (!writeBack)
+                throw new UserFriendlyException("Bu kaynak için portala durum güncelleme (write-back) etkin değil.");
+
+            bool canManage = IsManagerForRequest(r, ctx);
+            bool isAssignee = ctx.EmployeeId.HasValue && (r.AssignedEmployeeId == ctx.EmployeeId || r.SecondaryEmployeeId == ctx.EmployeeId);
+            if (!canManage && !isAssignee)
+                throw new UserFriendlyException("Bu talebin durumunu güncelleme yetkiniz yok.");
+
+            // ÖNCE portala POST (komut deseni); portal reddederse istisna → yerelde değişmez.
+            await PushStatusRawToPortalAsync(r, statusCode, note);
+
+            var mapped = MapStatusText(statusCode) ?? r.Status;
+            r.Status = mapped;
+            r.PortalStatusText = PortalStatusCatalog.LabelOf(statusCode);
+            r.CompletionPercentage = ProgressForStatus(mapped, r.CompletionPercentage);
+            if (mapped == RequestStatus.Cozuldu) { r.ResolvedDate = r.ResolvedDate ?? DateTime.Now; r.ClosedDate = null; }
+            else if (mapped == RequestStatus.Kapandi) { r.ResolvedDate = r.ResolvedDate ?? DateTime.Now; r.ClosedDate = r.ClosedDate ?? DateTime.Now; }
+            else if (mapped == RequestStatus.Iptal) { r.ClosedDate = r.ClosedDate ?? DateTime.Now; }
+            else { r.ResolvedDate = null; r.ClosedDate = null; }
+            await CurrentUnitOfWork.SaveChangesAsync();
+            return await GetAsync(r.Id);
+        }
+
         // (C13) Yerelde talebe yorum ekler.
         //  - DIŞ not (isInternal=false): write-back AÇIK olmalı → portala POST → müşteriye e-posta.
         //  - İÇ not (isInternal=true): write-back AÇIK ise portala dahili not olarak POST edilir; KAPALI ise
@@ -496,13 +532,17 @@ namespace ActivityManagement.ServiceRequests
         private static string PortalBasePath(string baseUrl)
             => baseUrl.Contains("?") ? baseUrl.Substring(0, baseUrl.IndexOf('?')) : baseUrl;
 
-        private async Task PushStatusToPortalAsync(ServiceRequest r, RequestStatus status, string note)
+        private Task PushStatusToPortalAsync(ServiceRequest r, RequestStatus status, string note)
+            => PushStatusRawToPortalAsync(r, StatusToPortalText(status), note);
+
+        // Portala HAM durum değeri (destek kodu, ör. "waiting_for_customer") gönderir.
+        private async Task PushStatusRawToPortalAsync(ServiceRequest r, string statusValue, string note)
         {
             var (baseUrl, apiKey, authHeader, authScheme, userEmail, writeBack) = await GetSourceAuthAsync(r.Source);
             if (!writeBack || string.IsNullOrWhiteSpace(baseUrl))
                 throw new UserFriendlyException("Bu kaynak için portala yazma (write-back) etkin değil.");
             var url = PortalBasePath(baseUrl).TrimEnd('/') + "/" + Uri.EscapeDataString(r.ExternalRef) + "/durum";
-            var payload = JsonSerializer.Serialize(new { status = StatusToPortalText(status), note = note });
+            var payload = JsonSerializer.Serialize(new { status = statusValue, note = note });
             using var req = new HttpRequestMessage(HttpMethod.Post, url)
             { Content = new StringContent(payload, Encoding.UTF8, "application/json") };
             ApplyAuth(req, apiKey, authHeader, authScheme, userEmail, CurrentContext().Email);
@@ -689,6 +729,8 @@ namespace ActivityManagement.ServiceRequests
             entity.ExtraInfo = input.ExtraInfo ?? entity.ExtraInfo;
             entity.ReceivedDate = input.ReceivedDate ?? entity.ReceivedDate ?? DateTime.Now;
             entity.DueDate = input.DueDate ?? entity.DueDate;
+            // Portalın HAM durum etiketini sakla (9'lu destek durumu; bizim 7'liye eşlenirken kaybolan detay burada durur).
+            if (!string.IsNullOrWhiteSpace(input.StatusText)) entity.PortalStatusText = input.StatusText.Trim();
             if (mappedScore.HasValue) entity.PriorityScore = ClampScore(mappedScore.Value);
             bool wasUnassigned = !entity.AssignedEmployeeId.HasValue;
             // Atanan boşsa ve portal artık eşleşen kişi veriyorsa doldur (manuel atamayı EZMEZ; yalnız null'ı doldurur).
@@ -796,6 +838,7 @@ namespace ActivityManagement.ServiceRequests
             if (entity == null) return; // talep henüz senkronlanmamış → atla (bir sonraki liste pull'unda gelir)
 
             // Durum aynası (Çözüldü/Kapandı/İptal + ara durumlar; yerelde kapalıysa dokunma)
+            if (!string.IsNullOrWhiteSpace(detail.StatusText)) entity.PortalStatusText = detail.StatusText.Trim();
             var mapped = MapStatusText(detail.StatusText);
             if (mapped.HasValue && entity.Status != mapped.Value
                 && entity.Status != RequestStatus.Kapandi && entity.Status != RequestStatus.Iptal)
@@ -911,7 +954,8 @@ namespace ActivityManagement.ServiceRequests
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
             var t = text.Trim().ToLowerInvariant();
-            if (t.Contains("krit") || t.Contains("acil") || t.Contains("critical") || t.Contains("urgent")) return 9;
+            // Destek öncelikleri (4): urgent/Acil→10, high/Yüksek→7, medium/Orta→5, low/Düşük→3 (1-10 sistemimize eşlenir)
+            if (t.Contains("krit") || t.Contains("acil") || t.Contains("critical") || t.Contains("urgent")) return 10;
             if (t.Contains("yüksek") || t.Contains("yuksek") || t.Contains("high")) return 7;
             if (t.Contains("düşük") || t.Contains("dusuk") || t.Contains("low")) return 3;
             if (t.Contains("orta") || t.Contains("normal") || t.Contains("medium")) return 5;
@@ -980,7 +1024,11 @@ namespace ActivityManagement.ServiceRequests
         {
             var dto = ObjectMapper.Map<ServiceRequestDto>(r);
             dto.SourceText = SourceText(r.Source);
-            dto.StatusText = StatusText(r.Status);
+            // Portal talebinde GERÇEK portal durumunu göster (destek 9'lu); yoksa/manuelde bizim durum metni.
+            dto.PortalStatusText = r.PortalStatusText;
+            dto.StatusText = !string.IsNullOrWhiteSpace(r.ExternalRef) && !string.IsNullOrWhiteSpace(r.PortalStatusText)
+                ? r.PortalStatusText
+                : StatusText(r.Status);
             dto.AssignedEmployeeName = r.AssignedEmployee?.FullName;
             dto.SecondaryEmployeeName = r.SecondaryEmployee?.FullName;
             dto.TeamName = r.Team?.Name;

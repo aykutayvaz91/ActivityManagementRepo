@@ -5,6 +5,35 @@ using ActivityManagement.Entities;
 
 namespace ActivityManagement.ServiceRequests.Dto
 {
+    // Destek (Cortex) durum kodları + görünür adları (kullanıcı listesi). Write-back dropdown'ı ve doğrulama bunu kullanır.
+    // Sıra: portal ekranındaki yaşam döngüsü. Kod POST edilir, ad gösterilir. code→bizim RequestStatus eşlemesi MapStatusText'te.
+    public static class PortalStatusCatalog
+    {
+        public static readonly (string Code, string Label)[] Destek = new[]
+        {
+            ("open", "Açık"),
+            ("in_progress", "İşlemde"),
+            ("pending", "Beklemede"),
+            ("transferred_to_dev", "Yazılım Departmanına Aktarıldı"),
+            ("waiting_for_customer", "Müşteriden Yanıt Bekleniyor"),
+            ("waiting_for_vendor", "Firmadan Yanıt Bekleniyor"),
+            ("resolved", "Çözüldü"),
+            ("rejected", "Uygun Görülmedi"),
+            ("closed", "Kapatıldı")
+        };
+
+        public static string LabelOf(string code)
+        {
+            foreach (var s in Destek) if (string.Equals(s.Code, code, System.StringComparison.OrdinalIgnoreCase)) return s.Label;
+            return code;
+        }
+        public static bool IsValid(string code)
+        {
+            foreach (var s in Destek) if (string.Equals(s.Code, code, System.StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+    }
+
     [AutoMapFrom(typeof(ServiceRequest))]
     public class ServiceRequestDto : FullAuditedEntityDto<long>
     {
@@ -23,6 +52,7 @@ namespace ActivityManagement.ServiceRequests.Dto
 
         public RequestStatus Status { get; set; }
         public string StatusText { get; set; }
+        public string PortalStatusText { get; set; }   // portalın ham durum etiketi (destek 9'lu); UI'da öncelikli gösterilir
 
         public TaskPriority Priority { get; set; }
         public int PriorityScore { get; set; }

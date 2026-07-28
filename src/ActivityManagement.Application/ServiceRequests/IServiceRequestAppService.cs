@@ -21,6 +21,9 @@ namespace ActivityManagement.ServiceRequests
         // Durum + ilerleme güncelle — atanan kişi veya yönetici. Portal + write-back açıksa portala da POST edilir (note opsiyonel).
         Task<ServiceRequestDto> UpdateStatusAsync(long id, RequestStatus status, int percentage, string note = null);
 
+        // Destek talebinde durumu destek'in 9'lu listesiyle güncelle (kod POST → portala; yerelde eşlenir). Write-back gerekir.
+        Task<ServiceRequestDto> UpdatePortalStatusAsync(long id, string statusCode, string note = null);
+
         // (C13) Portal talebine yorum ekle → portala POST + yerel ayna. isInternal=false müşteriye e-posta tetikler.
         Task AddCommentAsync(long id, string body, bool isInternal);
 

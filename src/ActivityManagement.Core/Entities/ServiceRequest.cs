@@ -52,6 +52,11 @@ namespace ActivityManagement.Entities
 
         public RequestStatus Status { get; set; } = RequestStatus.Yeni;
 
+        // Portalın HAM durum etiketi (ör. "Müşteriden Yanıt Bekleniyor"). Bizim 7 durumumuz daha kaba
+        // (pending/transferred_to_dev/waiting_* → Beklemede); destek talebinde GERÇEK durumu göstermek ve
+        // write-back'te doğru değeri geri yollamak için saklanır. Null ise Status'tan türetilir.
+        public string PortalStatusText { get; set; }
+
         public TaskPriority Priority { get; set; } = TaskPriority.Normal;
         // Dinamik önem (1-10; 10 = en yüksek). Listeler bu ve SLA'ya göre sıralanır.
         public int PriorityScore { get; set; } = 5;

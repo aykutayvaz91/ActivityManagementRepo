@@ -205,6 +205,21 @@ namespace ActivityManagement.Web.Controllers
             return SafeBack(returnUrl);
         }
 
+        // Destek talebinde durumu destek'in 9'lu listesiyle güncelle (kod portala POST edilir).
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdatePortalStatus(long id, string statusCode, string note = null, string returnUrl = null)
+        {
+            try
+            {
+                await _requestAppService.UpdatePortalStatusAsync(id, statusCode, note);
+                TempData["Success"] = "Durum güncellendi (portala işlendi).";
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
+            catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Requests/UpdatePortalStatus"); TempData["Uyari"] = "Durum güncellenemedi."; }
+            return SafeBack(returnUrl);
+        }
+
         // (C13) Portal talebine yorum ekle → portala POST. isInternal=false müşteriye e-posta tetikler.
         [HttpPost]
         [ValidateAntiForgeryToken]
