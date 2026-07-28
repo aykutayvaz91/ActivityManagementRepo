@@ -119,6 +119,36 @@ namespace ActivityManagement.ServiceRequests
             return _currentTeamId;
         }
 
+        // Efektif rol: normalde claim; login-as (ActAs) ise temsil edilen kişinin gerçek AppRole'ü.
+        private string EffectiveRole()
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
+                long? ownId = long.TryParse(user?.FindFirst("AdminOwnEmployeeId")?.Value, out var o) ? o : (long?)null;
+                if (empId.HasValue && ownId.HasValue && empId != ownId) // login-as başka kişi
+                    return CurrentEmployeeAppRole(empId) ?? "Uzman";
+            }
+            return role;
+        }
+
+        // (B10) Görünürlük kapsamı: Admin/Manager tümü; TakımLideri kendi TAKIMI + kendine atanan; Uzman yalnız kendine atanan.
+        private IQueryable<ServiceRequest> ApplyVisibilityScope(IQueryable<ServiceRequest> q)
+        {
+            if (SeesAllTeams()) return q;
+            long? empId = long.TryParse(_httpContextAccessor.HttpContext?.User?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
+            if (!empId.HasValue) return q.Where(r => false); // kimlik yok → güvenli boş
+            if (string.Equals(EffectiveRole(), "TakımLideri", StringComparison.OrdinalIgnoreCase))
+            {
+                var myTeam = CurrentEmployeeTeamId(empId);
+                return q.Where(r => r.AssignedEmployeeId == empId.Value || r.SecondaryEmployeeId == empId.Value
+                                    || (myTeam != null && r.TeamId == myTeam));
+            }
+            return q.Where(r => r.AssignedEmployeeId == empId.Value || r.SecondaryEmployeeId == empId.Value);
+        }
+
         // Yönetici bu talebi yönetebilir mi: Admin her zaman; TakımLideri yalnız kendi takımının (takımsız dahil).
         private bool IsManagerForRequest(ServiceRequest r, (string Role, string Email, long? EmployeeId) ctx)
         {
@@ -147,6 +177,7 @@ namespace ActivityManagement.ServiceRequests
                 .WhereIf(input.Status.HasValue, r => r.Status == input.Status.Value)
                 .WhereIf(input.AssignedEmployeeId.HasValue, r => r.AssignedEmployeeId == input.AssignedEmployeeId.Value)
                 .WhereIf(input.OnlyOpen == true, r => r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal)
+                .WhereIf(input.OnlyNoEffort == true, r => !r.Logs.Any())
                 .WhereIf(!string.IsNullOrWhiteSpace(input.Filter), r =>
                     r.Title.Contains(input.Filter) ||
                     (r.ExternalRef != null && r.ExternalRef.Contains(input.Filter)) ||
@@ -157,21 +188,16 @@ namespace ActivityManagement.ServiceRequests
                 query = query.Where(r => r.AssignedEmployeeId == ctx.EmployeeId.Value ||
                                          r.SecondaryEmployeeId == ctx.EmployeeId.Value);
 
-            // Görünürlük: Admin/Manager (SeesAllTeams) TÜM talepleri (havuz dahil) görür → atama yapar.
-            // Diğer personel YALNIZ kendine (1./2. sorumlu) atanan talepleri görür — "eşleşme ile personele göster".
-            // (Talep hacmi yüksek olduğundan takım-geneli değil, kişisel kapsam uygulanır.)
-            if (input.MineOnly != true && !SeesAllTeams() && ctx.EmployeeId.HasValue)
-            {
-                query = query.Where(r =>
-                    r.AssignedEmployeeId == ctx.EmployeeId.Value ||
-                    r.SecondaryEmployeeId == ctx.EmployeeId.Value);
-            }
+            // Görünürlük (B10): Admin/Manager tümü; TakımLideri kendi takımı + kendine; Uzman yalnız kendine.
+            if (input.MineOnly != true)
+                query = ApplyVisibilityScope(query);
 
-            // Açık talepler önce; sonra önem skoru, sonra yakın SLA.
+            // Açık talepler önce; sonra önem skoru, sonra yakın SLA. (A2) MaxResultCount server-side uygulanır.
             var items = await query
                 .OrderByDescending(r => r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal)
                 .ThenByDescending(r => r.PriorityScore)
                 .ThenBy(r => r.DueDate ?? DateTime.MaxValue)
+                .Take(Math.Clamp(input.MaxResultCount, 1, 100000))
                 .ToListAsync();
             return items.Select(r => MapRequest(r, ctx)).ToList();
         }
@@ -183,6 +209,48 @@ namespace ActivityManagement.ServiceRequests
                 .FirstOrDefaultAsync(x => x.Id == id);
             if (r == null) throw new UserFriendlyException("Talep bulunamadı.");
             return MapRequest(r, ctx);
+        }
+
+        // (A3) Talepler ana ekranı — VERİMLİ: sekme başına SINIRLI (cap) liste + gerçek SQL sayaçları.
+        // Tüm talepleri + Logs'u belleğe yüklemez. Arşiv/aktif ayrımı SQL'de.
+        public async Task<ServiceRequestsIndexDto> GetIndexAsync(int cap = 500)
+        {
+            var ctx = CurrentContext();
+            if (cap < 1) cap = 1; else if (cap > 2000) cap = 2000;
+
+            // Görünürlük kapsamı (B10): Admin/Manager tümü; TakımLideri kendi takımı; Uzman yalnız kendine
+            IQueryable<ServiceRequest> Scoped() => ApplyVisibilityScope(_requestRepository.GetAll().AsNoTracking());
+            // ARŞİV = terminal-done (Kapandı/Çözüldü) + efor girilmiş. AKTİF = arşiv değil ve İptal değil.
+            IQueryable<ServiceRequest> Active(RequestSource src) => Scoped()
+                .Where(r => r.Source == src && r.Status != RequestStatus.Iptal
+                            && !((r.Status == RequestStatus.Kapandi || r.Status == RequestStatus.Cozuldu) && r.Logs.Any()));
+            IQueryable<ServiceRequest> Archived() => Scoped()
+                .Where(r => (r.Status == RequestStatus.Kapandi || r.Status == RequestStatus.Cozuldu) && r.Logs.Any());
+
+            async Task<System.Collections.Generic.List<ServiceRequestDto>> Materialize(IQueryable<ServiceRequest> orderedIdQuery)
+            {
+                var ids = await orderedIdQuery.Select(r => r.Id).Take(cap).ToListAsync();
+                if (ids.Count == 0) return new System.Collections.Generic.List<ServiceRequestDto>();
+                var rows = await WithIncludes(_requestRepository.GetAll().AsNoTracking()).Where(r => ids.Contains(r.Id)).ToListAsync();
+                var map = rows.ToDictionary(r => r.Id);
+                return ids.Where(map.ContainsKey).Select(id => MapRequest(map[id], ctx)).ToList();
+            }
+
+            var dto = new ServiceRequestsIndexDto { Cap = cap };
+            dto.CountSunucu = await Active(RequestSource.SunucuKurulum).CountAsync();
+            dto.CountDestek = await Active(RequestSource.DisDestek).CountAsync();
+            dto.CountArchived = await Archived().CountAsync();
+
+            // Aktif: açık talepler önce, sonra önem, sonra SLA. Arşiv: en son çözülen/kapanan önce.
+            dto.ActiveSunucu = await Materialize(Active(RequestSource.SunucuKurulum)
+                .OrderByDescending(r => r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal && r.Status != RequestStatus.Cozuldu)
+                .ThenByDescending(r => r.PriorityScore).ThenBy(r => r.DueDate ?? DateTime.MaxValue));
+            dto.ActiveDestek = await Materialize(Active(RequestSource.DisDestek)
+                .OrderByDescending(r => r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal && r.Status != RequestStatus.Cozuldu)
+                .ThenByDescending(r => r.PriorityScore).ThenBy(r => r.DueDate ?? DateTime.MaxValue));
+            dto.Archived = await Materialize(Archived()
+                .OrderByDescending(r => r.ResolvedDate ?? r.ClosedDate ?? r.DueDate));
+            return dto;
         }
 
         // --- yazma ---
@@ -294,7 +362,8 @@ namespace ActivityManagement.ServiceRequests
                 throw new UserFriendlyException("Bu talebin durumu destek portalından güncellenir. Burada yalnızca efor girebilirsiniz.");
 
             bool canManage = IsManagerForRequest(r, ctx);
-            bool isAssignee = r.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue && r.AssignedEmployeeId == ctx.EmployeeId;
+            bool isAssignee = ctx.EmployeeId.HasValue &&
+                (r.AssignedEmployeeId == ctx.EmployeeId || r.SecondaryEmployeeId == ctx.EmployeeId); // 1. VEYA 2. sorumlu (UI ile uyumlu)
             if (!canManage && !isAssignee)
                 throw new UserFriendlyException("Bu talebin durumunu güncelleme yetkiniz yok.");
 
@@ -417,6 +486,9 @@ namespace ActivityManagement.ServiceRequests
                 ? await _employeeRepository.GetAll().AsNoTracking().Where(e => e.Id == resolvedEmpId.Value).Select(e => e.TeamId).FirstOrDefaultAsync()
                 : await ResolveTeamByNameAsync(input.GroupName);
             RequestStatus? mappedStatus = input.Status ?? MapStatusText(input.StatusText);
+            // A4: portalın gönderdiği durum metni eşlenemezse SESSİZCE kaybolmasın — logla ki MapStatusText genişletilsin.
+            if (!mappedStatus.HasValue && !string.IsNullOrWhiteSpace(input.StatusText))
+                Logger.Warn($"Eşlenemeyen talep durumu metni: '{input.StatusText}' (Source={input.Source}, Ref={input.ExternalRef}) — MapStatusText'e eklenmeli.");
             int? mappedScore = input.PriorityScore ?? MapPriorityScore(input.PriorityText);
 
             bool isNew = entity == null;
@@ -491,7 +563,9 @@ namespace ActivityManagement.ServiceRequests
             // talepler bildirilmez (isOpen filtresi); her senkronda tekrar bildirilmez (yalnız yeni/ilk atamada).
             bool newlyAssigned = entity.AssignedEmployeeId.HasValue && (isNew || wasUnassigned);
             bool isOpenReq = entity.Status != RequestStatus.Kapandi && entity.Status != RequestStatus.Iptal && entity.Status != RequestStatus.Cozuldu;
-            if (newlyAssigned && isOpenReq)
+            // B9: yalnız GERÇEKTEN YENİ (son 2 günde gelen) talepleri bildir → ilk backfill'de eski açık taleplerin bildirim seli olmaz.
+            bool recent = (entity.ReceivedDate ?? DateTime.Now) >= DateTime.Now.AddDays(-2);
+            if (newlyAssigned && isOpenReq && recent)
                 await _notificationManager.NotifyAsync(entity.AssignedEmployeeId, NotificationType.TalepAtandi,
                     "Yeni talep atandı", entity.Title, $"/Requests/Detail/{entity.Id}", severity: "info");
 

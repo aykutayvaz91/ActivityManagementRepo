@@ -85,12 +85,28 @@ namespace ActivityManagement.ServiceRequests.Dto
 
     public class GetServiceRequestsInput : PagedAndSortedResultRequestDto
     {
+        // Varsayılan: sınırsız (ABP'nin 10 varsayılanı yerine). Sayfalama isteyen açıkça küçültür (Query/Export).
+        public GetServiceRequestsInput() { MaxResultCount = 100000; }
+
         public RequestSource? Source { get; set; }
         public RequestStatus? Status { get; set; }
         public long? AssignedEmployeeId { get; set; }
-        public bool? OnlyOpen { get; set; }   // Kapandı/İptal hariç
-        public bool? MineOnly { get; set; }   // yalnız bana atanan
+        public bool? OnlyOpen { get; set; }     // Kapandı/İptal hariç
+        public bool? MineOnly { get; set; }     // yalnız bana atanan
+        public bool? OnlyNoEffort { get; set; } // yalnız eforu girilmemiş (rapor boşluğu)
         public string Filter { get; set; }
+    }
+
+    // Talepler ana ekranı (Index) — verimli: sekme başına SINIRLI liste + gerçek SQL sayaçları.
+    public class ServiceRequestsIndexDto
+    {
+        public System.Collections.Generic.List<ServiceRequestDto> ActiveSunucu { get; set; } = new();
+        public System.Collections.Generic.List<ServiceRequestDto> ActiveDestek { get; set; } = new();
+        public System.Collections.Generic.List<ServiceRequestDto> Archived { get; set; } = new();
+        public int CountSunucu { get; set; }
+        public int CountDestek { get; set; }
+        public int CountArchived { get; set; }
+        public int Cap { get; set; }
     }
 
     // Faz 2: Portaldan gelen normalize talep (webhook alıcısı / sync kullanır). Idempotent upsert.

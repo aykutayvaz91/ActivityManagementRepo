@@ -10,6 +10,7 @@ namespace ActivityManagement.ServiceRequests
     public interface IServiceRequestAppService : IApplicationService
     {
         Task<List<ServiceRequestDto>> GetAllAsync(GetServiceRequestsInput input);
+        Task<ServiceRequestsIndexDto> GetIndexAsync(int cap = 500);
         Task<ServiceRequestDto> GetAsync(long id);
         Task<ServiceRequestDto> CreateAsync(CreateUpdateServiceRequestDto input);
         Task<ServiceRequestDto> UpdateAsync(CreateUpdateServiceRequestDto input);

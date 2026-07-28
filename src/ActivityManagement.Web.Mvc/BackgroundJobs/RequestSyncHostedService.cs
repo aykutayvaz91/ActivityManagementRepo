@@ -158,11 +158,15 @@ namespace ActivityManagement.Web.BackgroundJobs
 
         // Tüm sayfaları çeker (sayfalama). Dedup: aynı externalRef/id ikinci kez gelirse durur (portal
         // `page`'i yok sayıp aynı sayfayı döndürse bile sonsuz döngü olmaz). Son sayfa: 0 kayıt / yeni-yok / <50.
+        private const int PageSize = 50;    // portala gönderilen sayfa boyutu
+        private const int MaxPages = 400;   // güvenlik cap'i (400×50 = 20000) — büyük backfill'de eksik çekmeyi önler
+
         private async Task<List<WireItem>> FetchAsync(string baseUrl, string apiKey, string authHeader, string authScheme, string userEmail, string filter, DateTime sinceUtc)
         {
             var all = new List<WireItem>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            for (int page = 1; page <= 50; page++)
+            int page = 1;
+            for (; page <= MaxPages; page++)
             {
                 var pageItems = await FetchPageAsync(baseUrl, apiKey, authHeader, authScheme, userEmail, filter, sinceUtc, page);
                 if (pageItems.Count == 0) break;
@@ -173,9 +177,13 @@ namespace ActivityManagement.Web.BackgroundJobs
                             : (it.Id.HasValue ? it.Id.Value.ToString() : null);
                     if (string.IsNullOrWhiteSpace(key) || seen.Add(key)) { all.Add(it); fresh++; }
                 }
-                if (fresh == 0) break;           // portal page'i yok saydı / yeni kayıt yok
-                if (pageItems.Count < 50) break; // son sayfa (PageSize=50)
+                if (fresh == 0) break;                  // portal page'i yok saydı / yeni kayıt yok
+                if (pageItems.Count < PageSize) break;  // son sayfa
             }
+            if (page > MaxPages)
+                ActivityManagement.Logging.ErrorLog.Write(
+                    new Exception($"Pull sayfa cap'ine ({MaxPages}) ulaşıldı — bazı kayıtlar bu turda çekilmemiş olabilir (baseUrl={baseUrl})"),
+                    "RequestSync/PageCap");
             return all;
         }
 
@@ -183,10 +191,11 @@ namespace ActivityManagement.Web.BackgroundJobs
         {
             var sb = new StringBuilder(baseUrl);
             sb.Append(baseUrl.Contains("?") ? "&" : "?");
+            // Artımlı senkron TEK parametre: updatedSince (portalın 'değişenleri' döndürmesi için). Not: 'from' (created)
+            // ile BİRLİKTE göndermek, portal AND'lerse eski taleplerdeki durum değişimini kaçırır → yalnız updatedSince.
             sb.Append("updatedSince=").Append(Uri.EscapeDataString(sinceUtc.ToString("yyyy-MM-ddTHH:mm:ssZ")));
-            // PSM tarih filtresi 'from' (created) — updatedSince'i yok sayarsa 'from' devreye girer (ikisi de gönderilir).
-            sb.Append("&from=").Append(Uri.EscapeDataString(sinceUtc.ToString("yyyy-MM-dd")));
             sb.Append("&page=").Append(page);
+            sb.Append("&pageSize=").Append(PageSize);   // sayfa boyutunu netleştir (yoksa <50 heuristiği güvenilmez)
             if (!string.IsNullOrWhiteSpace(filter)) sb.Append("&").Append(filter.TrimStart('&', '?'));
 
             using var req = new HttpRequestMessage(HttpMethod.Get, sb.ToString());

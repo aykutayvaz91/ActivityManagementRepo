@@ -98,14 +98,16 @@ namespace ActivityManagement.Web.Controllers
             var g = EnsurePageAccess("Requests"); if (g != null) return g;
             try
             {
-                var sunucuAll = await _requestAppService.GetAllAsync(new GetServiceRequestsInput { Source = RequestSource.SunucuKurulum });
-                var destekAll = await _requestAppService.GetAllAsync(new GetServiceRequestsInput { Source = RequestSource.DisDestek });
-                // ARŞİV: Kapandı + eforu girilmiş (tam bitmiş) talepler ayrı "Kapatılan" sekmesine; kaynak sekmelerinde görünmez.
-                bool IsArchived(ServiceRequestDto r) => r.Status == RequestStatus.Kapandi && r.TotalHours > 0;
-                ViewBag.Sunucu = sunucuAll.Where(r => !IsArchived(r)).ToList();
-                ViewBag.Destek = destekAll.Where(r => !IsArchived(r)).ToList();
-                ViewBag.Kapatilan = sunucuAll.Concat(destekAll).Where(IsArchived)
-                    .OrderByDescending(r => r.ResolvedDate ?? r.DueDate).ToList();
+                // (A3) Verimli: sekme başına SINIRLI liste + gerçek SQL sayaçları (tüm talepleri belleğe yüklemez).
+                // Aktif = arşiv değil + İptal değil; Arşiv = (Kapandı/Çözüldü) + efor girilmiş.
+                var idx = await _requestAppService.GetIndexAsync(500);
+                ViewBag.Sunucu = idx.ActiveSunucu;
+                ViewBag.Destek = idx.ActiveDestek;
+                ViewBag.Kapatilan = idx.Archived;
+                ViewBag.CountSunucu = idx.CountSunucu;
+                ViewBag.CountDestek = idx.CountDestek;
+                ViewBag.CountArchived = idx.CountArchived;
+                ViewBag.Cap = idx.Cap;
                 ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
                 ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
                 ViewBag.ActivityTypes = await _activityTypeAppService.GetAllAsync(onlyActive: true);

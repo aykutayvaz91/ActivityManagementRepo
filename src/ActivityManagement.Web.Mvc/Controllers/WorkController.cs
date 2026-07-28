@@ -75,10 +75,10 @@ namespace ActivityManagement.Web.Controllers
                 //    Efor yoksa raporda boş kalır → "efor bekliyor" olarak İşlerim'de görünür; efor girilince düşer.
                 //    (Tam bitmiş = kapalı + eforu girilmiş talepler İşlerim'de görünmez.)
                 var reqs = (await _requestAppService.GetAllAsync(new GetServiceRequestsInput { MineOnly = true }))
-                    .Where(r => r.IsOpen || r.TotalHours <= 0);
+                    .Where(r => r.Status != RequestStatus.Iptal && (r.IsOpen || r.TotalHours <= 0));
                 foreach (var r in reqs)
                 {
-                    bool eforBekliyor = !r.IsOpen && r.TotalHours <= 0; // kapalı ama efor yok
+                    bool eforBekliyor = !r.IsOpen && r.TotalHours <= 0; // kapalı ama efor yok (İptal hariç — yukarıda elendi)
                     rows.Add(new WorkItemRow
                     {
                         Kind = "Talep", KindIcon = "fa-inbox", KindColor = "info",

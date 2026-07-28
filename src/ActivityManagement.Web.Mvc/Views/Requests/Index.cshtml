@@ -12,6 +12,10 @@
     var types = ViewBag.ActivityTypes as System.Collections.Generic.IReadOnlyList<ActivityManagement.Activities.Dto.ActivityTypeDefDto>
                     ?? new System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>();
     bool isManager = ViewBag.IsManager == true;
+    int cntDestek = (int?)ViewBag.CountDestek ?? destek.Count;
+    int cntSunucu = (int?)ViewBag.CountSunucu ?? sunucu.Count;
+    int cntKapatilan = (int?)ViewBag.CountArchived ?? kapatilan.Count;
+    int cap = (int?)ViewBag.Cap ?? 500;
     var statuses = System.Enum.GetValues(typeof(RequestStatus)).Cast<RequestStatus>().ToList();
     var statusNames = new System.Collections.Generic.Dictionary<int,string> {
         {0,"Yeni"},{1,"Atandı"},{2,"Devam Ediyor"},{3,"Beklemede"},{4,"Çözüldü"},{5,"Kapandı"},{6,"İptal"}
@@ -32,38 +36,49 @@
     <li class="nav-item">
         <a class="nav-link active" data-bs-toggle="tab" href="#tab-destek">
             <i class="fas fa-headset me-1"></i>Destek Talepleri
-            <span class="badge bg-secondary ms-1" title="Toplam talep">@destek.Count</span>
+            <span class="badge bg-secondary ms-1" title="Aktif talep">@cntDestek</span>
             <small class="text-muted d-none d-md-inline">(destek.cmit.com.tr)</small>
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#tab-sunucu">
             <i class="fas fa-server me-1"></i>Sunucu Talepleri
-            <span class="badge bg-secondary ms-1" title="Toplam talep">@sunucu.Count</span>
+            <span class="badge bg-secondary ms-1" title="Aktif talep">@cntSunucu</span>
             <small class="text-muted d-none d-md-inline">(psm.tdv.org)</small>
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#tab-kapatilan">
             <i class="fas fa-box-archive me-1"></i>Kapatılan Talepler
-            <span class="badge bg-dark ms-1" title="Kapandı + efor girilmiş (arşiv)">@kapatilan.Count</span>
+            <span class="badge bg-dark ms-1" title="Kapandı/Çözüldü + efor girilmiş (arşiv)">@cntKapatilan</span>
         </a>
     </li>
 </ul>
 
+@functions {
+    static Microsoft.AspNetCore.Html.IHtmlContent CapNote(int shown, int total, int cap)
+    {
+        if (total <= shown) return Microsoft.AspNetCore.Html.HtmlString.Empty;
+        return new Microsoft.AspNetCore.Html.HtmlString(
+            $"<div class=\"alert alert-warning py-2 small mb-2\"><i class=\"fas fa-triangle-exclamation me-1\"></i>{total} talebin en yeni/öncelikli <strong>{shown}</strong> tanesi gösteriliyor. Tümü için <a href=\"/Requests/Query\">Talep Sorgula</a>.</div>");
+    }
+}
 <div class="tab-content">
     <div class="tab-pane fade show active" id="tab-destek">
+        @CapNote(destek.Count, cntDestek, cap)
         <div class="card shadow-sm"><div class="card-body p-2">
             @await Html.PartialAsync("_RequestTable", destek)
         </div></div>
     </div>
     <div class="tab-pane fade" id="tab-sunucu">
+        @CapNote(sunucu.Count, cntSunucu, cap)
         <div class="card shadow-sm"><div class="card-body p-2">
             @await Html.PartialAsync("_RequestTable", sunucu)
         </div></div>
     </div>
     <div class="tab-pane fade" id="tab-kapatilan">
-        <div class="alert alert-secondary py-2 small mb-2"><i class="fas fa-box-archive me-1"></i>Kapatılmış ve eforu girilmiş talepler (arşiv). Detaylı sorgu için <a href="/Requests/Query">Talep Sorgula</a>.</div>
+        <div class="alert alert-secondary py-2 small mb-2"><i class="fas fa-box-archive me-1"></i>Kapatılmış/çözülmüş ve eforu girilmiş talepler (arşiv). Detaylı sorgu için <a href="/Requests/Query">Talep Sorgula</a>.</div>
+        @CapNote(kapatilan.Count, cntKapatilan, cap)
         <div class="card shadow-sm"><div class="card-body p-2">
             @await Html.PartialAsync("_RequestTable", kapatilan)
         </div></div>
