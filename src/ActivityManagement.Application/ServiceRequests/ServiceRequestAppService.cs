@@ -448,22 +448,47 @@ namespace ActivityManagement.ServiceRequests
             entity.ReceivedDate = input.ReceivedDate ?? entity.ReceivedDate ?? DateTime.Now;
             entity.DueDate = input.DueDate ?? entity.DueDate;
             if (mappedScore.HasValue) entity.PriorityScore = ClampScore(mappedScore.Value);
+            bool wasUnassigned = !entity.AssignedEmployeeId.HasValue;
             // Atanan boşsa ve portal artık eşleşen kişi veriyorsa doldur (manuel atamayı EZMEZ; yalnız null'ı doldurur).
             if (!entity.AssignedEmployeeId.HasValue && resolvedEmpId.HasValue) entity.AssignedEmployeeId = resolvedEmpId;
             if (!entity.TeamId.HasValue && resolvedTeamId.HasValue) entity.TeamId = resolvedTeamId;
 
-            // Atama/durum YERELDE korunur (güncellemede portal ezmez). İstisna: portal kapanış/iptal bildirdiyse kapat.
+            // Atama/ARA durum YERELDE korunur (portal ezmez). İSTİSNA: portal ÇÖZÜM/TERMINAL durumu bildirdiyse
+            // (Çözüldü/Kapandı/İptal) yerel duruma yansıtılır — böylece destek portalında "Çözüldü" yapılınca bizde de gelir.
+            // Yerelde zaten Kapandı/İptal ise dokunulmaz (geri açma yok).
             if (mappedStatus.HasValue &&
-                (mappedStatus == RequestStatus.Kapandi || mappedStatus == RequestStatus.Iptal) &&
+                (mappedStatus == RequestStatus.Cozuldu || mappedStatus == RequestStatus.Kapandi || mappedStatus == RequestStatus.Iptal) &&
+                entity.Status != mappedStatus.Value &&
                 entity.Status != RequestStatus.Kapandi && entity.Status != RequestStatus.Iptal)
             {
                 entity.Status = mappedStatus.Value;
-                entity.CompletionPercentage = mappedStatus == RequestStatus.Kapandi ? 100 : entity.CompletionPercentage;
-                entity.ResolvedDate = input.ResolvedDate ?? entity.ResolvedDate ?? DateTime.Now;
-                entity.ClosedDate = DateTime.Now;
+                if (mappedStatus == RequestStatus.Cozuldu)
+                {
+                    entity.CompletionPercentage = 100;
+                    entity.ResolvedDate = input.ResolvedDate ?? entity.ResolvedDate ?? DateTime.Now;
+                }
+                else if (mappedStatus == RequestStatus.Kapandi)
+                {
+                    entity.CompletionPercentage = 100;
+                    entity.ResolvedDate = input.ResolvedDate ?? entity.ResolvedDate ?? DateTime.Now;
+                    entity.ClosedDate = DateTime.Now;
+                }
+                else // İptal
+                {
+                    entity.ClosedDate = DateTime.Now;
+                }
             }
 
             await CurrentUnitOfWork.SaveChangesAsync();
+
+            // YENİ + AÇIK bir talep bir personele atandıysa zil bildirimi (portaldan gelen). Backfill'deki eski/kapalı
+            // talepler bildirilmez (isOpen filtresi); her senkronda tekrar bildirilmez (yalnız yeni/ilk atamada).
+            bool newlyAssigned = entity.AssignedEmployeeId.HasValue && (isNew || wasUnassigned);
+            bool isOpenReq = entity.Status != RequestStatus.Kapandi && entity.Status != RequestStatus.Iptal && entity.Status != RequestStatus.Cozuldu;
+            if (newlyAssigned && isOpenReq)
+                await _notificationManager.NotifyAsync(entity.AssignedEmployeeId, NotificationType.TalepAtandi,
+                    "Yeni talep atandı", entity.Title, $"/Requests/Detail/{entity.Id}", severity: "info");
+
             return entity.Id;
         }
 

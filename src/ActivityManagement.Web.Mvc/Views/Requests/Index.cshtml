@@ -4,6 +4,7 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
     var sunucu = ViewBag.Sunucu as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto> ?? new();
     var destek = ViewBag.Destek as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto> ?? new();
+    var kapatilan = ViewBag.Kapatilan as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto> ?? new();
     var employees = ViewBag.Employees as System.Collections.Generic.IReadOnlyList<ActivityManagement.Employees.Dto.EmployeeDto>
                     ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>();
     var projects = ViewBag.Projects as System.Collections.Generic.IReadOnlyList<ActivityManagement.Projects.Dto.ProjectDto>
@@ -42,6 +43,12 @@
             <small class="text-muted d-none d-md-inline">(psm.tdv.org)</small>
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-kapatilan">
+            <i class="fas fa-box-archive me-1"></i>Kapatılan Talepler
+            <span class="badge bg-dark ms-1" title="Kapandı + efor girilmiş (arşiv)">@kapatilan.Count</span>
+        </a>
+    </li>
 </ul>
 
 <div class="tab-content">
@@ -53,6 +60,12 @@
     <div class="tab-pane fade" id="tab-sunucu">
         <div class="card shadow-sm"><div class="card-body p-2">
             @await Html.PartialAsync("_RequestTable", sunucu)
+        </div></div>
+    </div>
+    <div class="tab-pane fade" id="tab-kapatilan">
+        <div class="alert alert-secondary py-2 small mb-2"><i class="fas fa-box-archive me-1"></i>Kapatılmış ve eforu girilmiş talepler (arşiv). Detaylı sorgu için <a href="/Requests/Query">Talep Sorgula</a>.</div>
+        <div class="card shadow-sm"><div class="card-body p-2">
+            @await Html.PartialAsync("_RequestTable", kapatilan)
         </div></div>
     </div>
 </div>
@@ -244,7 +257,7 @@ function openEffort(id, title) {
 // Menüden #tab-destek / #tab-sunucu ile gelindiğinde ilgili sekmeyi aç
 document.addEventListener('DOMContentLoaded', function () {
     var h = window.location.hash;
-    if (h === '#tab-destek' || h === '#tab-sunucu') {
+    if (h && h.indexOf('#tab-') === 0) {
         var trigger = document.querySelector('#reqTabs a[href="' + h + '"]');
         if (trigger) new bootstrap.Tab(trigger).show();
     }

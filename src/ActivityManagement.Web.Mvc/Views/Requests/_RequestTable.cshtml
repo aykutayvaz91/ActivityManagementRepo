@@ -2,6 +2,7 @@
 @model System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto>
 @{
     var reqList = Model ?? new System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto>();
+    bool readOnly = (ViewData["ReadOnly"] as bool?) ?? false; // Sorgu ekranında salt-okunur (yalnız Detay)
     System.Func<RequestStatus, string> statusColor = s =>
         s == RequestStatus.Yeni ? "secondary" :
         s == RequestStatus.Atandi ? "info" :

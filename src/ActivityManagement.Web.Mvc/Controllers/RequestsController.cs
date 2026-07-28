@@ -1,6 +1,8 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
 using ActivityManagement.Activities.Dto;
 using ActivityManagement.Employees;
@@ -38,14 +40,72 @@ namespace ActivityManagement.Web.Controllers
         }
         private bool IsManager() => User.IsInRole("Admin") || User.IsInRole("TakımLideri");
 
+        // Talep Sorgula: TÜM talepler (arşiv/kapalı+eforlu dahil) — kaynak/durum/kişi/metin filtreli, açık+kapalı aynı ekranda.
+        // Görünürlük kapsamı serviste uygulanır (Admin/Manager tümü, diğerleri kendine atanan).
+        public async Task<IActionResult> Query(GetServiceRequestsInput input)
+        {
+            var g = EnsurePageAccess("Requests"); if (g != null) return g;
+            try
+            {
+                input.MaxResultCount = input.MaxResultCount > 0 ? input.MaxResultCount : 1000;
+                var items = await _requestAppService.GetAllAsync(input);
+                ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
+                ViewBag.IsManager = IsManager();
+                ViewBag.Input = input;
+                return View(items);
+            }
+            catch (Exception ex)
+            {
+                ActivityManagement.Logging.ErrorLog.Write(ex, "Requests/Query");
+                TempData["Uyari"] = "Talep sorgulanırken bir sorun oluştu.";
+                return Redirect("/Requests");
+            }
+        }
+
+        public async Task<IActionResult> ExportQueryExcel(GetServiceRequestsInput input)
+        {
+            var g = EnsurePageAccess("Requests"); if (g != null) return g;
+            input.MaxResultCount = 10000;
+            var items = await _requestAppService.GetAllAsync(input);
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add("Talep Sorgu");
+            var headers = new[] { "Talep No", "Kaynak", "Başlık", "Talep Eden", "Atanan", "Durum", "Önem", "Efor (saat)", "Geliş", "SLA" };
+            for (int i = 0; i < headers.Length; i++) ws.Cell(1, i + 1).Value = headers[i];
+            int row = 2;
+            foreach (var r in items)
+            {
+                ws.Cell(row, 1).Value = r.ExternalRef ?? "";
+                ws.Cell(row, 2).Value = r.SourceText;
+                ws.Cell(row, 3).Value = r.Title;
+                ws.Cell(row, 4).Value = r.RequesterName ?? "";
+                ws.Cell(row, 5).Value = r.AssignedEmployeeName ?? "";
+                ws.Cell(row, 6).Value = r.StatusText;
+                ws.Cell(row, 7).Value = r.PriorityScore;
+                ws.Cell(row, 8).Value = r.TotalHours;
+                ws.Cell(row, 9).Value = r.ReceivedDate?.ToString("dd.MM.yyyy") ?? "";
+                ws.Cell(row, 10).Value = r.DueDate?.ToString("dd.MM.yyyy") ?? "";
+                row++;
+            }
+            ws.Columns().AdjustToContents();
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            return File(ms.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"TalepSorgu_{DateTime.Today:yyyyMMdd}.xlsx");
+        }
+
         // Talepler ana ekranı: Sunucu / Destek sekmeleri.
         public async Task<IActionResult> Index()
         {
             var g = EnsurePageAccess("Requests"); if (g != null) return g;
             try
             {
-                ViewBag.Sunucu = await _requestAppService.GetAllAsync(new GetServiceRequestsInput { Source = RequestSource.SunucuKurulum });
-                ViewBag.Destek = await _requestAppService.GetAllAsync(new GetServiceRequestsInput { Source = RequestSource.DisDestek });
+                var sunucuAll = await _requestAppService.GetAllAsync(new GetServiceRequestsInput { Source = RequestSource.SunucuKurulum });
+                var destekAll = await _requestAppService.GetAllAsync(new GetServiceRequestsInput { Source = RequestSource.DisDestek });
+                // ARŞİV: Kapandı + eforu girilmiş (tam bitmiş) talepler ayrı "Kapatılan" sekmesine; kaynak sekmelerinde görünmez.
+                bool IsArchived(ServiceRequestDto r) => r.Status == RequestStatus.Kapandi && r.TotalHours > 0;
+                ViewBag.Sunucu = sunucuAll.Where(r => !IsArchived(r)).ToList();
+                ViewBag.Destek = destekAll.Where(r => !IsArchived(r)).ToList();
+                ViewBag.Kapatilan = sunucuAll.Concat(destekAll).Where(IsArchived)
+                    .OrderByDescending(r => r.ResolvedDate ?? r.DueDate).ToList();
                 ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
                 ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
                 ViewBag.ActivityTypes = await _activityTypeAppService.GetAllAsync(onlyActive: true);
