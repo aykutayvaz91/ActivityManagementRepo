@@ -289,6 +289,10 @@ namespace ActivityManagement.ServiceRequests
             var ctx = CurrentContext();
             var r = await _requestRepository.GetAsync(id);
 
+            // Portal talebi (ExternalRef dolu): durum PORTAL yönetir, yerelde değiştirilemez (sync bozulmasın; bizde yalnız efor).
+            if (!string.IsNullOrWhiteSpace(r.ExternalRef))
+                throw new UserFriendlyException("Bu talebin durumu destek portalından güncellenir. Burada yalnızca efor girebilirsiniz.");
+
             bool canManage = IsManagerForRequest(r, ctx);
             bool isAssignee = r.AssignedEmployeeId.HasValue && ctx.EmployeeId.HasValue && r.AssignedEmployeeId == ctx.EmployeeId;
             if (!canManage && !isAssignee)
@@ -453,29 +457,31 @@ namespace ActivityManagement.ServiceRequests
             if (!entity.AssignedEmployeeId.HasValue && resolvedEmpId.HasValue) entity.AssignedEmployeeId = resolvedEmpId;
             if (!entity.TeamId.HasValue && resolvedTeamId.HasValue) entity.TeamId = resolvedTeamId;
 
-            // Atama/ARA durum YERELDE korunur (portal ezmez). İSTİSNA: portal ÇÖZÜM/TERMINAL durumu bildirdiyse
-            // (Çözüldü/Kapandı/İptal) yerel duruma yansıtılır — böylece destek portalında "Çözüldü" yapılınca bizde de gelir.
-            // Yerelde zaten Kapandı/İptal ise dokunulmaz (geri açma yok).
-            if (mappedStatus.HasValue &&
-                (mappedStatus == RequestStatus.Cozuldu || mappedStatus == RequestStatus.Kapandi || mappedStatus == RequestStatus.Iptal) &&
-                entity.Status != mappedStatus.Value &&
-                entity.Status != RequestStatus.Kapandi && entity.Status != RequestStatus.Iptal)
+            // DURUM: PORTAL AUTHORITATIVE (tam ayna). Talebin yaşam döngüsü portalda; biz aynasıyız.
+            // Her senkronda portalın GÜNCEL durumu yerele yansıtılır — durum bizde DÜZENLENMEZ (tek yerel işlem: efor).
+            // Portal durumu metinden eşlenemezse (null) mevcut korunur.
+            if (mappedStatus.HasValue && entity.Status != mappedStatus.Value)
             {
                 entity.Status = mappedStatus.Value;
+                entity.CompletionPercentage = ProgressForStatus(mappedStatus.Value, entity.CompletionPercentage);
                 if (mappedStatus == RequestStatus.Cozuldu)
                 {
-                    entity.CompletionPercentage = 100;
                     entity.ResolvedDate = input.ResolvedDate ?? entity.ResolvedDate ?? DateTime.Now;
+                    entity.ClosedDate = null;
                 }
                 else if (mappedStatus == RequestStatus.Kapandi)
                 {
-                    entity.CompletionPercentage = 100;
                     entity.ResolvedDate = input.ResolvedDate ?? entity.ResolvedDate ?? DateTime.Now;
-                    entity.ClosedDate = DateTime.Now;
+                    entity.ClosedDate = entity.ClosedDate ?? DateTime.Now;
                 }
-                else // İptal
+                else if (mappedStatus == RequestStatus.Iptal)
                 {
-                    entity.ClosedDate = DateTime.Now;
+                    entity.ClosedDate = entity.ClosedDate ?? DateTime.Now;
+                }
+                else // Yeni/Atandı/Devam/Beklemede → yeniden açıldı: kapanış/çözüm tarihlerini temizle
+                {
+                    entity.ResolvedDate = null;
+                    entity.ClosedDate = null;
                 }
             }
 
