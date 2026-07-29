@@ -345,7 +345,9 @@ namespace ActivityManagement.Web.Controllers
                 ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
                 ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
                 await LoadCategoriesViewBagAsync();
-                return View(ObjectMapper.Map<CreateUpdateTaskItemDto>(task));
+                var model = ObjectMapper.Map<CreateUpdateTaskItemDto>(task);
+                model.OriginalStamp = (task.LastModificationTime ?? task.CreationTime).Ticks; // eşzamanlılık damgası (H3)
+                return View(model);
             }
             catch (Abp.UI.UserFriendlyException) { TempData["Uyari"] = "Görev bulunamadı."; return RedirectToAction("Index"); }
             catch (Exception ex)

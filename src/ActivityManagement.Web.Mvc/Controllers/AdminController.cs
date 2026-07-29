@@ -312,6 +312,9 @@ namespace ActivityManagement.Web.Controllers
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
                 new ClaimsPrincipal(identity),
                 new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
+            await _auditLogAppService.WriteAuthEventAsync("LoginAs", adminEmail,
+                HttpContext?.Connection?.RemoteIpAddress?.ToString(),
+                $"'{emp.FullName}' (#{employeeId}) olarak işlem yapmaya başladı");
             TempData["Success"] = $"Artık '{emp.FullName}' olarak işlem yapıyorsunuz. (Görev/efor bu kişi adına kaydedilir.)";
             return RedirectToAction("Index");
         }

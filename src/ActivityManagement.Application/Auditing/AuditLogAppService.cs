@@ -76,6 +76,33 @@ namespace ActivityManagement.Auditing
             return new PagedResultDto<AuditLogDto>(count, items.Select(a => ObjectMapper.Map<AuditLogDto>(a)).ToList());
         }
 
+        // KİMLİK DOĞRULAMA denetimi (H7): login/logout/başarısız giriş/login-as olaylarını yazar.
+        // Dosya loguna HER ZAMAN (DB'ye bağımsız, dayanıklı) + SystemAuditLog'a best-effort (admin ekranında görünür).
+        // Giriş akışını asla bloklamaz (try/catch). Uzaktan çağrıya KAPALI (sahte kayıt enjeksiyonu önlenir).
+        [Abp.Application.Services.RemoteService(false)]
+        public async Task WriteAuthEventAsync(string action, string userName, string ip, string detail)
+        {
+            var ts = DateTime.Now;
+            if (string.IsNullOrWhiteSpace(ip))
+                ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            try { AuditFileLogger.WriteLine($"{ts:yyyy-MM-dd HH:mm:ss} [AUTH] {action} | {userName ?? "?"} | {ip ?? "-"} | {detail ?? ""}"); } catch { }
+            try
+            {
+                await _auditRepository.InsertAsync(new SystemAuditLog
+                {
+                    TenantId = 1,
+                    UserName = userName,
+                    ExecutionTime = ts,
+                    ClientIpAddress = ip,
+                    ActionType = action,
+                    EntityName = "Auth",
+                    NewValues = detail
+                });
+                await CurrentUnitOfWork.SaveChangesAsync();
+            }
+            catch { /* DB erişilemezse dosya logu yeter; giriş bloklanmaz */ }
+        }
+
         // Arşiv özeti (kayıt sayısı + en eski/yeni tarih) — ekran başlığında gösterilir.
         public async Task<ArchiveSummaryDto> GetArchiveSummaryAsync()
         {

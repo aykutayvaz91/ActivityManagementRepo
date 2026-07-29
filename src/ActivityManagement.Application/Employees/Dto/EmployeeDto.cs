@@ -41,6 +41,8 @@ namespace ActivityManagement.Employees.Dto
         public int PendingTaskCount { get; set; }
         public int InProgressTaskCount { get; set; }
         public int CompletedTaskCount { get; set; }
+        // Atama dropdown'larında iş yükü göstergesi: açık görev sayısı (Tamamlandı/Kapatıldı/İptal hariç).
+        public int OpenTaskCount { get; set; }
 
         // İzin/pasif/silme sonrası açık işlerin yedeğe devir özeti (Employee'de yok; yalnız Update dönüşünde doldurulur).
         public string HandoverInfo { get; set; }

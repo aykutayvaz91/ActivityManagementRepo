@@ -444,7 +444,21 @@ namespace ActivityManagement.Employees
                 .Where(e => e.IsActive && !e.IsSystemAccount)
                 .OrderBy(e => e.LastName)
                 .ToListAsync();
-            return new ListResultDto<EmployeeDto>(ObjectMapper.Map<List<EmployeeDto>>(employees));
+            var dtos = ObjectMapper.Map<List<EmployeeDto>>(employees);
+
+            // İş yükü göstergesi (H6): kişi başına AÇIK görev sayısı — tek GroupBy sorgusu.
+            var openLoad = await _taskRepository.GetAll().AsNoTracking()
+                .Where(t => t.AssignedEmployeeId.HasValue
+                            && t.Status != Entities.TaskStatus.Tamamlandi
+                            && t.Status != Entities.TaskStatus.Kapatildi
+                            && t.Status != Entities.TaskStatus.Iptal)
+                .GroupBy(t => t.AssignedEmployeeId.Value)
+                .Select(g => new { EmployeeId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.EmployeeId, x => x.Count);
+            foreach (var d in dtos)
+                if (openLoad.TryGetValue(d.Id, out var c)) d.OpenTaskCount = c;
+
+            return new ListResultDto<EmployeeDto>(dtos);
         }
     }
 }

@@ -10,5 +10,6 @@ namespace ActivityManagement.Auditing
         Task<PagedResultDto<AuditLogDto>> GetAllAsync(GetAuditLogsInput input);
         Task<PagedResultDto<AuditLogDto>> GetArchiveAsync(GetAuditLogsInput input);
         Task<ArchiveSummaryDto> GetArchiveSummaryAsync();
+        Task WriteAuthEventAsync(string action, string userName, string ip, string detail);
     }
 }

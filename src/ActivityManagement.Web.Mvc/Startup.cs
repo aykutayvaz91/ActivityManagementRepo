@@ -130,6 +130,17 @@ namespace ActivityManagement.Web
                             if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
                                 id.AddClaim(new Claim("IsAdmin", "true"));
                         }
+
+                        // H7 — Google girişini denetime yaz (best-effort; giriş akışını ASLA bloklamaz).
+                        try
+                        {
+                            var ip = context.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+                            var audit = context.HttpContext?.RequestServices?
+                                .GetService(typeof(ActivityManagement.Auditing.IAuditLogAppService))
+                                as ActivityManagement.Auditing.IAuditLogAppService;
+                            audit?.WriteAuthEventAsync("Login", email, ip, "Google girişi").GetAwaiter().GetResult();
+                        }
+                        catch { }
                         return Task.CompletedTask;
                     };
                 });

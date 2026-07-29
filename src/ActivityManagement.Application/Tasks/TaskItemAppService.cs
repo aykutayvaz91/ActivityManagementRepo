@@ -436,6 +436,14 @@ namespace ActivityManagement.Tasks
             var task = await _taskRepository.GetAsync(input.Id);
             EnsureCanModify(task);
 
+            // EŞZAMANLILIK (H3): form açıldığından beri kayıt başkası tarafından değiştirildiyse sessizce üzerine yazma.
+            if (input.OriginalStamp > 0)
+            {
+                var currentStamp = (task.LastModificationTime ?? task.CreationTime).Ticks;
+                if (currentStamp > input.OriginalStamp)
+                    throw new UserFriendlyException("Bu görev siz düzenlerken başka biri tarafından güncellendi. Lütfen sayfayı yenileyip değişikliklerinizi tekrar uygulayın.");
+            }
+
             // Önem derecesi 1-10 clamp + renk enum senkronu
             if (input.PriorityScore < 1) input.PriorityScore = 5;
             if (input.PriorityScore > 10) input.PriorityScore = 10;

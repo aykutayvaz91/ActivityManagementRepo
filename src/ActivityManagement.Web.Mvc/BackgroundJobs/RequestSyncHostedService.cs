@@ -26,6 +26,11 @@ namespace ActivityManagement.Web.BackgroundJobs
         private readonly IHttpClientFactory _httpClientFactory;
         private static readonly JsonSerializerOptions JsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
+        // H5 — art arda başarısızlık takibi: eşiğe ulaşınca admin(ler)e bir kez uyarı (başarıda sıfırlanır → spam yok).
+        private int _consecutiveFailures;
+        private bool _adminAlerted;
+        private const int FailureAlertThreshold = 3;
+
         public RequestSyncHostedService(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
         {
             _serviceProvider = serviceProvider;
@@ -39,14 +44,52 @@ namespace ActivityManagement.Web.BackgroundJobs
             while (!stoppingToken.IsCancellationRequested)
             {
                 int intervalMinutes = 10;
-                try { intervalMinutes = await RunOnceAsync(); }
-                catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "RequestSyncHostedService"); }
+                try
+                {
+                    intervalMinutes = await RunOnceAsync();
+                    // Başarılı tur → sayaç ve uyarı bayrağı sıfırlanır.
+                    _consecutiveFailures = 0;
+                    _adminAlerted = false;
+                }
+                catch (Exception ex)
+                {
+                    ActivityManagement.Logging.ErrorLog.Write(ex, "RequestSyncHostedService");
+                    _consecutiveFailures++;
+                    if (_consecutiveFailures >= FailureAlertThreshold && !_adminAlerted)
+                    {
+                        _adminAlerted = true; // aynı hata serisinde bir kez
+                        try { await AlertAdminsAsync(_consecutiveFailures, ex); }
+                        catch (Exception aex) { ActivityManagement.Logging.ErrorLog.Write(aex, "RequestSyncHostedService/AlertAdmins"); }
+                    }
+                }
 
                 var delay = TimeSpan.FromMinutes(intervalMinutes < 1 ? 1 : intervalMinutes);
                 try { await Task.Delay(delay, stoppingToken); }
                 catch { break; }
             }
         }
+
+        // Talep senkronu art arda başarısız → tüm aktif Admin'lere in-app bildirim (danger).
+        private async Task AlertAdminsAsync(int failures, Exception ex)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var sp = scope.ServiceProvider;
+            var uowManager = sp.GetRequiredService<IUnitOfWorkManager>();
+            var empRepo = sp.GetRequiredService<IRepository<Employee, long>>();
+            var notifier = sp.GetRequiredService<ActivityManagement.Notifications.INotificationManager>();
+
+            using var uow = uowManager.Begin();
+            var admins = await empRepo.GetAll().AsNoTracking()
+                .Where(e => e.IsActive && e.AppRole == "Admin")
+                .Select(e => e.Id).ToListAsync();
+            var msg = $"Talep senkronizasyonu {failures} turdur başarısız. Son hata: {Trunc(ex?.Message, 160)}. Entegrasyon ayarlarını/portalı kontrol edin.";
+            foreach (var adminId in admins)
+                await notifier.NotifyAsync(adminId, Entities.NotificationType.Genel,
+                    "Senkron hatası", msg, "/Admin/Integration", icon: "fa-triangle-exclamation", severity: "danger");
+            await uow.CompleteAsync();
+        }
+
+        private static string Trunc(string s, int n) => string.IsNullOrEmpty(s) ? s : (s.Length <= n ? s : s.Substring(0, n) + "…");
 
         // Bir tur: aktif kaynakları çeker. Dönen değer bir sonraki bekleme (dakika).
         private async Task<int> RunOnceAsync()

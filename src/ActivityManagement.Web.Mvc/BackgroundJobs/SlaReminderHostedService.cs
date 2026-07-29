@@ -71,7 +71,7 @@ namespace ActivityManagement.Web.BackgroundJobs
             foreach (var t in dueTasks)
             {
                 var link = $"/Tasks/Detail/{t.Id}";
-                if (!await ShouldRemindAsync(notifRepo, t.AssignedEmployeeId.Value, link, now)) continue;
+                if (!await ShouldRemindAsync(notifRepo, t.AssignedEmployeeId.Value, link, now, MaxReminders, MinGap)) continue;
 
                 await notifier.NotifyAsync(t.AssignedEmployeeId, Entities.NotificationType.SlaYaklasti,
                     "SLA yaklaşıyor", $"{t.Title} — son teslim {t.DueDate.Value:dd.MM.yyyy HH:mm}",
@@ -79,9 +79,16 @@ namespace ActivityManagement.Web.BackgroundJobs
 
                 var emp = await empRepo.GetAll().AsNoTracking().FirstOrDefaultAsync(e => e.Id == t.AssignedEmployeeId.Value);
                 if (emp != null && !string.IsNullOrWhiteSpace(emp.Email))
-                    await sender.SendAsync(emp.Email,
-                        $"SLA hatırlatması: {t.Title}",
-                        $"<p>Merhaba {emp.FullName},</p><p><b>{System.Net.WebUtility.HtmlEncode(t.Title)}</b> görevinin son teslim tarihi yaklaşıyor: <b>{t.DueDate.Value:dd.MM.yyyy HH:mm}</b>.</p>");
+                {
+                    // E-posta hatası tek işi etkiler, tüm turu KESMEZ (in-app bildirim zaten gitti).
+                    try
+                    {
+                        await sender.SendAsync(emp.Email,
+                            $"SLA hatırlatması: {t.Title}",
+                            $"<p>Merhaba {emp.FullName},</p><p><b>{System.Net.WebUtility.HtmlEncode(t.Title)}</b> görevinin son teslim tarihi yaklaşıyor: <b>{t.DueDate.Value:dd.MM.yyyy HH:mm}</b>.</p>");
+                    }
+                    catch (Exception mex) { ActivityManagement.Logging.ErrorLog.Write(mex, "SlaReminder/Email"); }
+                }
             }
 
             // --- Talepler: SLA'sı önümüzdeki 24 saatte, geçmemiş, kapanmamış, atanmış ---
@@ -94,27 +101,73 @@ namespace ActivityManagement.Web.BackgroundJobs
             foreach (var r in dueReqs)
             {
                 var link = $"/Requests/Detail/{r.Id}";
-                if (!await ShouldRemindAsync(notifRepo, r.AssignedEmployeeId.Value, link, now)) continue;
+                if (!await ShouldRemindAsync(notifRepo, r.AssignedEmployeeId.Value, link, now, MaxReminders, MinGap)) continue;
 
                 await notifier.NotifyAsync(r.AssignedEmployeeId, Entities.NotificationType.SlaYaklasti,
                     "Talep SLA yaklaşıyor", $"{r.Title} — hedef {r.DueDate.Value:dd.MM.yyyy HH:mm}",
                     link, severity: "warning");
             }
 
+            // --- SLA İHLALİ (H5): son teslim GEÇMİŞ, hâlâ açık işler → TAKIM LİDERİNE eskalasyon ---
+            // (son 30 gün içinde ihlal olanlar; lidere en fazla 3 kez, aralarında ≥ 24 saat)
+            var breachFloor = now.AddDays(-30);
+            var teamLeaders = await empRepo.GetAll().AsNoTracking()
+                .Where(e => e.TeamId != null)
+                .Join(sp.GetRequiredService<IRepository<Team, long>>().GetAll().AsNoTracking(),
+                      e => e.TeamId, t => t.Id, (e, t) => new { EmpTeamId = t.Id, t.LeaderId })
+                .Where(x => x.LeaderId != null)
+                .Distinct()
+                .ToDictionaryAsync(x => x.EmpTeamId, x => x.LeaderId.Value);
+
+            var breachedTasks = await taskRepo.GetAll()
+                .Where(t => t.DueDate.HasValue && t.DueDate.Value < now && t.DueDate.Value >= breachFloor
+                            && t.Status != Entities.TaskStatus.Tamamlandi
+                            && t.Status != Entities.TaskStatus.Kapatildi
+                            && t.Status != Entities.TaskStatus.Iptal
+                            && t.TeamId != null)
+                .ToListAsync();
+            foreach (var t in breachedTasks)
+            {
+                if (!t.TeamId.HasValue || !teamLeaders.TryGetValue(t.TeamId.Value, out var leaderId)) continue;
+                var link = $"/Tasks/Detail/{t.Id}";
+                if (!await ShouldRemindAsync(notifRepo, leaderId, link, now, EscalationMax, EscalationGap)) continue;
+                await notifier.NotifyAsync(leaderId, Entities.NotificationType.SlaYaklasti,
+                    "SLA İHLALİ (eskalasyon)", $"{t.Title} — son teslim {t.DueDate.Value:dd.MM.yyyy HH:mm} GEÇTİ, iş hâlâ açık.",
+                    link, severity: "danger");
+            }
+
+            var breachedReqs = await reqRepo.GetAll()
+                .Where(r => r.DueDate.HasValue && r.DueDate.Value < now && r.DueDate.Value >= breachFloor
+                            && r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal
+                            && r.TeamId != null)
+                .ToListAsync();
+            foreach (var r in breachedReqs)
+            {
+                if (!r.TeamId.HasValue || !teamLeaders.TryGetValue(r.TeamId.Value, out var leaderId)) continue;
+                var link = $"/Requests/Detail/{r.Id}";
+                if (!await ShouldRemindAsync(notifRepo, leaderId, link, now, EscalationMax, EscalationGap)) continue;
+                await notifier.NotifyAsync(leaderId, Entities.NotificationType.SlaYaklasti,
+                    "Talep SLA İHLALİ (eskalasyon)", $"{r.Title} — hedef {r.DueDate.Value:dd.MM.yyyy HH:mm} GEÇTİ, talep hâlâ açık.",
+                    link, severity: "danger");
+            }
+
             await uow.CompleteAsync();
         }
 
-        // Bu görev/talep için hatırlatma gönderilmeli mi: toplam < 3 VE son hatırlatmadan bu yana ≥ 2 saat.
-        private static async Task<bool> ShouldRemindAsync(IRepository<Notification, long> notifRepo, long recipientId, string link, DateTime now)
+        private const int EscalationMax = 3;
+        private static readonly TimeSpan EscalationGap = TimeSpan.FromHours(24);
+
+        // Bu alıcı+link için bildirim gönderilmeli mi: toplam < max VE son bildirimden bu yana ≥ gap.
+        private static async Task<bool> ShouldRemindAsync(IRepository<Notification, long> notifRepo, long recipientId, string link, DateTime now, int max, TimeSpan gap)
         {
             var q = notifRepo.GetAll().Where(n => n.RecipientEmployeeId == recipientId
                 && n.Type == NotificationType.SlaYaklasti && n.Link == link);
             var count = await q.CountAsync();
-            if (count >= MaxReminders) return false;
+            if (count >= max) return false;
             if (count > 0)
             {
                 var lastAt = await q.OrderByDescending(n => n.Id).Select(n => n.CreationTime).FirstOrDefaultAsync();
-                if (now - lastAt < MinGap) return false;
+                if (now - lastAt < gap) return false;
             }
             return true;
         }

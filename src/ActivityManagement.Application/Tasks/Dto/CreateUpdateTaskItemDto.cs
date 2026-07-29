@@ -11,6 +11,10 @@ namespace ActivityManagement.Tasks.Dto
     {
         public long Id { get; set; }
 
+        // Eşzamanlılık (H3): formu açtığınız andaki değişiklik damgası (LastModificationTime/CreationTime ticks).
+        // Kayıt sırasında DB daha yeni ise "başkası değiştirdi" uyarısı verilir (sessiz üzerine yazma önlenir).
+        public long OriginalStamp { get; set; }
+
         [Required]
         [MaxLength(256)]
         public string Title { get; set; }

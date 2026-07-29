@@ -21,12 +21,17 @@ namespace ActivityManagement.Web.Controllers
     {
         private readonly IConfiguration _configuration;
         private readonly IRepository<Employee, long> _employeeRepository;
+        private readonly ActivityManagement.Auditing.IAuditLogAppService _authAudit;
 
-        public AccountController(IConfiguration configuration, IRepository<Employee, long> employeeRepository)
+        public AccountController(IConfiguration configuration, IRepository<Employee, long> employeeRepository,
+            ActivityManagement.Auditing.IAuditLogAppService authAudit)
         {
             _configuration = configuration;
             _employeeRepository = employeeRepository;
+            _authAudit = authAudit;
         }
+
+        private string ClientIp() => HttpContext?.Connection?.RemoteIpAddress?.ToString();
 
         // Config-admin'i bir Employee kaydına bağlar (yoksa "Sistem Yöneticisi" oluşturur).
         // Böylece admin de EmployeeId sahibi olur; efor/görev/kişi kartı gibi kişi-kimliği gerektiren
@@ -119,15 +124,19 @@ namespace ActivityManagement.Web.Controllers
                     new ClaimsPrincipal(identity),
                     new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
 
+                await _authAudit.WriteAuthEventAsync("Login", adminEmail, ClientIp(), "Admin girişi (parola)");
                 return Redirect(string.IsNullOrEmpty(returnUrl) ? "/Admin" : returnUrl);
             }
 
+            await _authAudit.WriteAuthEventAsync("LoginFailed", username, ClientIp(), "Hatalı kullanıcı adı/şifre");
             TempData["AdminError"] = "Kullanıcı adı veya şifre hatalı.";
             return RedirectToAction("Login");
         }
 
         public async Task<IActionResult> Logout()
         {
+            var who = User?.FindFirst(ClaimTypes.Email)?.Value ?? User?.Identity?.Name;
+            await _authAudit.WriteAuthEventAsync("Logout", who, ClientIp(), null);
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Redirect("/Account/LoggedOut");
         }
