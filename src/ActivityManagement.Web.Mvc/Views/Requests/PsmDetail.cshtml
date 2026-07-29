@@ -1,0 +1,139 @@
+@using ActivityManagement.Entities
+@model ActivityManagement.ServiceRequests.Dto.ServiceRequestDto
+@{
+    ViewData["Title"] = "Sunucu Kurulum Talebi";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var efforts = ViewBag.Efforts as System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityLogDto> ?? new();
+    var types = ViewBag.ActivityTypes as System.Collections.Generic.IReadOnlyList<ActivityManagement.Activities.Dto.ActivityTypeDefDto>
+                    ?? new System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>();
+    string StatusColor(RequestStatus s) =>
+        s == RequestStatus.Yeni ? "secondary" : s == RequestStatus.Atandi ? "info" :
+        s == RequestStatus.DevamEdiyor ? "primary" : s == RequestStatus.Beklemede ? "warning" :
+        s == RequestStatus.Cozuldu ? "success" : s == RequestStatus.Kapandi ? "dark" : "danger";
+    // PSM künyesi: ExtraInfo "Etiket: Değer" satırlarından oluşur → ayrıştır.
+    var lines = (Model.ExtraInfo ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4><i class="fas fa-server text-primary me-2"></i>@Model.Title</h4>
+    <a href="/Requests" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Talepler</a>
+</div>
+
+<style>.psm-desc{overflow-wrap:anywhere;word-break:break-word} .psm-desc img{max-width:100%;height:auto}</style>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card shadow-sm mb-3 border-primary">
+            <div class="card-header d-flex justify-content-between align-items-center bg-primary bg-opacity-10">
+                <span><i class="fas fa-server me-2 text-primary"></i><strong>Sunucu Kurulum Talebi</strong>
+                      <span class="badge bg-@StatusColor(Model.Status) ms-1">@Model.StatusText</span></span>
+                @if (!string.IsNullOrEmpty(Model.ExternalUrl))
+                {
+                    <a href="@Model.ExternalUrl" target="_blank" rel="noopener" class="small">PSM'de aç <i class="fas fa-external-link-alt fa-xs"></i></a>
+                }
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-sm-3">Talep No</dt><dd class="col-sm-9">@(Model.ExternalRef ?? "-")</dd>
+                    <dt class="col-sm-3">Talep Eden</dt><dd class="col-sm-9">@(Model.RequesterName ?? "-") @(string.IsNullOrEmpty(Model.RequesterEmail) ? "" : $"({Model.RequesterEmail})")</dd>
+                    <dt class="col-sm-3">Atanan Uzman</dt><dd class="col-sm-9">@(Model.AssignedEmployeeName ?? "<atanmadı>") @(string.IsNullOrEmpty(Model.SecondaryEmployeeName) ? "" : $"/ 2. {Model.SecondaryEmployeeName}")</dd>
+                    <dt class="col-sm-3">Takım</dt><dd class="col-sm-9">@(Model.TeamName ?? "-")</dd>
+                    <dt class="col-sm-3">Faaliyet Tipi</dt><dd class="col-sm-9">@(string.IsNullOrEmpty(Model.ActivityType) ? "Kurulum" : Model.ActivityType)</dd>
+                    <dt class="col-sm-3">Önem</dt><dd class="col-sm-9">@Model.PriorityScore / 10</dd>
+                    <dt class="col-sm-3">Geliş</dt><dd class="col-sm-9">@(Model.ReceivedDate?.ToString("dd.MM.yyyy HH:mm") ?? "-")</dd>
+                    <dt class="col-sm-3">Hedef/SLA</dt><dd class="col-sm-9 @(Model.IsOverdue ? "text-danger fw-bold" : "")">@(Model.DueDate?.ToString("dd.MM.yyyy") ?? "-") @(Model.IsOverdue ? "(gecikti)" : "")</dd>
+                    <dt class="col-sm-3">İlerleme</dt>
+                    <dd class="col-sm-9">
+                        <div class="progress" style="height:8px"><div class="progress-bar bg-primary" style="width:@Model.CompletionPercentage%"></div></div>
+                        <small class="text-muted">@Model.CompletionPercentage%</small>
+                    </dd>
+                </dl>
+                @if (!string.IsNullOrWhiteSpace(Model.Description))
+                {
+                    <hr /><div class="small psm-desc">@Html.Raw(ActivityManagement.Web.Helpers.SafeHtml.RenderDescription(Model.Description))</div>
+                }
+            </div>
+        </div>
+
+        @* PSM sunucu/kurulum künyesi (ExtraInfo: hostname, IP, OS, donanım, servis/portlar, istenen/kurulan) *@
+        @if (lines.Length > 0)
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header"><i class="fas fa-microchip me-2 text-secondary"></i>Sunucu / Kurulum Bilgileri</div>
+                <div class="card-body">
+                    <dl class="row mb-0 small">
+                        @foreach (var ln in lines)
+                        {
+                            var ix = ln.IndexOf(':');
+                            if (ix > 0)
+                            {
+                                <dt class="col-sm-4 text-muted">@ln.Substring(0, ix).Trim()</dt>
+                                <dd class="col-sm-8">@ln.Substring(ix + 1).Trim()</dd>
+                            }
+                            else
+                            {
+                                <dd class="col-12">@ln</dd>
+                            }
+                        }
+                    </dl>
+                    <div class="small text-muted mt-2"><i class="fas fa-shield-halved me-1"></i>Parola/kimlik bilgileri PSM'den <strong>alınmaz</strong> (güvenlik).</div>
+                </div>
+            </div>
+        }
+
+        <div class="alert alert-info py-2 small mb-3">
+            <i class="fas fa-arrows-rotate me-1"></i>Bu talebin <strong>durumu PSM (psm.tdv.org) üzerinden</strong> yönetilir. Burada <strong>efor</strong> girersiniz.
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-clock me-2"></i>Efor Kayıtları</span>
+                <span class="badge bg-primary">@Model.TotalHours.ToString("0.##") saat</span>
+            </div>
+            <div class="card-body">
+                @if (Model.CanLogEffort)
+                {
+                    <form method="post" action="/Requests/LogEffort" class="border-bottom pb-3 mb-3">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="serviceRequestId" value="@Model.Id" />
+                        <input type="hidden" name="returnUrl" value="/Requests/PsmDetail/@Model.Id" />
+                        <div class="row g-2">
+                            <div class="col-6"><label class="form-label small">Tarih</label><input type="date" name="activityDate" class="form-control form-control-sm" value="@DateTime.Today.ToString("yyyy-MM-dd")" /></div>
+                            <div class="col-6"><label class="form-label small">Süre (saat)</label><input type="number" name="hoursSpent" class="form-control form-control-sm" step="0.25" min="0.25" value="1" required /></div>
+                            <div class="col-12"><label class="form-label small">Faaliyet Tipi</label>
+                                <select name="activityType" class="form-select form-select-sm">
+                                    <option value="Kurulum" selected="@(string.IsNullOrEmpty(Model.ActivityType))">Kurulum</option>
+                                    @foreach (var t in types) { <option value="@t.Name" selected="@(t.Name == Model.ActivityType)">@t.Name</option> }
+                                </select>
+                            </div>
+                            <div class="col-12"><label class="form-label small">Açıklama</label><textarea name="description" class="form-control form-control-sm" rows="2"></textarea></div>
+                            <div class="col-12"><button class="btn btn-success btn-sm w-100"><i class="fas fa-plus me-1"></i>Efor Ekle</button></div>
+                        </div>
+                    </form>
+                }
+                @if (!efforts.Any())
+                {
+                    <p class="text-muted small mb-0">Henüz efor girilmemiş.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var e in efforts)
+                        {
+                            <li class="list-group-item px-0">
+                                <div class="d-flex justify-content-between">
+                                    <span><strong>@e.HoursSpent.ToString("0.##") sa</strong> <small class="text-muted">@e.ActivityType</small></span>
+                                    <small class="text-muted">@e.ActivityDate.ToString("dd.MM.yyyy")</small>
+                                </div>
+                                <small class="text-muted d-block">@e.EmployeeName</small>
+                                @if (!string.IsNullOrWhiteSpace(e.Description)) { <small class="d-block">@e.Description</small> }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>

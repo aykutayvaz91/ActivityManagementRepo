@@ -1,6 +1,31 @@
-# Yapılacaklar — Backlog (kaydedildi 2026-07-29, henüz UYGULANMADI)
+# Yapılacaklar — Backlog
 
-> Kullanıcı "bunları yapılacaklar listesine kaydet, yapma şimdilik" dedi. Aşağıdaki 4 yeni madde + denetimden çıkan Orta/Düşük/eksik-özellik maddeleri bekliyor. "Devam et"te bu dosya + `history/2026-07-29.md` okunmalı.
+> DURUM (2026-07-29 sonu): Y1/Y2/Y3 + denetim ORTA + DÜŞÜK maddeleri UYGULANDI (v1.17.2→1.17.5, canlı). Kalanlar aşağıda **[BEKLİYOR]** ile işaretli. "Devam et"te bu dosya + `history/2026-07-29.md` okunmalı.
+
+## ✅ TAMAMLANANLAR (2026-07-29, canlı)
+- **Y1** İç not + resim: portal reddederse (destek multipart bug) iç not YEREL saklanır. (v1.17.2)
+- **Y2** Faaliyetler: Admin/Manager/TakımLideri tümü, Uzman kendi+atanan; server-side arama. (v1.17.2)
+- **Y3** Talep: Çözüldü ≠ Kapatılan; yalnız Kapandı+efor → arşiv. (v1.17.2)
+- **6 KRİTİK GÜVENLİK** (v1.17.1): dosya-yükleme XSS, talep-detay IDOR, rapor IDOR, SafeHtml sanitizer, portal-ek SSRF, Tasks CSRF.
+- **ORTA:** EmployeeAppService takım-kapsamı; sync watermark sırası+detay hata sayacı; PortalStatusText normalize; yorum çift-kayıt; GetTeamReport N+1; ProjectAppService+ReportAppService AsNoTracking; Tasks Edit/Delete null-safety+try/catch; TaskItem AddComment async I/O; /Reports 500 fix. (v1.17.3–1.17.4)
+- **DÜŞÜK:** güvenlik başlıkları (X-Frame/nosniff/Referrer); admin login sabit-zaman + fallback parola kaldırıldı; webhook X-Api-Key sabit-zaman; AccessControl okuma RemoteService(false); çift HoursSpent kaldırıldı. (v1.17.5)
+
+## [BEKLİYOR] — kalan işler
+
+### Y5 — Destek vs PSM talep DETAY ayrı arayüz  [BEKLİYOR]
+- Destek: `/Requests/Detail/{no}`. PSM: farklı URL (ör. `/Requests/PsmDetail/{no}`) + PSM'e özel arayüz (sunucu künyesi).
+
+### [BEKLİYOR] Yetki yardımcıları base'e taşıma (~50x tekrar)
+- En büyük teknik borç; RİSKLİ (12 dosya, login-as edge). Kendi odaklı turunda + kapsamlı doğrulamayla yapılmalı.
+
+### [BEKLİYOR] Kalan düşük/perf
+- Sayfa-ACL fail-open → fail-closed (lockout riskiyle dikkatli). ProjectAppService kartezyen (AsSplitQuery — Relational referansı gerekir). Kalan AsNoTracking sweep (TaskItem/ActivityLog/Team/Category/Employee okuma uçları). RoutineTask/ParentTaskId ölü şema (migration ile temizle ya da RoutineTask özelliğini tamamla). ActivityTypeLabels tekrarı + Reports bounds.
+
+### [BEKLİYOR] Eksik özellikler (Batch E)
+- PDF raporlama; Gantt bağımlılık/kritik yol; global arama; toplu (bulk) işlemler; bildirim tercihleri; kişi kartı efor trendi.
+
+---
+## (özgün kayıt) — Yeni istekler (2026-07-29)
 
 ## Yeni istekler (2026-07-29, öncelikli)
 

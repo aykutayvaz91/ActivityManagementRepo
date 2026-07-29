@@ -123,6 +123,7 @@ namespace ActivityManagement.Web.Controllers
             }
         }
 
+        // Dış Destek talep detayı. PSM (Sunucu Kurulum) talepleri farklı arayüze (PsmDetail) yönlendirilir.
         public async Task<IActionResult> Detail(long id)
         {
             var g = EnsurePageAccess("Requests"); if (g != null) return g;
@@ -130,6 +131,8 @@ namespace ActivityManagement.Web.Controllers
             {
                 var dto = await _requestAppService.GetAsync(id);
                 if (dto == null) { TempData["Uyari"] = "Talep bulunamadı."; return RedirectToAction("Index"); }
+                if (dto.Source == ActivityManagement.Entities.RequestSource.SunucuKurulum)
+                    return RedirectToAction("PsmDetail", new { id });
                 ViewBag.Efforts = await _requestAppService.GetEffortsAsync(id);
                 ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
                 ViewBag.ActivityTypes = await _activityTypeAppService.GetAllAsync(onlyActive: true);
@@ -139,6 +142,29 @@ namespace ActivityManagement.Web.Controllers
             catch (Exception ex)
             {
                 ActivityManagement.Logging.ErrorLog.Write(ex, "Requests/Detail");
+                TempData["Uyari"] = "Talep açılırken bir sorun oluştu.";
+                return RedirectToAction("Index");
+            }
+        }
+
+        // (Y5) PSM (Sunucu Kurulum) talep detayı — sunucu künyesi odaklı AYRI arayüz. Destek talebi buraya gelirse Detail'e döner.
+        public async Task<IActionResult> PsmDetail(long id)
+        {
+            var g = EnsurePageAccess("Requests"); if (g != null) return g;
+            try
+            {
+                var dto = await _requestAppService.GetAsync(id);
+                if (dto == null) { TempData["Uyari"] = "Talep bulunamadı."; return RedirectToAction("Index"); }
+                if (dto.Source != ActivityManagement.Entities.RequestSource.SunucuKurulum)
+                    return RedirectToAction("Detail", new { id });
+                ViewBag.Efforts = await _requestAppService.GetEffortsAsync(id);
+                ViewBag.ActivityTypes = await _activityTypeAppService.GetAllAsync(onlyActive: true);
+                return View(dto);
+            }
+            catch (Abp.UI.UserFriendlyException) { TempData["Uyari"] = "Talep bulunamadı."; return RedirectToAction("Index"); }
+            catch (Exception ex)
+            {
+                ActivityManagement.Logging.ErrorLog.Write(ex, "Requests/PsmDetail");
                 TempData["Uyari"] = "Talep açılırken bir sorun oluştu.";
                 return RedirectToAction("Index");
             }
