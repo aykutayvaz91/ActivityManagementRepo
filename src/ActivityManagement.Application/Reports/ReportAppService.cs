@@ -18,6 +18,8 @@ namespace ActivityManagement.Reports
         {
             "Bakım","Geliştirme","Kurulum","Destek","Test","Dokümantasyon","Eğitim","Analiz","Proje","Diğer"
         };
+        // Sınır kontrollü etiket (enum büyürse IndexOutOfRange olmasın — CLAUDE.md kuralı).
+        private static string ActivityTypeLabel(int idx) => idx >= 0 && idx < ActivityTypeLabels.Length ? ActivityTypeLabels[idx] : "Diğer";
 
         private readonly IRepository<Employee, long> _employeeRepository;
         private readonly IRepository<ActivityLog, long> _activityRepository;
@@ -117,7 +119,7 @@ namespace ActivityManagement.Reports
                 .GroupBy(t => t.ActivityType)
                 .Select(g => new TaskTypeSummaryDto
                 {
-                    Type = g.Key.HasValue ? ActivityTypeLabels[(int)g.Key.Value] : "Belirtilmemiş",
+                    Type = g.Key.HasValue ? ActivityTypeLabel((int)g.Key.Value) : "Belirtilmemiş",
                     Count = g.Count(),
                     Hours = g.Sum(x => x.ActualHours)
                 })
@@ -156,7 +158,7 @@ namespace ActivityManagement.Reports
                             t.CompletedDate.HasValue &&
                             t.CompletedDate.Value.Date >= input.StartDate.Date &&
                             t.CompletedDate.Value.Date <= input.EndDate.Date)
-                .GroupBy(t => t.ActivityType.HasValue ? ActivityTypeLabels[(int)t.ActivityType.Value] : "Belirtilmemiş")
+                .GroupBy(t => t.ActivityType.HasValue ? ActivityTypeLabel((int)t.ActivityType.Value) : "Belirtilmemiş")
                 .ToDictionary(g => g.Key, g => new { Count = g.Count(), Hours = g.Sum(x => x.ActualHours) });
 
             var actByType = activities

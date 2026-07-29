@@ -53,11 +53,17 @@ namespace ActivityManagement.Web.Controllers
         // Rol × Sayfa erişim seti (OnActionExecutionAsync'te doldurulur). Null => henüz yüklenmedi (fail-open).
         private System.Collections.Generic.HashSet<string> _allowedPages;
 
-        // Sayfa erişim kontrolü. Yüklenememişse (null) veya Admin ise izinli sayılır (kilitlenme önlemi).
+        // Sayfa erişim kontrolü. Admin her zaman izinli. ACL yüklenemediyse (null) FAIL-OPEN yerine ROL VARSAYILANI
+        // (PageCatalog.DefaultAccess) uygulanır → ACL DB hatasında "her şey açık" olmaz, kilitlenme de olmaz.
         protected bool CanAccessPage(string pageKey)
         {
             if (User != null && User.IsInRole("Admin")) return true;
-            if (_allowedPages == null) return true; // fail-open
+            if (_allowedPages == null)
+            {
+                var role = User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Uzman";
+                return ActivityManagement.Authorization.PageCatalog.DefaultAccess.TryGetValue(role, out var def)
+                    && def.Contains(pageKey);
+            }
             return _allowedPages.Contains(pageKey);
         }
 

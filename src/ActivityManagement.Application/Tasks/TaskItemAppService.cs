@@ -213,7 +213,7 @@ namespace ActivityManagement.Tasks
 
         public async Task<PagedResultDto<TaskItemDto>> GetAllAsync(GetTasksInput input)
         {
-            var query = _taskRepository.GetAll()
+            var query = _taskRepository.GetAll().AsNoTracking()
                 .Include(t => t.Project)
                 .Include(t => t.AssignedEmployee)
                 .Include(t => t.SecondaryEmployee)
@@ -258,7 +258,7 @@ namespace ActivityManagement.Tasks
 
         public async Task<TaskItemDto> GetAsync(long id)
         {
-            var task = await _taskRepository.GetAll()
+            var task = await _taskRepository.GetAll().AsNoTracking()
                 .Include(t => t.Project)
                 .Include(t => t.AssignedEmployee)
                 .Include(t => t.SecondaryEmployee)
@@ -654,7 +654,7 @@ namespace ActivityManagement.Tasks
         // önem derecesi yüksek olanlar üstte
         public async Task<ListResultDto<TaskItemDto>> GetEmployeeTasksAsync(long employeeId)
         {
-            var tasks = await _taskRepository.GetAll()
+            var tasks = await _taskRepository.GetAll().AsNoTracking()
                 .Include(t => t.Project)
                 .Include(t => t.AssignedEmployee)
                 .Include(t => t.SecondaryEmployee)
@@ -672,7 +672,7 @@ namespace ActivityManagement.Tasks
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
             // Görev, başlangıç VEYA son tarihi bu ay içindeyse takvimde görünür (başlangıç saatiyle çizilir).
-            var tasks = await _taskRepository.GetAll()
+            var tasks = await _taskRepository.GetAll().AsNoTracking()
                 .Include(t => t.Project)
                 .Where(t => t.AssignedEmployeeId == employeeId &&
                             ((t.DueDate >= startDate && t.DueDate <= endDate) ||

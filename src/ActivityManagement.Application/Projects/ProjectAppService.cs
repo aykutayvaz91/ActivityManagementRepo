@@ -119,9 +119,9 @@ namespace ActivityManagement.Projects
 
         public async Task<PagedResultDto<ProjectDto>> GetAllAsync(GetProjectsInput input)
         {
-            // AsNoTracking (salt-okuma). Not: iki koleksiyon Include (ProjectEmployees+Tasks) paging ile kartezyen
-            // şişme yapıyor; AsSplitQuery Relational pakette (Application'da yok) → optimizasyon backlog'a bırakıldı.
-            var query = _projectRepository.GetAll().AsNoTracking()
+            // AsNoTracking (salt-okuma) + AsSplitQuery: iki koleksiyon Include (ProjectEmployees+Tasks) paging ile
+            // kartezyen şişme yapıyordu → ayrı sorgulara bölünür (Relational paketi eklendi).
+            var query = _projectRepository.GetAll().AsNoTracking().AsSplitQuery()
                 .Include(p => p.Manager)
                 .Include(p => p.PrimaryResponsible)
                 .Include(p => p.SecondaryResponsible)
@@ -147,7 +147,7 @@ namespace ActivityManagement.Projects
 
         public async Task<ProjectDto> GetAsync(long id)
         {
-            var project = await _projectRepository.GetAll().AsNoTracking()
+            var project = await _projectRepository.GetAll().AsNoTracking().AsSplitQuery()
                 .Include(p => p.Manager)
                 .Include(p => p.PrimaryResponsible)
                 .Include(p => p.SecondaryResponsible)
