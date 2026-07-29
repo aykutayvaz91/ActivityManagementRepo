@@ -1,6 +1,16 @@
 # Yapılacaklar — Backlog
 
-> DURUM (2026-07-29 sonu): Y1/Y2/Y3 + denetim ORTA + DÜŞÜK maddeleri UYGULANDI (v1.17.2→1.17.5, canlı). Kalanlar aşağıda **[BEKLİYOR]** ile işaretli. "Devam et"te bu dosya + `history/2026-07-29.md` okunmalı.
+> DURUM (2026-07-29 sonu, v1.21.0 canlı): Y1–Y5 + denetim ORTA/DÜŞÜK + **TASARIM BOŞLUĞU KAPATMA EPIC'İ (H1–H7)** TAMAMLANDI ve canlıda. Detay: `history/2026-07-29.md` "Tasarım boşluğu kapatma epic'i" bölümü. **Bekleyen tasarım boşluğu YOK.** Kalanlar aşağıda **[BEKLİYOR]** (uzun vadeli: yetki-refactor + Batch E özellikleri). "Devam et"te bu dosya + `history/2026-07-29.md` okunmalı.
+
+## ✅ TASARIM BOŞLUĞU KAPATMA (2026-07-29, v1.20.0→1.21.0, canlı)
+- **H1** Devir (handover): izin/pasif/silme'de açık görev+talepler yedeğe devredilir + iç not ile "neden" izli.
+- **H2** Upload → **D:\Uploads** (ayrı storage; UploadStorage + ayrı static provider + nosniff/attachment).
+- **H3** Eşzamanlılık: TaskItem düzenlemede OriginalStamp round-trip → sessiz üzerine yazma önlenir.
+- **H4** Yıllık arşiv: SystemAuditLogArchive tablosu + ArchiveHostedService (geçmiş yıl taşınır) + "Denetim Arşivi" sorgu ekranı; eski bildirim purge.
+- **H5** Sync art-arda hata → admin uyarısı; SLA İHLALİ → takım liderine eskalasyon.
+- **H6** İş yükü: atama dropdown'larında "(N açık iş)".
+- **H7** Auth denetimi: giriş/başarısız/çıkış/login-as → dosya log + SystemAuditLogs (uçtan uca doğrulandı).
+- (Rutin görev ayrı özelliği İSTENMEDİ — faaliyet başlığı altında efor ile yönetiliyor.)
 
 ## ✅ TAMAMLANANLAR (2026-07-29, canlı)
 - **Y1** İç not + resim: portal reddederse (destek multipart bug) iç not YEREL saklanır. (v1.17.2)

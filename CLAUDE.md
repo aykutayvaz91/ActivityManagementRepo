@@ -1,6 +1,6 @@
 # ActivityManagement — Ana Kurallar (Claude Code)
 
-> **⏭️ SIRADAKI OTURUM (2026-07-29 sonu, canlı v1.18.1):** Bekleyen işler `yapilacaklar-backlog.md` + detay `history/2026-07-29.md`. "devam et" denince ÖNCE bunları oku. Bu oturumda tamamlanan: talep entegrasyonu V2 (destek detay senkronu + yorum/dosya write-back), 6 KRİTİK güvenlik açığı kapatıldı, denetim ORTA/DÜŞÜK maddeleri, Y1 (iç not portal-reddi→yerel), Y2 (faaliyet görünürlük+arama), Y3 (Çözüldü≠Kapatılan), Y5 (PSM vs Destek ayrı detay arayüzü). **KALAN (backlog):** yetki-yardımcısı base-refactor (riskli), Batch E özellikleri (PDF rapor, Gantt bağımlılık, global arama, toplu işlem, bildirim tercihleri), ACL fail-closed, ölü şema temizliği.
+> **⏭️ SIRADAKI OTURUM (2026-07-29 sonu, canlı v1.21.0):** Bekleyen işler `yapilacaklar-backlog.md` + detay `history/2026-07-29.md`. "devam et" denince ÖNCE bunları oku. Bu oturumda tamamlanan: talep entegrasyonu V2/V3, 6 KRİTİK güvenlik, denetim ORTA/DÜŞÜK, Y1–Y5, global arama, izin/görev-atama, ölü şema temizliği (v1.17–1.19) **+ TASARIM BOŞLUĞU KAPATMA EPIC'İ H1–H7 (v1.20.0→1.21.0):** H1 devir/handover (izin/pasif/silme'de açık işler yedeğe + iç not izi), H2 upload→**D:\Uploads**, H3 eşzamanlılık (TaskItem OriginalStamp), H4 **yıllık denetim arşivi** (SystemAuditLogArchive + ArchiveHostedService + "Denetim Arşivi" ekranı), H5 sync-hata admin uyarısı + SLA-ihlal lider eskalasyonu, H6 atama dropdown'da açık-iş sayısı, H7 auth denetimi (giriş/başarısız/çıkış/login-as). **Bekleyen tasarım boşluğu YOK.** KALAN (uzun vade): yetki-yardımcısı base-refactor (riskli), Batch E (PDF rapor, Gantt bağımlılık/kritik yol, toplu işlem, bildirim tercihleri, kişi kartı efor trendi).
 
 ## Çalışma Geçmişi (ÖNEMLİ — devam etme mekanizması)
 - Tüm oturum/çalışma geçmişi `history/` klasöründe **gün gün** tutulur: `history/YYYY-MM-DD.md` (örn. `history/2026-07-22.md`). ISO tarih adı sıralanabilir olduğundan "en güncel dosya" nettir.
@@ -20,8 +20,8 @@
 ## IIS Yazma İzinleri (ÖNEMLİ — fresh setup/deploy'da gerekli)
 - App pool kimliği `ApplicationPoolIdentity` (IIS_IUSRS grubu). Site kökü varsayılan salt-okunur.
 - Uygulamanın yazdığı klasörlere **IIS_IUSRS Modify** verilmeli:
-  - `C:\inetpub\ActivityManagement\logs` (audit dosya logları)
-  - `C:\inetpub\ActivityManagement\wwwroot\uploads` (görev yorumu dosya ekleri)
+  - `C:\inetpub\ActivityManagement\logs` (audit + hata dosya logları)
+  - **`D:\Uploads`** (personel foto / görev yorumu eki / marka logosu — ayrı storage; `appsettings.Production.json` → `Storage:UploadsPath`. Erişilemezse otomatik `wwwroot\uploads`'a düşer. `/uploads` URL'i ayrı `PhysicalFileProvider` ile bu köke bağlı; H2, v1.20.0).
   - Komut: `icacls "<klasör>" /grant "IIS_IUSRS:(OI)(CI)M" /T`
 
 ## Deploy (otomatik yapılabilir — bypass permissions modunda)
