@@ -106,17 +106,8 @@ namespace ActivityManagement.Entities
         // Görev grubu (üst görevler için: "Sistem Birimi", "Network Birimi", "Ortak")
         public string GroupName { get; set; }
 
-        // Üst görev hiyerarşisi
-        public long? ParentTaskId { get; set; }
-        public virtual TaskItem ParentTask { get; set; }
-        public virtual ICollection<TaskItem> SubTasks { get; set; } = new List<TaskItem>();
-
-        // Alt görev aktivite tipi
+        // Faaliyet tipi (raporlama kırılımı)
         public ActivityType? ActivityType { get; set; }
-
-        public bool IsRoutine { get; set; }
-        public long? RoutineTaskId { get; set; }
-        public virtual RoutineTask RoutineTask { get; set; }
 
         public virtual ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
         public virtual ICollection<TaskAttachment> Attachments { get; set; } = new List<TaskAttachment>();

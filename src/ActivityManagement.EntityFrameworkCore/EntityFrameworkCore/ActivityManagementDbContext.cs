@@ -17,7 +17,6 @@ namespace ActivityManagement.EntityFrameworkCore
         public DbSet<TaskAttachment> TaskAttachments { get; set; }
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<ActivitySubject> ActivitySubjects { get; set; }
-        public DbSet<RoutineTask> RoutineTasks { get; set; }
         public DbSet<Responsibility> Responsibilities { get; set; }
         public DbSet<WorkflowStatus> WorkflowStatuses { get; set; }
         public DbSet<Category> Categories { get; set; }
@@ -160,15 +159,6 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.HasOne(t => t.AssignedByEmployee)
                  .WithMany()
                  .HasForeignKey(t => t.AssignedByEmployeeId)
-                 .OnDelete(DeleteBehavior.Restrict);
-                b.HasOne(t => t.RoutineTask)
-                 .WithMany(r => r.GeneratedTasks)
-                 .HasForeignKey(t => t.RoutineTaskId)
-                 .OnDelete(DeleteBehavior.SetNull);
-                b.HasOne(t => t.ParentTask)
-                 .WithMany(t => t.SubTasks)
-                 .HasForeignKey(t => t.ParentTaskId)
-                 .IsRequired(false)
                  .OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(t => t.SubCategory)
                  .WithMany(sc => sc.Tasks)
@@ -407,17 +397,6 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.Property(n => n.Icon).HasMaxLength(64);
                 b.Property(n => n.Severity).HasMaxLength(16);
                 b.HasIndex(n => new { n.RecipientEmployeeId, n.IsRead });
-            });
-
-            modelBuilder.Entity<RoutineTask>(b =>
-            {
-                b.ToTable("RoutineTasks");
-                b.Property(r => r.Title).IsRequired().HasMaxLength(256);
-                b.Property(r => r.EstimatedHours).HasPrecision(18, 2);
-                b.HasOne(r => r.Employee)
-                 .WithMany(e => e.RoutineTasks)
-                 .HasForeignKey(r => r.EmployeeId)
-                 .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<WorkflowStatus>(b =>

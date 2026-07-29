@@ -42,8 +42,6 @@ namespace ActivityManagement.Tasks.Dto
         public decimal EstimatedHours { get; set; }
         public decimal ActualHours { get; set; }
         public int CompletionPercentage { get; set; }
-        public bool IsRoutine { get; set; }
-        public long? RoutineTaskId { get; set; }
 
         // Görev grubu
         public string GroupName { get; set; }

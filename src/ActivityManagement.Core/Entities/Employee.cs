@@ -45,7 +45,6 @@ namespace ActivityManagement.Entities
         public virtual ICollection<ProjectEmployee> ProjectEmployees { get; set; } = new List<ProjectEmployee>();
         public virtual ICollection<TaskItem> AssignedTasks { get; set; } = new List<TaskItem>();
         public virtual ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
-        public virtual ICollection<RoutineTask> RoutineTasks { get; set; } = new List<RoutineTask>();
         public virtual ICollection<Responsibility> Responsibilities { get; set; } = new List<Responsibility>();
     }
 }

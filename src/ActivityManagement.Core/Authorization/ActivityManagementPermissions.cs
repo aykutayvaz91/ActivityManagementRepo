@@ -49,13 +49,5 @@ namespace ActivityManagement.Authorization
             public const string Export   = Default + ".Export";
         }
 
-        // RoutineTask
-        public static class RoutineTasks
-        {
-            public const string Default = GroupName + ".RoutineTasks";
-            public const string Create = Default + ".Create";
-            public const string Edit   = Default + ".Edit";
-            public const string Delete = Default + ".Delete";
-        }
     }
 }

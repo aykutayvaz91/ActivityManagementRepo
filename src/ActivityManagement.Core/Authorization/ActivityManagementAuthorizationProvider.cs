@@ -41,12 +41,6 @@ namespace ActivityManagement.Authorization
             reports.CreateChildPermission(ActivityManagementPermissions.Reports.Personal, L("PersonalReport"));
             reports.CreateChildPermission(ActivityManagementPermissions.Reports.Team,     L("TeamReport"));
             reports.CreateChildPermission(ActivityManagementPermissions.Reports.Export,   L("ExportReport"));
-
-            // RoutineTasks
-            var routines = pages.CreateChildPermission(ActivityManagementPermissions.RoutineTasks.Default, L("RoutineTasks"));
-            routines.CreateChildPermission(ActivityManagementPermissions.RoutineTasks.Create, L("Create"));
-            routines.CreateChildPermission(ActivityManagementPermissions.RoutineTasks.Edit,   L("Edit"));
-            routines.CreateChildPermission(ActivityManagementPermissions.RoutineTasks.Delete, L("Delete"));
         }
 
         private static ILocalizableString L(string name)

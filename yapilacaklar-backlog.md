@@ -21,7 +21,7 @@
 ### Kalan düşük/perf — ✅ KÜÇÜK KOVA KAPANDI
 - ✅ (v1.18.2) global arama. ✅ (v1.18.4) ACL fail-open→rol-varsayılanı; Project AsSplitQuery; TaskItem AsNoTracking; Reports bounds.
 - ✅ (v1.18.5) AsNoTracking sweep tamam (Employee/Team/Category/ActivityLog okuma); ActivityTypeLabels → tek Core helper (Entities.ActivityTypeLabels); ölü kod kaldırıldı (kullanılmayan IsAdmin x2, WireItem StatusLabel/UpdatedAt/ClosedAt).
-- [BEKLİYOR — ORTA/migration] RoutineTask/ParentTaskId ölü şema (migration ile temizle ya da RoutineTask özelliğini tamamla).
+- ✅ (v1.19.1) RoutineTask/ParentTaskId ölü şema TEMİZLENDİ — RoutineTask entity/tablo/DbSet/config, TaskItem.ParentTaskId/ParentTask/SubTasks/IsRoutine/RoutineTaskId/RoutineTask, Employee.RoutineTasks nav, RoutineTasks permission tanımları + DTO alanları kaldırıldı; migration (veri yoktu). Tasks sayfaları 200.
 
 ### [BEKLİYOR] Eksik özellikler (Batch E)
 - PDF raporlama; Gantt bağımlılık/kritik yol; toplu (bulk) işlemler; bildirim tercihleri; kişi kartı efor trendi.
