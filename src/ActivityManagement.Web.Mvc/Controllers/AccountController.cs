@@ -86,10 +86,15 @@ namespace ActivityManagement.Web.Controllers
         public async Task<IActionResult> AdminLogin(string username, string password, string returnUrl = "/Admin")
         {
             var adminEmail = _configuration["Admin:Email"] ?? "admin@cmit.com.tr";
-            var adminPassword = DpapiProtector.Unprotect(_configuration["Admin:Password"]) ?? "Admin123!";
+            // GÜVENLİK: Admin:Password yapılandırılmamışsa girişi TAMAMEN REDDET (bilinen varsayılan "Admin123!" fallback'i kaldırıldı).
+            var adminPassword = DpapiProtector.Unprotect(_configuration["Admin:Password"]);
 
-            if (string.Equals(username?.Trim(), adminEmail, StringComparison.OrdinalIgnoreCase) &&
-                password == adminPassword)
+            bool userOk = string.Equals(username?.Trim(), adminEmail, StringComparison.OrdinalIgnoreCase);
+            // Sabit-zamanlı parola karşılaştırması (timing side-channel önlenir).
+            bool passOk = !string.IsNullOrEmpty(adminPassword) && !string.IsNullOrEmpty(password)
+                && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                    System.Text.Encoding.UTF8.GetBytes(password), System.Text.Encoding.UTF8.GetBytes(adminPassword));
+            if (userOk && passOk)
             {
                 var claims = new List<Claim>
                 {

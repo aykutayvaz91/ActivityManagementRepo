@@ -323,9 +323,6 @@ namespace ActivityManagement.Activities
             if (input.HoursSpent <= 0)
                 throw new UserFriendlyException("Harcanan süre 0'dan büyük olmalıdır.");
 
-            if (input.HoursSpent <= 0)
-                throw new UserFriendlyException("Harcanan süre 0'dan büyük olmalıdır.");
-
             var log = new ActivityLog
             {
                 TenantId = AbpSession.TenantId ?? 1,

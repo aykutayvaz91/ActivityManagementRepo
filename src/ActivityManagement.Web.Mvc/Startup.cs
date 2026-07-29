@@ -176,6 +176,17 @@ namespace ActivityManagement.Web
             // Hatalarda sayfa patlamasın: kullanıcı dostu hata sayfası + dosyaya loglama (/Home/Error).
             app.UseExceptionHandler("/Home/Error");
 
+            // GÜVENLİK başlıkları (tüm yanıtlar): clickjacking + MIME sniffing + referrer sızıntısı.
+            // (Not: script-src CSP'si inline script/CDN nedeniyle nonce refactoru gerektirir → backlog.)
+            app.Use(async (context, next) =>
+            {
+                var h = context.Response.Headers;
+                h["X-Content-Type-Options"] = "nosniff";
+                h["X-Frame-Options"] = "SAMEORIGIN";
+                h["Referrer-Policy"] = "strict-origin-when-cross-origin";
+                await next();
+            });
+
             // GÜVENLİK: nosniff (MIME sniffing kapalı) + /uploads altında görsel-olmayan dosyaları
             // "attachment" (indirme) olarak sun → yüklenen metin/HTML tarayıcıda ÇALIŞTIRILMAZ (depolanmış XSS önlenir).
             app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions

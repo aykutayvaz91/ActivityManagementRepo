@@ -34,7 +34,11 @@ namespace ActivityManagement.Web.Controllers
                 return StatusCode(503, new { error = "Talep entegrasyonu henüz etkin değil." });
 
             var provided = Request.Headers["X-Api-Key"].ToString();
-            if (!string.Equals(provided, key, StringComparison.Ordinal))
+            // Sabit-zamanlı karşılaştırma (timing side-channel önlenir).
+            bool keyOk = !string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(provided)
+                && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                    System.Text.Encoding.UTF8.GetBytes(provided), System.Text.Encoding.UTF8.GetBytes(key));
+            if (!keyOk)
                 return Unauthorized(new { error = "Geçersiz API anahtarı." });
 
             if (input == null || string.IsNullOrWhiteSpace(input.Title))
