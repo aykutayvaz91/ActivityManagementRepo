@@ -158,6 +158,10 @@
                         </li>
                     }
                 </ul>
+                @* Global arama (üst bar) — görev/talep/faaliyet/proje/kişi *@
+                <form class="d-flex me-2 my-1 my-xl-0" method="get" action="/Search" role="search">
+                    <input type="search" name="q" class="form-control form-control-sm" style="min-width:180px" placeholder="Ara..." aria-label="Ara" />
+                </form>
                 <ul class="navbar-nav">
                     @if (__hasEmp)
                     {

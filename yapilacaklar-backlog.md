@@ -22,7 +22,7 @@
 - Sayfa-ACL fail-open → fail-closed (lockout riskiyle dikkatli). ProjectAppService kartezyen (AsSplitQuery — Relational referansı gerekir). Kalan AsNoTracking sweep (TaskItem/ActivityLog/Team/Category/Employee okuma uçları). RoutineTask/ParentTaskId ölü şema (migration ile temizle ya da RoutineTask özelliğini tamamla). ActivityTypeLabels tekrarı + Reports bounds.
 
 ### [BEKLİYOR] Eksik özellikler (Batch E)
-- PDF raporlama; Gantt bağımlılık/kritik yol; global arama; toplu (bulk) işlemler; bildirim tercihleri; kişi kartı efor trendi.
+- PDF raporlama; Gantt bağımlılık/kritik yol; toplu (bulk) işlemler; bildirim tercihleri; kişi kartı efor trendi.
 
 ---
 ## (özgün kayıt) — Yeni istekler (2026-07-29)
