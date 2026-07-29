@@ -46,10 +46,8 @@ namespace ActivityManagement.Web.Controllers
             return all.Where(e => e.Id == myId).ToList();
         }
 
-        public IActionResult Index()
-        {
-            return View();
-        }
+        // /Reports (view'ı yok) → Kişisel Rapor'a yönlendir (bare URL 500 vermesin).
+        public IActionResult Index() => RedirectToAction("Personal");
 
         public async Task<IActionResult> Personal(long? employeeId, DateTime? startDate, DateTime? endDate)
         {
