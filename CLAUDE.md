@@ -1,6 +1,6 @@
 # ActivityManagement — Ana Kurallar (Claude Code)
 
-> **⏭️ SIRADAKI OTURUM:** `23072026-gelistirme.md` (8 madde), `23072026-gelistirmev2.md` (v3, P1–P4) **ve** `gelistirme-talepleri-v4.md` (7 bölüm, P-A…P-G) TAMAMEN canlıda (AG cluster, 2026-07-23). Bekleyen backlog yok. "devam et" denince: CLAUDE.md + `history/` en güncel dosya + (varsa) yeni gelistirme dosyası okunup uygulanır. Not: V4 ile `TaskItem.PriorityScore` (1-10 önem), dinamik `ActivityTypes` (faaliyet tipi CRUD), `ThemeSettings` (dinamik renk/logo/marka) eklendi; ana kategori CRUD ve proje oluşturma artık Admin/Lider'e özel.
+> **⏭️ SIRADAKI OTURUM (2026-07-29 sonu, canlı v1.18.1):** Bekleyen işler `yapilacaklar-backlog.md` + detay `history/2026-07-29.md`. "devam et" denince ÖNCE bunları oku. Bu oturumda tamamlanan: talep entegrasyonu V2 (destek detay senkronu + yorum/dosya write-back), 6 KRİTİK güvenlik açığı kapatıldı, denetim ORTA/DÜŞÜK maddeleri, Y1 (iç not portal-reddi→yerel), Y2 (faaliyet görünürlük+arama), Y3 (Çözüldü≠Kapatılan), Y5 (PSM vs Destek ayrı detay arayüzü). **KALAN (backlog):** yetki-yardımcısı base-refactor (riskli), Batch E özellikleri (PDF rapor, Gantt bağımlılık, global arama, toplu işlem, bildirim tercihleri), ACL fail-closed, ölü şema temizliği.
 
 ## Çalışma Geçmişi (ÖNEMLİ — devam etme mekanizması)
 - Tüm oturum/çalışma geçmişi `history/` klasöründe **gün gün** tutulur: `history/YYYY-MM-DD.md` (örn. `history/2026-07-22.md`). ISO tarih adı sıralanabilir olduğundan "en güncel dosya" nettir.
@@ -53,6 +53,7 @@
 - `Project`/`TaskItem`/`Employee`/`ActivitySubject` üzerinde `TeamId` (çoklu takım izolasyonuna hazırlık).
 - 13 sabit ana kategori (migration seed), alt kategoriler Admin/TakımLideri tarafından yönetilir.
 
-## Bekleyen Fazlar (en güncel history dosyasında detaylı)
-- **Faz 3:** Görev onay mekanizması (`ApprovalStatus`) + yorumda Rich Text + Ctrl+V ekran görüntüsü + dosya eki.
-- **Faz 4:** Audit Log modülü + Kişi Kartı 360° + MS Project tarzı Gantt + gelişmiş Raporlama (Excel/PDF).
+## Bekleyen Fazlar / Backlog
+- **Faz 3 — TAMAMLANDI:** Görev onay (`ApprovalStatus`) + yorumda Rich Text (Quill) + Ctrl+V ekran görüntüsü + dosya eki (görev + talep). 
+- **Faz 4 — büyük oranda TAMAM:** Audit Log modülü ✓, Kişi Kartı 360° ✓, Gantt (frappe-gantt) ✓ ama bağımlılık/kritik yol YOK, Raporlama Excel ✓ **PDF YOK**.
+- **Güncel bekleyenler:** bkz. `yapilacaklar-backlog.md` (PDF rapor, Gantt bağımlılık, global arama, toplu işlem, bildirim tercihleri; yetki-yardımcısı base-refactor; ACL fail-closed; RoutineTask/ParentTaskId ölü şema temizliği).
