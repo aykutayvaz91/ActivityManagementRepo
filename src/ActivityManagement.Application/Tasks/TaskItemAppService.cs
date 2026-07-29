@@ -67,9 +67,12 @@ namespace ActivityManagement.Tasks
                 throw new UserFriendlyException("Görevi 'Tamamlandı' yapmadan önce efor (harcanan süre) girmelisiniz. Lütfen görev üzerinden efor ekleyin.");
         }
 
-        // İzin durumu (tarih-duyarlı): IsOnLeave işaretli VE (bitiş yok veya bugüne/ileriye) ise izinli sayılır.
+        // İzin durumu (tarih-duyarlı): IsOnLeave işaretli VE bugün izin aralığında [başlangıç, bitiş] ise izinli sayılır.
+        // Tarihler opsiyonel: başlangıç yoksa "hep başlamış", bitiş yoksa "süresiz". İleri tarihli izin bugün etkilemez.
         private static bool IsOnLeaveNow(Employee e) =>
-            e != null && e.IsOnLeave && (!e.LeaveEndDate.HasValue || e.LeaveEndDate.Value.Date >= DateTime.Today);
+            e != null && e.IsOnLeave
+            && (!e.LeaveStartDate.HasValue || e.LeaveStartDate.Value.Date <= DateTime.Today)
+            && (!e.LeaveEndDate.HasValue || e.LeaveEndDate.Value.Date >= DateTime.Today);
 
         // Mevcut kullanıcının rolü ve çalışan kimliği (cookie claim'lerinden - DB sorgusu yok)
         private (string Role, string Email, long? EmployeeId) CurrentContext()
@@ -321,7 +324,8 @@ namespace ActivityManagement.Tasks
             if (!input.DueDate.HasValue)
                 throw new UserFriendlyException("Görev bitiş (son teslim) tarihi zorunludur. Proje görevlerinde proje SLA tarihi girilmelidir.");
 
-            // İZİN kontrolü: atanacak 1. sorumlu izinliyse görev 2. sorumluya (yedek) atanır, izinli kişi yedeğe geçer.
+            // İZİN kontrolü (UYAR AMA İZİN VER): atanan kişi izinliyse otomatik yönlendirme YAPILMAZ; kişi bilinçli
+            // seçildiği için görev ona atanır, yalnızca bir UYARI notu döner (UI'da da onay istenir).
             string assignmentNote = null;
             if (input.AssignedEmployeeId.HasValue)
             {
@@ -329,19 +333,8 @@ namespace ActivityManagement.Tasks
                     .FirstOrDefaultAsync(e => e.Id == input.AssignedEmployeeId.Value);
                 if (IsOnLeaveNow(primaryEmp))
                 {
-                    if (input.SecondaryEmployeeId.HasValue && input.SecondaryEmployeeId.Value != input.AssignedEmployeeId.Value)
-                    {
-                        var secEmp = await _employeeRepository.GetAll().AsNoTracking()
-                            .FirstOrDefaultAsync(e => e.Id == input.SecondaryEmployeeId.Value);
-                        var onLeaveId = input.AssignedEmployeeId.Value;
-                        input.AssignedEmployeeId = input.SecondaryEmployeeId;   // 2. sorumluya ata
-                        input.SecondaryEmployeeId = onLeaveId;                  // izinli kişi yedeğe geçer
-                        assignmentNote = $"1. sorumlu {primaryEmp.FullName} izinli olduğu için görev 2. sorumlu {secEmp?.FullName} kişisine atandı.";
-                    }
-                    else
-                    {
-                        assignmentNote = $"Uyarı: 1. sorumlu {primaryEmp.FullName} izinli ancak tanımlı bir 2. sorumlu (yedek) yok; görev yine de bu kişiye atandı.";
-                    }
+                    var bitis = primaryEmp.LeaveEndDate.HasValue ? $" ({primaryEmp.LeaveEndDate.Value:dd.MM.yyyy} tarihine kadar)" : "";
+                    assignmentNote = $"Uyarı: {primaryEmp.FullName} şu an izinli{bitis}. Görev yine de bu kişiye atandı.";
                 }
             }
 

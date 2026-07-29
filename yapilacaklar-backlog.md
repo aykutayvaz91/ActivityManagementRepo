@@ -79,3 +79,7 @@
 ## Entegrasyon (bekleyen)
 - **Destek V3 multipart bug:** bizim istemci hazır; destek ucu multipart'ı reddediyor (Y1 ile ilişkili). `destek-entegrasyon-v3-hata-bildirimi.md` iletilecek.
 - **PSM ayrı tasarım** (farklı format). Write-back durum POST kod/etiket teyidi (ilk canlı yazımda).
+
+## Yeni istek (2026-07-29) — İzin & görev atama — ✅ (v1.19.2)
+- İzinli personele görev atamada "uyar ama izin ver": atama dropdown'ında izinli kişi "(izinli)" işaretli; ana sorumlu izinliyse atamadan önce onay istenir; otomatik yedeğe-swap KALDIRILDI (kişi bilinçli seçiliyor + uyarı notu). IsOnLeaveNow tarih-aralığı duyarlı.
+- İzin girişi: Personel → Düzenle'de "İzinli" + **İzin Başlangıç** (yeni) + İzin Bitiş; kişi kartında izinli/izin-planlı rozeti. LeaveStartDate migration eklendi.

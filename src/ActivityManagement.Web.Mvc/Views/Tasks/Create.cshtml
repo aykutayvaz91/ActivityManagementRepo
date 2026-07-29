@@ -128,7 +128,7 @@
                                     {
                                         foreach (var e in employees)
                                         {
-                                            <option value="@e.Id">@e.FullName - @e.Title</option>
+                                            <option value="@e.Id" data-onleave="@(e.OnLeaveNow ? "1" : "0")">@e.FullName - @e.Title@(e.OnLeaveNow ? " (izinli)" : "")</option>
                                         }
                                     }
                                 </select>
@@ -143,7 +143,7 @@
                                     {
                                         foreach (var e in employees)
                                         {
-                                            <option value="@e.Id">@e.FullName - @e.Title</option>
+                                            <option value="@e.Id" data-onleave="@(e.OnLeaveNow ? "1" : "0")">@e.FullName - @e.Title@(e.OnLeaveNow ? " (izinli)" : "")</option>
                                         }
                                     }
                                 </select>
@@ -301,6 +301,23 @@
                 applyResponsibleSuggestion();
             }
         })();
+    })();
+    </script>
+    <script>
+    // İzinli ana sorumlu seçilirse atamadan önce onay iste (uyar ama izin ver)
+    (function () {
+        var sel = document.getElementById('AssignedEmployeeId');
+        if (!sel) return;
+        var form = sel.closest('form');
+        if (!form) return;
+        form.addEventListener('submit', function (e) {
+            var opt = sel.options[sel.selectedIndex];
+            if (opt && opt.getAttribute('data-onleave') === '1') {
+                if (!confirm('Seçtiğiniz Ana Sorumlu şu an İZİNLİ görünüyor. Görev yine de bu kişiye atansın mı?')) {
+                    e.preventDefault();
+                }
+            }
+        });
     })();
     </script>
 }

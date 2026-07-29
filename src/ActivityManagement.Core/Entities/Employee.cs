@@ -38,9 +38,10 @@ namespace ActivityManagement.Entities
         // gerçek personel sayılmaz. Yalnız login-as/işlem kimliği için vardır.
         public bool IsSystemAccount { get; set; } = false;
 
-        // İzin durumu: izinliyse görev atamalarında 1. sorumlu atlanır, 2. sorumluya atanır.
+        // İzin durumu: izinli işaretli + bugün izin aralığındaysa görev atamada uyarı verilir.
         public bool IsOnLeave { get; set; }
-        public DateTime? LeaveEndDate { get; set; } // opsiyonel bilgi: "... tarihine kadar izinli"
+        public DateTime? LeaveStartDate { get; set; } // opsiyonel: bu tarihten itibaren (ileri tarihli izin planlanabilir)
+        public DateTime? LeaveEndDate { get; set; }   // opsiyonel: bu tarihe kadar izinli
 
         public virtual ICollection<ProjectEmployee> ProjectEmployees { get; set; } = new List<ProjectEmployee>();
         public virtual ICollection<TaskItem> AssignedTasks { get; set; } = new List<TaskItem>();

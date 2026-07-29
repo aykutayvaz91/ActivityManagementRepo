@@ -29,7 +29,12 @@ namespace ActivityManagement.Employees.Dto
         public DateTime HireDate { get; set; }
         public bool IsActive { get; set; }
         public bool IsOnLeave { get; set; }
+        public DateTime? LeaveStartDate { get; set; }
         public DateTime? LeaveEndDate { get; set; }
+        // Bugün fiilen izinli mi (işaret + tarih aralığı) — atama dropdown'ında "(izinli)" göstermek için.
+        public bool OnLeaveNow => IsOnLeave
+            && (!LeaveStartDate.HasValue || LeaveStartDate.Value.Date <= DateTime.Today)
+            && (!LeaveEndDate.HasValue || LeaveEndDate.Value.Date >= DateTime.Today);
 
         public List<ResponsibilityDto> Responsibilities { get; set; } = new List<ResponsibilityDto>();
         public List<AssignedProjectDto> AssignedProjects { get; set; } = new List<AssignedProjectDto>();

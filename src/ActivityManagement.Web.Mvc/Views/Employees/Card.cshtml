@@ -50,9 +50,15 @@
                 {
                     <span class="badge bg-primary"><i class="fas fa-users me-1"></i>@Model.TeamName</span>
                 }
-                @if (Model.IsOnLeave)
+                @if (Model.OnLeaveNow)
                 {
-                    <span class="badge bg-warning text-dark"><i class="fas fa-umbrella-beach me-1"></i>İzinli@(Model.LeaveEndDate.HasValue ? " (" + Model.LeaveEndDate.Value.ToString("dd.MM.yyyy") + ")" : "")</span>
+                    var aralik = (Model.LeaveStartDate.HasValue ? Model.LeaveStartDate.Value.ToString("dd.MM.yyyy") : "") +
+                                 (Model.LeaveEndDate.HasValue ? " - " + Model.LeaveEndDate.Value.ToString("dd.MM.yyyy") : "");
+                    <span class="badge bg-warning text-dark"><i class="fas fa-umbrella-beach me-1"></i>İzinli@(string.IsNullOrWhiteSpace(aralik) ? "" : " (" + aralik.Trim(' ', '-') + ")")</span>
+                }
+                else if (Model.IsOnLeave && Model.LeaveStartDate.HasValue && Model.LeaveStartDate.Value.Date > DateTime.Today)
+                {
+                    <span class="badge bg-info text-dark"><i class="fas fa-calendar me-1"></i>İzin planlı (@Model.LeaveStartDate.Value.ToString("dd.MM.yyyy"))</span>
                 }
                 <hr />
                 <div class="text-start small">
