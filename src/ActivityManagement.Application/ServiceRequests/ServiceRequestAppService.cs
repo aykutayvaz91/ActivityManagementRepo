@@ -238,12 +238,13 @@ namespace ActivityManagement.ServiceRequests
 
             // Görünürlük kapsamı (B10): Admin/Manager tümü; TakımLideri kendi takımı; Uzman yalnız kendine
             IQueryable<ServiceRequest> Scoped() => ApplyVisibilityScope(_requestRepository.GetAll().AsNoTracking());
-            // ARŞİV = terminal-done (Kapandı/Çözüldü) + efor girilmiş. AKTİF = arşiv değil ve İptal değil.
+            // (Y3) ARŞİV = yalnız KAPANDI + efor girilmiş. Çözüldü KAPATILAN sayılmaz → AKTİF'te kalır
+            // (kapatıldı/kapandı yapılınca arşive düşer). AKTİF = arşiv değil ve İptal değil.
             IQueryable<ServiceRequest> Active(RequestSource src) => Scoped()
                 .Where(r => r.Source == src && r.Status != RequestStatus.Iptal
-                            && !((r.Status == RequestStatus.Kapandi || r.Status == RequestStatus.Cozuldu) && r.Logs.Any()));
+                            && !(r.Status == RequestStatus.Kapandi && r.Logs.Any()));
             IQueryable<ServiceRequest> Archived() => Scoped()
-                .Where(r => (r.Status == RequestStatus.Kapandi || r.Status == RequestStatus.Cozuldu) && r.Logs.Any());
+                .Where(r => r.Status == RequestStatus.Kapandi && r.Logs.Any());
 
             async Task<System.Collections.Generic.List<ServiceRequestDto>> Materialize(IQueryable<ServiceRequest> orderedIdQuery)
             {
@@ -467,22 +468,32 @@ namespace ActivityManagement.ServiceRequests
             var returnedAtts = new List<PortalAttachmentDto>();
             string localBody = body;
 
+            if (string.IsNullOrWhiteSpace(StripTags(body)) && files.Count == 0)
+                throw new UserFriendlyException("Yorum veya dosya girmelisiniz.");
+
             if (writeBack)
             {
                 // Ctrl+V ile gömülen base64 görselleri DOSYA'ya çıkar; gövde metne indirger (destek dosyaları ayrı alır).
                 var portalBody = ExtractInlineImages(body, files);
-                if (string.IsNullOrWhiteSpace(StripTags(portalBody)) && files.Count == 0)
-                    throw new UserFriendlyException("Yorum boş olamaz.");
-                localBody = portalBody;
-                (newId, returnedAtts) = await PushCommentToPortalAsync(r, portalBody?.Trim(), isInternal, files);
+                try
+                {
+                    (newId, returnedAtts) = await PushCommentToPortalAsync(r, portalBody?.Trim(), isInternal, files);
+                    localBody = portalBody; // portal aldı → görseller "Portal Dosya Ekleri"nde, gövde metin
+                }
+                catch (Exception ex) when (isInternal)
+                {
+                    // (Y1) İÇ NOT: portal reddetse de (ör. destek multipart ucu bozuk) not KAYBOLMASIN → YEREL sakla.
+                    // Orijinal gövde korunur (base64 görsel inline → bizde görünür); portala gitmez, dış kullanıcıya ulaşmaz.
+                    Logger.Warn($"İç not portala iletilemedi, yerelde saklanıyor (Source={r.Source}, Ref={r.ExternalRef}): {ex.Message}");
+                    localBody = body; newId = null; returnedAtts = new List<PortalAttachmentDto>();
+                }
+                // DIŞ not'ta istisna yakalanmaz → yukarı fırlar (müşteriye ulaşması gereken not sessizce yutulmaz).
             }
             else
             {
                 // Write-back kapalı: DIŞ not gönderilemez; İÇ not yalnız yerelde saklanır (base64 görsel gövdede kalır → yerelde görünür).
                 if (!isInternal)
                     throw new UserFriendlyException("Dış not (müşteriye açık) göndermek için bu kaynakta write-back açık olmalı (Admin → Entegrasyon). İç not olarak kaydedebilirsiniz.");
-                if (string.IsNullOrWhiteSpace(StripTags(body)))
-                    throw new UserFriendlyException("Yorum boş olamaz.");
             }
 
             // Yerel yorum aynası

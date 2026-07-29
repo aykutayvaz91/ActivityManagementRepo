@@ -22,6 +22,11 @@
 
 ### Y4 — Denetim Orta + Düşük maddeleri (aşağıdaki liste) uygulanacak.
 
+### Y5 — Destek vs PSM talep DETAY sayfaları AYRI arayüz
+- Destek talepleri: `/Requests/Detail/{no}` (mevcut, dış destek arayüzü).
+- PSM talepleri: FARKLI URL (ör. `/Requests/PsmDetail/{no}`) + FARKLI arayüz (sunucu kurulum künyesi: requested/installed/services, hostname/IP/OS vb. PSM'e özgü alanlar).
+- URL'ye karar serbest; şart: ayrı arayüz. PSM ayrı-tasarım kararıyla (talepler farklı format) uyumlu.
+
 ---
 
 ## Denetimden (2026-07-29) — ORTA

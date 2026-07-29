@@ -54,5 +54,6 @@ namespace ActivityManagement.Activities.Dto
         public long? AssignedEmployeeId { get; set; }
         public long? ProjectId { get; set; }
         public bool? OnlyActive { get; set; }
+        public string Search { get; set; }   // (Y2) başlık/açıklama içinde hızlı arama
     }
 }

@@ -128,6 +128,22 @@ namespace ActivityManagement.Activities
             return false;
         }
 
+        // (Y2) Faaliyet listesinde TÜMÜNÜ gören roller: Admin / Manager / TakımLideri (login-as etkin rol dahil).
+        // Uzman yalnız kendine ait faaliyetleri görür.
+        private bool SeesAllActivities()
+        {
+            if (SeesAllTeams()) return true; // Admin-self / Manager (+ login-as Manager/Admin)
+            var user = _httpContextAccessor.HttpContext?.User;
+            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
+            if (string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)) // login-as başka kişi
+            {
+                long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
+                if (string.Equals(CurrentEmployeeAppRole(empId), "TakımLideri", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
         // Login-as ile temsil edilen kişinin gerçek AppRole'ü (istek başına cache'li).
         private bool _empRoleLoaded;
         private string _currentEmpRole;
@@ -176,22 +192,22 @@ namespace ActivityManagement.Activities
         public async Task<List<ActivitySubjectDto>> GetAllAsync(GetActivitySubjectsInput input)
         {
             var ctx = CurrentContext();
+            var search = input.Search?.Trim();
             var query = WithIncludes(_subjectRepository.GetAll().AsNoTracking())
                 .WhereIf(input.CategoryId.HasValue, s => s.CategoryId == input.CategoryId.Value)
                 .WhereIf(input.SubCategoryId.HasValue, s => s.SubCategoryId == input.SubCategoryId.Value)
                 .WhereIf(input.AssignedEmployeeId.HasValue, s => s.AssignedEmployeeId == input.AssignedEmployeeId.Value)
                 .WhereIf(input.ProjectId.HasValue, s => s.ProjectId == input.ProjectId.Value)
-                .WhereIf(input.OnlyActive == true, s => s.IsActive);
+                .WhereIf(input.OnlyActive == true, s => s.IsActive)
+                // (Y2) hızlı arama — başlık veya açıklamada (server-side LIKE)
+                .WhereIf(!string.IsNullOrWhiteSpace(search),
+                    s => s.Title.Contains(search) || (s.Description != null && s.Description.Contains(search)));
 
-            // Görünürlük kuralı: Admin tüm konuları görür; TakımLideri ve Uzman kendi TAKIMININ
-            // konularını görür (takımdaki kişilere atanan/oluşturulan faaliyetler dahil). İşlem yetkisi
-            // (efor/düzenle/sil) ayrıca "kendine ait" kuralıyla sınırlıdır (CanManage/CanLogEffort).
-            if (!SeesAllTeams() && ctx.EmployeeId.HasValue)
+            // (Y2) Görünürlük: Admin / Manager / TakımLideri TÜM faaliyetleri görür; Uzman yalnız KENDİ
+            // (kendine atanan veya kendi oluşturduğu) faaliyetleri görür. İşlem yetkisi ayrıca "kendine ait".
+            if (!SeesAllActivities() && ctx.EmployeeId.HasValue)
             {
-                var myTeamId = await _employeeRepository.GetAll().AsNoTracking()
-                    .Where(e => e.Id == ctx.EmployeeId.Value).Select(e => e.TeamId).FirstOrDefaultAsync();
                 query = query.Where(s =>
-                    (myTeamId != null && s.TeamId == myTeamId) ||
                     s.AssignedEmployeeId == ctx.EmployeeId.Value ||
                     s.CreatedByLeaderId == ctx.EmployeeId.Value);
             }

@@ -12,11 +12,22 @@
                     ?? new System.Collections.Generic.List<ActivityManagement.Projects.Dto.ProjectDto>();
     var actTypes = ViewBag.ActivityTypes as System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>
                     ?? new System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>();
+    var search = ViewBag.Search as string;
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="fas fa-clipboard-check text-primary me-2"></i>Faaliyetler</h2>
-    <div class="d-flex gap-2">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h2 class="mb-0"><i class="fas fa-clipboard-check text-primary me-2"></i>Faaliyetler</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        <form method="get" action="/Activities" class="d-flex" role="search">
+            <div class="input-group input-group-sm" style="min-width:260px">
+                <input type="text" name="search" class="form-control" placeholder="Faaliyet ara (başlık/açıklama)..." value="@(search ?? "")" />
+                <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
+                @if (!string.IsNullOrWhiteSpace(search))
+                {
+                    <a href="/Activities" class="btn btn-outline-secondary" title="Aramayı temizle"><i class="fas fa-times"></i></a>
+                }
+            </div>
+        </form>
         <a href="/Activities/Today" class="btn btn-outline-success">
             <i class="fas fa-business-time me-1"></i>Günlük Efor
         </a>
@@ -25,6 +36,10 @@
         </button>
     </div>
 </div>
+@if (!string.IsNullOrWhiteSpace(search))
+{
+    <div class="small text-muted mb-2"><i class="fas fa-filter me-1"></i>"@search" için @Model.Count sonuç. <a href="/Activities">Tümünü göster</a></div>
+}
 
 
 <div class="card shadow-sm">

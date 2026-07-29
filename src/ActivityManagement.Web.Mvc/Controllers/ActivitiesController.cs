@@ -106,10 +106,11 @@ namespace ActivityManagement.Web.Controllers
             return RedirectToAction("Today", new { date = activityDate.ToString("yyyy-MM-dd") });
         }
 
-        public async Task<IActionResult> Index(long? projectId = null)
+        public async Task<IActionResult> Index(long? projectId = null, string search = null)
         {
             var g = EnsurePageAccess("Activities"); if (g != null) return g;
-            var subjects = await _subjectAppService.GetAllAsync(new GetActivitySubjectsInput { MaxResultCount = 1000 });
+            var subjects = await _subjectAppService.GetAllAsync(new GetActivitySubjectsInput { MaxResultCount = 1000, Search = search });
+            ViewBag.Search = search;
             ViewBag.IsManager = IsManager();
             ViewBag.Categories = await _categoryAppService.GetAllAsync(onlyActive: true);
             ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
