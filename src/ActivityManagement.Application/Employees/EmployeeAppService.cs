@@ -103,7 +103,7 @@ namespace ActivityManagement.Employees
 
         public async Task<PagedResultDto<EmployeeDto>> GetAllAsync(GetEmployeesInput input)
         {
-            var query = _employeeRepository.GetAll()
+            var query = _employeeRepository.GetAll().AsNoTracking()
                 .Include(e => e.Team)
                 .Where(e => !e.IsSystemAccount) // Sistem Yöneticisi personel listesinde/sayımında görünmez
                 .WhereIf(!string.IsNullOrWhiteSpace(input.Filter),
@@ -129,7 +129,7 @@ namespace ActivityManagement.Employees
 
         public async Task<EmployeeDto> GetAsync(long id)
         {
-            var employee = await _employeeRepository.GetAll().Include(e => e.Team).FirstOrDefaultAsync(e => e.Id == id);
+            var employee = await _employeeRepository.GetAll().AsNoTracking().Include(e => e.Team).FirstOrDefaultAsync(e => e.Id == id);
             var d = ObjectMapper.Map<EmployeeDto>(employee);
             d.TeamName = employee?.Team?.Name;
             return d;
@@ -137,7 +137,7 @@ namespace ActivityManagement.Employees
 
         public async Task<EmployeeDto> GetCardAsync(long id)
         {
-            var employee = await _employeeRepository.GetAll()
+            var employee = await _employeeRepository.GetAll().AsNoTracking()
                 .Include(e => e.Team).ThenInclude(t => t.Leader)
                 .Include(e => e.Responsibilities)
                 .Include(e => e.ProjectEmployees).ThenInclude(pe => pe.Project)
@@ -168,7 +168,7 @@ namespace ActivityManagement.Employees
                 };
             }
 
-            var responsibleProjects = await _projectRepository.GetAll()
+            var responsibleProjects = await _projectRepository.GetAll().AsNoTracking()
                 .Where(p => p.PrimaryResponsibleId == id || p.SecondaryResponsibleId == id)
                 .Select(p => new { p.Id, p.Name, p.Code, p.Status, p.PrimaryResponsibleId })
                 .ToListAsync();
@@ -195,7 +195,7 @@ namespace ActivityManagement.Employees
 
             dto.AssignedProjects = assigned.Values.OrderBy(x => x.Name).ToList();
 
-            var tasks = await _taskRepository.GetAll()
+            var tasks = await _taskRepository.GetAll().AsNoTracking()
                 .Where(t => t.AssignedEmployeeId == id)
                 .ToListAsync();
 
@@ -318,7 +318,7 @@ namespace ActivityManagement.Employees
         public async Task<ListResultDto<EmployeeDto>> GetAllListAsync()
         {
             // Sistem Yöneticisi (config-admin) atama/sorumlu dropdown'larında GÖSTERİLMEZ.
-            var employees = await _employeeRepository.GetAll()
+            var employees = await _employeeRepository.GetAll().AsNoTracking()
                 .Where(e => e.IsActive && !e.IsSystemAccount)
                 .OrderBy(e => e.LastName)
                 .ToListAsync();

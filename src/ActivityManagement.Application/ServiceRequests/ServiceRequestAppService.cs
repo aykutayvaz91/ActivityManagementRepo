@@ -68,9 +68,6 @@ namespace ActivityManagement.ServiceRequests
             string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
 
-        private static bool IsAdmin(string role) =>
-            string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
-
         // Tüm takımlarda geçerli yönetici (config hariç admin gibi): Admin veya Manager.
         private static bool IsCrossTeamManager(string role) =>
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||

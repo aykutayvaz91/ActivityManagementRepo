@@ -78,7 +78,7 @@ namespace ActivityManagement.Activities
 
         public async Task<PagedResultDto<ActivityLogDto>> GetAllAsync(GetActivitiesInput input)
         {
-            var query = _activityRepository.GetAll()
+            var query = _activityRepository.GetAll().AsNoTracking()
                 .Include(a => a.Employee)
                 .Include(a => a.TaskItem)
                 .Include(a => a.Project)
@@ -131,7 +131,7 @@ namespace ActivityManagement.Activities
 
         public async Task<List<ActivityLogDto>> GetEmployeeActivitiesAsync(long employeeId, DateTime startDate, DateTime endDate)
         {
-            var items = await _activityRepository.GetAll()
+            var items = await _activityRepository.GetAll().AsNoTracking()
                 .Include(a => a.TaskItem)
                 .Include(a => a.Project)
                 .Where(a => a.EmployeeId == employeeId && a.ActivityDate >= startDate && a.ActivityDate <= endDate)

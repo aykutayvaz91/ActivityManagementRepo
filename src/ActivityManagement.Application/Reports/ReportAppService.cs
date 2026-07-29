@@ -14,12 +14,8 @@ namespace ActivityManagement.Reports
     // Yetki cookie claim tabanlı (global [Authorize] filtresi giriş zorunluluğunu sağlar).
     public class ReportAppService : ActivityManagementAppServiceBase, IReportAppService
     {
-        private static readonly string[] ActivityTypeLabels = new[]
-        {
-            "Bakım","Geliştirme","Kurulum","Destek","Test","Dokümantasyon","Eğitim","Analiz","Proje","Diğer"
-        };
-        // Sınır kontrollü etiket (enum büyürse IndexOutOfRange olmasın — CLAUDE.md kuralı).
-        private static string ActivityTypeLabel(int idx) => idx >= 0 && idx < ActivityTypeLabels.Length ? ActivityTypeLabels[idx] : "Diğer";
+        // Tek kaynak: Entities.ActivityTypeLabels (Core). Sınır-kontrollü.
+        private static string ActivityTypeLabel(int idx) => ActivityManagement.Entities.ActivityTypeLabels.Of(idx);
 
         private readonly IRepository<Employee, long> _employeeRepository;
         private readonly IRepository<ActivityLog, long> _activityRepository;

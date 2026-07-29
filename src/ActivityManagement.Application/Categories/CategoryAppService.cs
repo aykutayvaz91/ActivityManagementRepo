@@ -74,7 +74,7 @@ namespace ActivityManagement.Categories
 
         public async Task<List<CategoryDto>> GetAllAsync(bool onlyActive = false)
         {
-            IQueryable<Category> query = _categoryRepository.GetAll()
+            IQueryable<Category> query = _categoryRepository.GetAll().AsNoTracking()
                 .Include(c => c.ResponsibleEmployee1)
                 .Include(c => c.ResponsibleEmployee2)
                 .Include(c => c.Team)
@@ -88,7 +88,7 @@ namespace ActivityManagement.Categories
 
         public async Task<CategoryDto> GetAsync(long id)
         {
-            var category = await _categoryRepository.GetAll()
+            var category = await _categoryRepository.GetAll().AsNoTracking()
                 .Include(c => c.ResponsibleEmployee1)
                 .Include(c => c.ResponsibleEmployee2)
                 .Include(c => c.Team)
@@ -151,7 +151,7 @@ namespace ActivityManagement.Categories
 
         public async Task<List<SubCategoryDto>> GetAllSubCategoriesAsync(long? categoryId = null, bool onlyActive = false)
         {
-            var query = _subCategoryRepository.GetAll().Include(sc => sc.Category).AsQueryable();
+            var query = _subCategoryRepository.GetAll().AsNoTracking().Include(sc => sc.Category).AsQueryable();
 
             if (categoryId.HasValue) query = query.Where(sc => sc.CategoryId == categoryId.Value);
             if (onlyActive) query = query.Where(sc => sc.IsActive);

@@ -18,9 +18,10 @@
 ### [BEKLİYOR] Yetki yardımcıları base'e taşıma (~50x tekrar)
 - En büyük teknik borç; RİSKLİ (12 dosya, login-as edge). Kendi odaklı turunda + kapsamlı doğrulamayla yapılmalı.
 
-### Kalan düşük/perf
-- ✅ (v1.18.4) Sayfa-ACL fail-open→rol-varsayılanı; ProjectAppService AsSplitQuery; TaskItem okuma AsNoTracking; Reports ActivityTypeLabels bounds. ✅ (v1.18.2) global arama.
-- [BEKLİYOR] Kalan AsNoTracking (ActivityLog/Team/Category/Employee — düşük trafik); RoutineTask/ParentTaskId ölü şema (migration gerekir); ActivityTypeLabels 3 yerde tekrar → tek yardımcı.
+### Kalan düşük/perf — ✅ KÜÇÜK KOVA KAPANDI
+- ✅ (v1.18.2) global arama. ✅ (v1.18.4) ACL fail-open→rol-varsayılanı; Project AsSplitQuery; TaskItem AsNoTracking; Reports bounds.
+- ✅ (v1.18.5) AsNoTracking sweep tamam (Employee/Team/Category/ActivityLog okuma); ActivityTypeLabels → tek Core helper (Entities.ActivityTypeLabels); ölü kod kaldırıldı (kullanılmayan IsAdmin x2, WireItem StatusLabel/UpdatedAt/ClosedAt).
+- [BEKLİYOR — ORTA/migration] RoutineTask/ParentTaskId ölü şema (migration ile temizle ya da RoutineTask özelliğini tamamla).
 
 ### [BEKLİYOR] Eksik özellikler (Batch E)
 - PDF raporlama; Gantt bağımlılık/kritik yol; toplu (bulk) işlemler; bildirim tercihleri; kişi kartı efor trendi.

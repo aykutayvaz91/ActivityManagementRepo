@@ -33,7 +33,7 @@ namespace ActivityManagement.Teams
 
         public async Task<List<TeamDto>> GetAllAsync(bool onlyActive = false)
         {
-            IQueryable<Team> query = _teamRepository.GetAll()
+            IQueryable<Team> query = _teamRepository.GetAll().AsNoTracking()
                 .Include(t => t.Leader)
                 .Include(t => t.Members)
                 .Include(t => t.Projects);
@@ -46,7 +46,7 @@ namespace ActivityManagement.Teams
 
         public async Task<TeamDto> GetAsync(long id)
         {
-            var team = await _teamRepository.GetAll()
+            var team = await _teamRepository.GetAll().AsNoTracking()
                 .Include(t => t.Leader)
                 .Include(t => t.Members)
                 .Include(t => t.Projects)

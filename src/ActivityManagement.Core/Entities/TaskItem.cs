@@ -47,6 +47,15 @@ namespace ActivityManagement.Entities
         Diger = 9
     }
 
+    // ActivityType → Türkçe etiket (tek kaynak; Reports + Tasks buradan kullanır). Sınır-kontrollü.
+    public static class ActivityTypeLabels
+    {
+        private static readonly string[] Labels =
+            { "Bakım", "Geliştirme", "Kurulum", "Destek", "Test", "Dokümantasyon", "Eğitim", "Analiz", "Proje", "Diğer" };
+        public static string Of(int idx) => idx >= 0 && idx < Labels.Length ? Labels[idx] : "Diğer";
+        public static string Of(ActivityType t) => Of((int)t);
+    }
+
     public class TaskItem : FullAuditedEntity<long>, IMustHaveTenant
     {
         public int TenantId { get; set; }

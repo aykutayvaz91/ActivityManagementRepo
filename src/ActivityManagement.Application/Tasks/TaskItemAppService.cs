@@ -681,11 +681,6 @@ namespace ActivityManagement.Tasks
             return new ListResultDto<TaskItemDto>(tasks.Select(MapToDto).ToList());
         }
 
-        private static readonly string[] ActivityTypeLabels = new[]
-        {
-            "Bakım","Geliştirme","Kurulum","Destek","Test","Dokümantasyon","Eğitim","Analiz","Proje","Diğer"
-        };
-
         // Önem derecesi (1-10) → renk için TaskPriority enum karşılığı
         private static TaskPriority PriorityFromScore(int score) =>
             score >= 9 ? TaskPriority.Kritik :
@@ -725,9 +720,8 @@ namespace ActivityManagement.Tasks
             dto.CompletedOnTime = (t.DueDate.HasValue && t.CompletedDate.HasValue)
                 ? t.CompletedDate.Value <= t.DueDate.Value
                 : (bool?)null;
-            var atIdx = t.ActivityType.HasValue ? (int)t.ActivityType.Value : -1;
-            dto.ActivityTypeText = (atIdx >= 0 && atIdx < ActivityTypeLabels.Length)
-                ? ActivityTypeLabels[atIdx]
+            dto.ActivityTypeText = t.ActivityType.HasValue
+                ? ActivityManagement.Entities.ActivityTypeLabels.Of((int)t.ActivityType.Value)
                 : null;
             var ctx = CurrentContext();
             dto.CanEdit = CanEdit(t, ctx);

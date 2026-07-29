@@ -423,7 +423,6 @@ namespace ActivityManagement.Web.BackgroundJobs
             public string RequestedByName { get; set; }
             public string AssignedToEmail { get; set; }
             public string AssignedToName { get; set; }
-            public string StatusLabel { get; set; }
             public string HostingType { get; set; }
             public string OsRequested { get; set; }
             public int? CpuCores { get; set; }
@@ -450,12 +449,10 @@ namespace ActivityManagement.Web.BackgroundJobs
             public string Network { get; set; }
             public string Status { get; set; }
             public DateTime? CreatedAt { get; set; }
-            public DateTime? UpdatedAt { get; set; }
             public DateTime? StartedAt { get; set; }
             public DateTime? CompletedAt { get; set; }
             public DateTime? DueDate { get; set; }
             public DateTime? ResolvedAt { get; set; }
-            public DateTime? ClosedAt { get; set; }
             public Dictionary<string, JsonElement> Requested { get; set; }
             public Dictionary<string, JsonElement> Installed { get; set; }
             public List<Dictionary<string, JsonElement>> Services { get; set; }
