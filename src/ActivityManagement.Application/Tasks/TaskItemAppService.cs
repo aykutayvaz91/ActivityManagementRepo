@@ -603,7 +603,8 @@ namespace ActivityManagement.Tasks
             // Dahili not yalnızca yönetici ekleyebilir
             if (isInternal && !IsManager(ctx.Role)) isInternal = false;
             var author = ctx.EmployeeId.HasValue
-                ? _employeeRepository.Get(ctx.EmployeeId.Value).FullName
+                ? (await _employeeRepository.GetAll().AsNoTracking()
+                    .Where(e => e.Id == ctx.EmployeeId.Value).Select(e => e.FullName).FirstOrDefaultAsync() ?? ctx.Email ?? "Bilinmiyor")
                 : (ctx.Email ?? "Bilinmiyor");
             var entity = new TaskComment
             {

@@ -37,11 +37,11 @@ namespace ActivityManagement.Reports
         {
             if (!input.EmployeeId.HasValue || input.EmployeeId.Value <= 0)
                 throw new Abp.UI.UserFriendlyException("Rapor için personel seçilmedi.");
-            var employee = await _employeeRepository.GetAll().FirstOrDefaultAsync(e => e.Id == input.EmployeeId.Value);
+            var employee = await _employeeRepository.GetAll().AsNoTracking().FirstOrDefaultAsync(e => e.Id == input.EmployeeId.Value);
             if (employee == null)
                 throw new Abp.UI.UserFriendlyException("Seçilen personel bulunamadı.");
 
-            var activities = await _activityRepository.GetAll()
+            var activities = await _activityRepository.GetAll().AsNoTracking()
                 .Include(a => a.Project)
                 .Include(a => a.TaskItem)
                 .Include(a => a.ActivitySubject)
@@ -51,7 +51,7 @@ namespace ActivityManagement.Reports
                             a.ActivityDate <= input.EndDate)
                 .ToListAsync();
 
-            var tasks = await _taskRepository.GetAll()
+            var tasks = await _taskRepository.GetAll().AsNoTracking()
                 .Include(t => t.Project)
                 .Where(t => t.AssignedEmployeeId == input.EmployeeId.Value)
                 .ToListAsync();
@@ -193,38 +193,47 @@ namespace ActivityManagement.Reports
 
         public async Task<TeamReportDto> GetTeamReportAsync(GetReportInput input)
         {
-            var employees = await _employeeRepository.GetAll()
+            var employees = await _employeeRepository.GetAll().AsNoTracking()
                 .Where(e => e.IsActive)
                 .WhereIf(input.TeamId.HasValue, e => e.TeamId == input.TeamId.Value)
                 .ToListAsync();
+            var empIds = employees.Select(e => e.Id).ToList();
 
-            var report = new TeamReportDto
-            {
-                StartDate = input.StartDate,
-                EndDate = input.EndDate
-            };
+            // (N+1 giderildi) Tüm eforlar (tarih aralığı) + tüm görevler TEK sorguda çekilip bellekte gruplanır.
+            var actByEmp = (await _activityRepository.GetAll().AsNoTracking()
+                    .Where(a => empIds.Contains(a.EmployeeId)
+                                && a.ActivityDate >= input.StartDate && a.ActivityDate <= input.EndDate)
+                    .Select(a => new { a.EmployeeId, a.HoursSpent })
+                    .ToListAsync())
+                .GroupBy(a => a.EmployeeId)
+                .ToDictionary(g => g.Key, g => new { Hours = g.Sum(x => x.HoursSpent), Count = g.Count() });
 
+            var tskByEmp = (await _taskRepository.GetAll().AsNoTracking()
+                    .Where(t => t.AssignedEmployeeId != null && empIds.Contains(t.AssignedEmployeeId.Value))
+                    .Select(t => new { EmpId = t.AssignedEmployeeId.Value, t.Status })
+                    .ToListAsync())
+                .GroupBy(t => t.EmpId)
+                .ToDictionary(g => g.Key, g => new
+                {
+                    Completed = g.Count(x => x.Status == Entities.TaskStatus.Tamamlandi || x.Status == Entities.TaskStatus.Kapatildi),
+                    Pending = g.Count(x => x.Status == Entities.TaskStatus.Beklemede)
+                });
+
+            var report = new TeamReportDto { StartDate = input.StartDate, EndDate = input.EndDate };
             foreach (var emp in employees)
             {
-                var activities = await _activityRepository.GetAll()
-                    .Where(a => a.EmployeeId == emp.Id &&
-                                a.ActivityDate >= input.StartDate && a.ActivityDate <= input.EndDate)
-                    .ToListAsync();
-
-                var tasks = await _taskRepository.GetAll()
-                    .Where(t => t.AssignedEmployeeId == emp.Id)
-                    .ToListAsync();
-
+                actByEmp.TryGetValue(emp.Id, out var a);
+                tskByEmp.TryGetValue(emp.Id, out var t);
                 report.EmployeeSummaries.Add(new EmployeeReportSummaryDto
                 {
                     EmployeeId = emp.Id,
                     FullName = emp.FullName,
                     Department = emp.Department,
                     Title = emp.Title,
-                    TotalHours = activities.Sum(a => a.HoursSpent),
-                    TotalActivities = activities.Count,
-                    CompletedTasks = tasks.Count(t => (t.Status == Entities.TaskStatus.Tamamlandi || t.Status == Entities.TaskStatus.Kapatildi)),
-                    PendingTasks = tasks.Count(t => t.Status == Entities.TaskStatus.Beklemede)
+                    TotalHours = a?.Hours ?? 0,
+                    TotalActivities = a?.Count ?? 0,
+                    CompletedTasks = t?.Completed ?? 0,
+                    PendingTasks = t?.Pending ?? 0
                 });
             }
 

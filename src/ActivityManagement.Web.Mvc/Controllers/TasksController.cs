@@ -332,14 +332,25 @@ namespace ActivityManagement.Web.Controllers
 
         public async Task<IActionResult> Edit(long id)
         {
-            var task = await _taskAppService.GetAsync(id);
-            var myEmpId = CurrentEmployeeId();
-            if (!IsManager() && !(task.AssignedEmployeeId.HasValue && myEmpId.HasValue && task.AssignedEmployeeId == myEmpId))
-                return AccessDeniedRedirect();
-            ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
-            ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
-            await LoadCategoriesViewBagAsync();
-            return View(ObjectMapper.Map<CreateUpdateTaskItemDto>(task));
+            try
+            {
+                var task = await _taskAppService.GetAsync(id);
+                if (task == null) { TempData["Uyari"] = "Görev bulunamadı."; return RedirectToAction("Index"); }
+                var myEmpId = CurrentEmployeeId();
+                if (!IsManager() && !(task.AssignedEmployeeId.HasValue && myEmpId.HasValue && task.AssignedEmployeeId == myEmpId))
+                    return AccessDeniedRedirect();
+                ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;
+                ViewBag.Projects = (await _projectAppService.GetAllListAsync()).Items;
+                await LoadCategoriesViewBagAsync();
+                return View(ObjectMapper.Map<CreateUpdateTaskItemDto>(task));
+            }
+            catch (Abp.UI.UserFriendlyException) { TempData["Uyari"] = "Görev bulunamadı."; return RedirectToAction("Index"); }
+            catch (Exception ex)
+            {
+                ActivityManagement.Logging.ErrorLog.Write(ex, "Tasks/Edit");
+                TempData["Uyari"] = "Görev açılırken bir sorun oluştu.";
+                return RedirectToAction("Index");
+            }
         }
 
         [HttpPost]
@@ -373,7 +384,13 @@ namespace ActivityManagement.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(long id)
         {
-            await _taskAppService.DeleteAsync(id);
+            try
+            {
+                await _taskAppService.DeleteAsync(id);
+                TempData["Success"] = "Görev silindi.";
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
+            catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Tasks/Delete"); TempData["Uyari"] = "Görev silinemedi."; }
             return RedirectToAction("Index");
         }
 
