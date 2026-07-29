@@ -139,24 +139,11 @@ namespace ActivityManagement.Web.BackgroundJobs
                     await uow.CompleteAsync();
                 }
 
-                // Watermark + durum (tüm batch'ler commit oldu → watermark güvenle ilerletilir)
-                using (var scope = _serviceProvider.CreateScope())
-                {
-                    var sp = scope.ServiceProvider;
-                    var uowManager = sp.GetRequiredService<IUnitOfWorkManager>();
-                    var sourceRepo = sp.GetRequiredService<IRepository<IntegrationSource, int>>();
-                    using var uow = uowManager.Begin();
-                    var src = await sourceRepo.GetAsync(sourceId);
-                    src.LastSyncUtc = runStartUtc;
-                    src.LastRunUtc = DateTime.Now;
-                    src.LastResult = $"OK: {count} kayıt";
-                    await uow.CompleteAsync();
-                    result = src.LastResult;
-                }
-
                 // (V2) Talep DETAYI: yorum + dosya + güncel durum aynası — yalnız portalın detay ucu açık
-                // kaynaklarda (DetailSyncEnabled). Best-effort: bir talebin detayı alınamazsa atlanır (loglanır),
-                // liste senkronu ve watermark etkilenmez. Liste zaten updatedSince ile süzülü → sınırlı sayıda detay.
+                // kaynaklarda (DetailSyncEnabled). Best-effort: bir talebin detayı alınamazsa atlanır (loglanır).
+                // WATERMARK'TAN ÖNCE yapılır: tur ortasında süreç çökerse/yeniden başlarsa watermark ilerlememiş
+                // olur ve sonraki tur aynı pencereyi yeniden çeker (idempotent upsert/ingest → güvenli).
+                int detailFail = 0;
                 if (detailSyncEnabled)
                 {
                     foreach (var wire in items)
@@ -178,9 +165,26 @@ namespace ActivityManagement.Web.BackgroundJobs
                         }
                         catch (Exception dex)
                         {
+                            detailFail++;
                             ActivityManagement.Logging.ErrorLog.Write(dex, $"RequestSync/{source}/Detail/{extRef}");
                         }
                     }
+                }
+
+                // Watermark + durum (liste batch'leri + detay senkronu bitti → watermark güvenle ilerletilir).
+                // Not: poison bir detay kaydında sonsuz yeniden-çekme olmasın diye kısmi hata olsa da ilerletilir (loglanır).
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var sp = scope.ServiceProvider;
+                    var uowManager = sp.GetRequiredService<IUnitOfWorkManager>();
+                    var sourceRepo = sp.GetRequiredService<IRepository<IntegrationSource, int>>();
+                    using var uow = uowManager.Begin();
+                    var src = await sourceRepo.GetAsync(sourceId);
+                    src.LastSyncUtc = runStartUtc;
+                    src.LastRunUtc = DateTime.Now;
+                    src.LastResult = detailFail > 0 ? $"OK: {count} kayıt ({detailFail} detay hatası)" : $"OK: {count} kayıt";
+                    await uow.CompleteAsync();
+                    result = src.LastResult;
                 }
             }
             catch (Exception ex)

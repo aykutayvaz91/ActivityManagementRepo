@@ -268,6 +268,14 @@ namespace ActivityManagement.Employees
             if (!isManager && input.Id != CurrentEmployeeId())
                 throw new UserFriendlyException("Sadece kendi kaydınızı düzenleyebilirsiniz.");
 
+            // GÜVENLİK: TakımLideri yalnız KENDİ takımının personelini düzenleyebilir (Admin/Manager tümü).
+            if (isManager)
+            {
+                var (scoped, teamId) = await TeamScopeAsync();
+                if (scoped && employee.TeamId != teamId)
+                    throw new UserFriendlyException("Yalnızca kendi takımınızdaki personeli düzenleyebilirsiniz.");
+            }
+
             // HASSAS alanlar (rol/aktiflik/hesap bağlantısı/takım) yalnız ADMIN tarafından değiştirilebilir.
             // (TakımLideri de dahil olmak üzere Admin olmayan hiç kimse AppRole'ü "Admin" yapıp yetki yükseltemez.)
             if (!isAdmin)
@@ -289,6 +297,11 @@ namespace ActivityManagement.Employees
         public async Task DeleteAsync(long id)
         {
             EnsureManager();
+            // GÜVENLİK: TakımLideri yalnız KENDİ takımının personelini silebilir (Admin/Manager tümü).
+            var target = await _employeeRepository.GetAsync(id);
+            var (scoped, teamId) = await TeamScopeAsync();
+            if (scoped && target.TeamId != teamId)
+                throw new UserFriendlyException("Yalnızca kendi takımınızdaki personeli silebilirsiniz.");
             await _employeeRepository.DeleteAsync(id);
         }
 

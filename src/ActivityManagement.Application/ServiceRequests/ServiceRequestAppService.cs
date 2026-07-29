@@ -467,6 +467,7 @@ namespace ActivityManagement.ServiceRequests
             string newId = null;
             var returnedAtts = new List<PortalAttachmentDto>();
             string localBody = body;
+            bool pushedOk = false;
 
             if (string.IsNullOrWhiteSpace(StripTags(body)) && files.Count == 0)
                 throw new UserFriendlyException("Yorum veya dosya girmelisiniz.");
@@ -479,6 +480,7 @@ namespace ActivityManagement.ServiceRequests
                 {
                     (newId, returnedAtts) = await PushCommentToPortalAsync(r, portalBody?.Trim(), isInternal, files);
                     localBody = portalBody; // portal aldı → görseller "Portal Dosya Ekleri"nde, gövde metin
+                    pushedOk = true;
                 }
                 catch (Exception ex) when (isInternal)
                 {
@@ -496,14 +498,23 @@ namespace ActivityManagement.ServiceRequests
                     throw new UserFriendlyException("Dış not (müşteriye açık) göndermek için bu kaynakta write-back açık olmalı (Admin → Entegrasyon). İç not olarak kaydedebilirsiniz.");
             }
 
-            // Yerel yorum aynası
-            r.Comments.Add(new ServiceRequestComment
+            // (B4) Yerel yorum aynası. Portala BAŞARIYLA gitti ama id DÖNMEDİYSE yerel kopya EKLENMEZ:
+            // aksi halde sonraki detay senkronu portalın gerçek id'siyle aynı yorumu getirir ve
+            // (null id ≠ gerçek id) dedup tutmaz → yorum İKİ KEZ görünürdü. Bu durumda senkron getirir.
+            if (pushedOk && string.IsNullOrWhiteSpace(newId))
             {
-                TenantId = r.TenantId, ServiceRequestId = r.Id,
-                ExternalCommentId = string.IsNullOrWhiteSpace(newId) ? null : newId,
-                AuthorName = Trunc(ctx.Email, 256), AuthorEmail = Trunc(ctx.Email, 256),
-                CommentDate = DateTime.Now, Body = localBody?.Trim(), IsInternal = isInternal
-            });
+                Logger.Warn($"Portal yorum id döndürmedi; yerel kopya atlandı, senkron getirecek (Source={r.Source}, Ref={r.ExternalRef}).");
+            }
+            else
+            {
+                r.Comments.Add(new ServiceRequestComment
+                {
+                    TenantId = r.TenantId, ServiceRequestId = r.Id,
+                    ExternalCommentId = string.IsNullOrWhiteSpace(newId) ? null : newId,
+                    AuthorName = Trunc(ctx.Email, 256), AuthorEmail = Trunc(ctx.Email, 256),
+                    CommentDate = DateTime.Now, Body = localBody?.Trim(), IsInternal = isInternal
+                });
+            }
 
             // Portalın döndürdüğü ekleri yerel aynaya (dedup ExternalAttachmentId) → "Portal Dosya Ekleri"nde görünür + indirilebilir
             if (returnedAtts.Count > 0)
@@ -880,7 +891,8 @@ namespace ActivityManagement.ServiceRequests
             entity.ReceivedDate = input.ReceivedDate ?? entity.ReceivedDate ?? DateTime.Now;
             entity.DueDate = input.DueDate ?? entity.DueDate;
             // Portalın HAM durum etiketini sakla (9'lu destek durumu; bizim 7'liye eşlenirken kaybolan detay burada durur).
-            if (!string.IsNullOrWhiteSpace(input.StatusText)) entity.PortalStatusText = input.StatusText.Trim();
+            // (B3) kod ("in_progress") veya etiket ("İşlemde") gelse de katalog ETİKETİNE normalize et → dropdown/rozet tutarlı
+            if (!string.IsNullOrWhiteSpace(input.StatusText)) entity.PortalStatusText = PortalStatusCatalog.LabelOf(input.StatusText.Trim());
             if (mappedScore.HasValue) entity.PriorityScore = ClampScore(mappedScore.Value);
             bool wasUnassigned = !entity.AssignedEmployeeId.HasValue;
             // Atanan boşsa ve portal artık eşleşen kişi veriyorsa doldur (manuel atamayı EZMEZ; yalnız null'ı doldurur).
@@ -994,7 +1006,7 @@ namespace ActivityManagement.ServiceRequests
             if (entity == null) return; // talep henüz senkronlanmamış → atla (bir sonraki liste pull'unda gelir)
 
             // Durum aynası (Çözüldü/Kapandı/İptal + ara durumlar; yerelde kapalıysa dokunma)
-            if (!string.IsNullOrWhiteSpace(detail.StatusText)) entity.PortalStatusText = detail.StatusText.Trim();
+            if (!string.IsNullOrWhiteSpace(detail.StatusText)) entity.PortalStatusText = PortalStatusCatalog.LabelOf(detail.StatusText.Trim());
             var mapped = MapStatusText(detail.StatusText);
             if (mapped.HasValue && entity.Status != mapped.Value
                 && entity.Status != RequestStatus.Kapandi && entity.Status != RequestStatus.Iptal)
