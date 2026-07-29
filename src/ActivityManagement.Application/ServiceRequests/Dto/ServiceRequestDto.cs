@@ -160,6 +160,8 @@ namespace ActivityManagement.ServiceRequests.Dto
         public string Name { get; set; }
         public string Url { get; set; }
         public long SizeBytes { get; set; }
+        // Portal bazı yanıtlarda "size", bazılarında "sizeBytes" döndürüyor → ikisini de kabul et (0 KB göstermemek için).
+        public long Size { get => SizeBytes; set { if (value != 0 && SizeBytes == 0) SizeBytes = value; } }
         public string ContentType { get; set; }
         public DateTime? UploadedAt { get; set; }
     }
