@@ -44,6 +44,7 @@ namespace ActivityManagement.Web.Controllers
         private readonly ActivityManagement.Authorization.IAccessControlAppService _accessControlAppService;
         private readonly ActivityManagement.SystemSettings.IIntegrationSettingsAppService _integrationAppService;
         private readonly Microsoft.AspNetCore.Hosting.IWebHostEnvironment _env;
+        private readonly ActivityManagement.Web.Helpers.UploadStorage _uploads;
 
         public AdminController(
             IEmployeeAppService employeeAppService,
@@ -59,7 +60,8 @@ namespace ActivityManagement.Web.Controllers
             ActivityManagement.Theming.IThemeSettingsAppService themeAppService,
             ActivityManagement.Authorization.IAccessControlAppService accessControlAppService,
             ActivityManagement.SystemSettings.IIntegrationSettingsAppService integrationAppService,
-            Microsoft.AspNetCore.Hosting.IWebHostEnvironment env)
+            Microsoft.AspNetCore.Hosting.IWebHostEnvironment env,
+            ActivityManagement.Web.Helpers.UploadStorage uploads)
         {
             _employeeAppService = employeeAppService;
             _projectAppService = projectAppService;
@@ -75,6 +77,7 @@ namespace ActivityManagement.Web.Controllers
             _accessControlAppService = accessControlAppService;
             _integrationAppService = integrationAppService;
             _env = env;
+            _uploads = uploads;
         }
 
         // FAZ 2 — Entegrasyon Ayarları (webhook + pull kaynakları) — sadece Admin
@@ -194,11 +197,10 @@ namespace ActivityManagement.Web.Controllers
                     // GÜVENLİK: logo yalnızca güvenli raster görsel (svg reddedilir — script taşıyabilir → XSS)
                     if (!ActivityManagement.Web.Helpers.UploadValidator.IsInlineSafe(logoFile.FileName))
                     { TempData["Error"] = "Logo yalnızca PNG/JPG/GIF/WEBP olabilir."; return RedirectToAction("Theme"); }
-                    var uploads = System.IO.Path.Combine(_env.WebRootPath, "uploads", "brand");
-                    System.IO.Directory.CreateDirectory(uploads);
+                    var brandDir = _uploads.EnsureSubDir("brand");
                     var ext = System.IO.Path.GetExtension(logoFile.FileName);
                     var fileName = "logo" + ext;
-                    var full = System.IO.Path.Combine(uploads, fileName);
+                    var full = System.IO.Path.Combine(brandDir, fileName);
                     using (var fs = new System.IO.FileStream(full, System.IO.FileMode.Create))
                         await logoFile.CopyToAsync(fs);
                     dto.LogoUrl = "/uploads/brand/" + fileName + "?v=" + System.DateTime.Now.Ticks;
@@ -592,6 +594,48 @@ namespace ActivityManagement.Web.Controllers
             wb.SaveAs(ms);
             return File(ms.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 $"SistemLoglari_{DateTime.Today:yyyyMMdd}.xlsx");
+        }
+
+        // Denetim ARŞİVİ (geçmiş yıllara ait, taşınmış kayıtlar) — sadece Admin
+        public async Task<IActionResult> SystemLogsArchive(ActivityManagement.Auditing.Dto.GetAuditLogsInput input)
+        {
+            if (!IsAdmin()) return AccessDeniedRedirect();
+            input.MaxResultCount = input.MaxResultCount > 0 ? input.MaxResultCount : 100;
+            var result = await _auditLogAppService.GetArchiveAsync(input);
+            ViewBag.Input = input;
+            ViewBag.TotalCount = result.TotalCount;
+            ViewBag.Summary = await _auditLogAppService.GetArchiveSummaryAsync();
+            return View(result.Items);
+        }
+
+        public async Task<IActionResult> ExportSystemLogsArchiveExcel(ActivityManagement.Auditing.Dto.GetAuditLogsInput input)
+        {
+            if (!IsAdmin()) return AccessDeniedRedirect();
+            input.MaxResultCount = 50000;
+            var result = await _auditLogAppService.GetArchiveAsync(input);
+
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add("Denetim Arşivi");
+            var headers = new[] { "Tarih/Saat", "Kullanıcı", "IP", "İşlem", "Varlık", "Kayıt", "Eski Değerler", "Yeni Değerler" };
+            for (int i = 0; i < headers.Length; i++) ws.Cell(1, i + 1).Value = headers[i];
+            int row = 2;
+            foreach (var a in result.Items)
+            {
+                ws.Cell(row, 1).Value = a.ExecutionTime.ToString("dd.MM.yyyy HH:mm:ss");
+                ws.Cell(row, 2).Value = a.UserName;
+                ws.Cell(row, 3).Value = a.ClientIpAddress;
+                ws.Cell(row, 4).Value = a.ActionType;
+                ws.Cell(row, 5).Value = a.EntityName;
+                ws.Cell(row, 6).Value = a.EntityId;
+                ws.Cell(row, 7).Value = a.OriginalValues;
+                ws.Cell(row, 8).Value = a.NewValues;
+                row++;
+            }
+            ws.Columns().AdjustToContents();
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            return File(ms.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"DenetimArsivi_{DateTime.Today:yyyyMMdd}.xlsx");
         }
 
         // Alt kategori Sorumluluk Matrisi (Admin + TakımLideri)

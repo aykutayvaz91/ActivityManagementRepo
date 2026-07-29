@@ -28,6 +28,7 @@ namespace ActivityManagement.Web.Controllers
         private readonly ITeamAppService _teamAppService;
         private readonly ActivityManagement.Responsibilities.ISubCategoryResponsibilityAppService _subCatRespAppService;
         private readonly IWebHostEnvironment _env;
+        private readonly ActivityManagement.Web.Helpers.UploadStorage _uploads;
 
         public TasksController(
             ITaskItemAppService taskAppService,
@@ -36,7 +37,8 @@ namespace ActivityManagement.Web.Controllers
             ICategoryAppService categoryAppService,
             ITeamAppService teamAppService,
             ActivityManagement.Responsibilities.ISubCategoryResponsibilityAppService subCatRespAppService,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            ActivityManagement.Web.Helpers.UploadStorage uploads)
         {
             _taskAppService = taskAppService;
             _employeeAppService = employeeAppService;
@@ -45,6 +47,7 @@ namespace ActivityManagement.Web.Controllers
             _teamAppService = teamAppService;
             _subCatRespAppService = subCatRespAppService;
             _env = env;
+            _uploads = uploads;
         }
 
         // Alt kategori → (asıl, yedek) sorumlu haritası (sorumluluk matrisi). Görev oluştururken 1./2. sorumlu ön-seçimi.
@@ -453,8 +456,7 @@ namespace ActivityManagement.Web.Controllers
                 if (hasFiles)
                 {
                     var relDir = $"/uploads/tasks/{taskId}";
-                    var absDir = Path.Combine(_env.WebRootPath, "uploads", "tasks", taskId.ToString());
-                    Directory.CreateDirectory(absDir);
+                    var absDir = _uploads.EnsureSubDir("tasks", taskId.ToString());
                     foreach (var f in files.Where(f => f != null && f.Length > 0))
                     {
                         var safeName = Path.GetFileName(f.FileName);

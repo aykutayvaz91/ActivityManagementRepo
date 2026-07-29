@@ -15,24 +15,25 @@ namespace ActivityManagement.Web.Controllers
         private readonly ITeamAppService _teamAppService;
         private readonly ISubCategoryResponsibilityAppService _responsibilityAppService;
         private readonly Microsoft.AspNetCore.Hosting.IWebHostEnvironment _env;
+        private readonly ActivityManagement.Web.Helpers.UploadStorage _uploads;
 
-        public EmployeesController(IEmployeeAppService employeeAppService, ITeamAppService teamAppService, ISubCategoryResponsibilityAppService responsibilityAppService, Microsoft.AspNetCore.Hosting.IWebHostEnvironment env)
+        public EmployeesController(IEmployeeAppService employeeAppService, ITeamAppService teamAppService, ISubCategoryResponsibilityAppService responsibilityAppService, Microsoft.AspNetCore.Hosting.IWebHostEnvironment env, ActivityManagement.Web.Helpers.UploadStorage uploads)
         {
             _employeeAppService = employeeAppService;
             _teamAppService = teamAppService;
+            _uploads = uploads;
             _responsibilityAppService = responsibilityAppService;
             _env = env;
         }
 
-        // Profil fotoğrafını wwwroot/uploads/photos altına kaydeder, göreli URL döner (V4)
+        // Profil fotoğrafını depolama kökü altında uploads/photos'a kaydeder, göreli URL döner (V4)
         private async Task<string> SavePhotoAsync(Microsoft.AspNetCore.Http.IFormFile photo)
         {
             if (photo == null || photo.Length == 0) return null;
             // GÜVENLİK: yalnız güvenli görsel türü (svg/html vb. reddedilir → depolanmış XSS önlenir)
             if (!ActivityManagement.Web.Helpers.UploadValidator.IsInlineSafe(photo.FileName))
                 throw new Abp.UI.UserFriendlyException("Fotoğraf yalnızca PNG/JPG/GIF/WEBP olabilir.");
-            var dir = System.IO.Path.Combine(_env.WebRootPath, "uploads", "photos");
-            System.IO.Directory.CreateDirectory(dir);
+            var dir = _uploads.EnsureSubDir("photos");
             var ext = System.IO.Path.GetExtension(photo.FileName);
             var name = System.Guid.NewGuid().ToString("N") + ext;
             var full = System.IO.Path.Combine(dir, name);
@@ -120,7 +121,9 @@ namespace ActivityManagement.Web.Controllers
             }
             var url = await SavePhotoAsync(photoFile);
             if (url != null) input.PhotoUrl = url;
-            await _employeeAppService.UpdateAsync(input);
+            var updated = await _employeeAppService.UpdateAsync(input);
+            if (!string.IsNullOrWhiteSpace(updated?.HandoverInfo))
+                TempData["Uyari"] = "Açık işler yedeğe devredildi → " + updated.HandoverInfo;
             return RedirectToAction("Index");
         }
 

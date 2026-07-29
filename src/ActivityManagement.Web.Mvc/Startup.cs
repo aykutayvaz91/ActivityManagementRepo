@@ -62,11 +62,17 @@ namespace ActivityManagement.Web
             services.AddSession();
             services.AddHttpContextAccessor();
 
+            // Yüklenen dosyaların depolama kökü (Storage:UploadsPath → D:\Uploads). Tek örnek yeter.
+            services.AddSingleton<ActivityManagement.Web.Helpers.UploadStorage>();
+
             // Günlük SLA hatırlatma servisi (SMTP yapılandırılmamışsa no-op)
             services.AddHostedService<ActivityManagement.Web.BackgroundJobs.SlaReminderHostedService>();
 
             // Otomatik arşiv: tamamlandığı AY geçen görevleri "Kapatıldı"ya çeker (~12 saatte bir)
             services.AddHostedService<ActivityManagement.Web.BackgroundJobs.TaskAutoCloseHostedService>();
+
+            // Yıllık arşiv: geçmiş yıla ait denetim kayıtlarını arşiv tablosuna taşır + eski bildirimleri siler (~24 saatte bir)
+            services.AddHostedService<ActivityManagement.Web.BackgroundJobs.ArchiveHostedService>();
 
             // FAZ 2 — Talep PULL senkron servisi (Admin → Entegrasyon; varsayılan kapalı, no-op)
             services.AddHttpClient();
@@ -187,8 +193,26 @@ namespace ActivityManagement.Web
                 await next();
             });
 
-            // GÜVENLİK: nosniff (MIME sniffing kapalı) + /uploads altında görsel-olmayan dosyaları
-            // "attachment" (indirme) olarak sun → yüklenen metin/HTML tarayıcıda ÇALIŞTIRILMAZ (depolanmış XSS önlenir).
+            // Yüklenen dosyalar AYRI storage kökünden (D:\Uploads) /uploads altında sunulur.
+            // GÜVENLİK: nosniff (MIME sniffing kapalı) + görsel-olmayan dosyalar "attachment" (indirme)
+            // → yüklenen metin/HTML tarayıcıda ÇALIŞTIRILMAZ (depolanmış XSS önlenir).
+            var uploadRoot = app.ApplicationServices
+                .GetRequiredService<ActivityManagement.Web.Helpers.UploadStorage>().Root;
+            app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
+            {
+                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadRoot),
+                RequestPath = "/uploads",
+                OnPrepareResponse = ctx =>
+                {
+                    ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                    // RequestPath eşlemesi nedeniyle burada yol "/uploads" öneki olmadan gelir; uzantı kontrolü yeterli.
+                    var p = ctx.Context.Request.Path.Value ?? "";
+                    if (!ActivityManagement.Web.Helpers.UploadValidator.IsInlineSafe(p))
+                        ctx.Context.Response.Headers["Content-Disposition"] = "attachment";
+                }
+            });
+
+            // Diğer statik varlıklar (css/js/img) wwwroot'tan; /uploads altındaki görsel-olmayanlara yine nosniff+attachment.
             app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
             {
                 OnPrepareResponse = ctx =>

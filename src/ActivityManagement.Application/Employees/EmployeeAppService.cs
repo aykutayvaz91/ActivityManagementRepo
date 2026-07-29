@@ -25,6 +25,9 @@ namespace ActivityManagement.Employees
         private readonly IRepository<ProjectEmployee, long> _projectEmployeeRepository;
         private readonly IRepository<TaskItem, long> _taskRepository;
         private readonly IRepository<Project, long> _projectRepository;
+        private readonly IRepository<ServiceRequest, long> _requestRepository;
+        private readonly IRepository<TaskComment, long> _taskCommentRepository;
+        private readonly IRepository<ServiceRequestComment, long> _requestCommentRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public EmployeeAppService(
@@ -33,6 +36,9 @@ namespace ActivityManagement.Employees
             IRepository<ProjectEmployee, long> projectEmployeeRepository,
             IRepository<TaskItem, long> taskRepository,
             IRepository<Project, long> projectRepository,
+            IRepository<ServiceRequest, long> requestRepository,
+            IRepository<TaskComment, long> taskCommentRepository,
+            IRepository<ServiceRequestComment, long> requestCommentRepository,
             IHttpContextAccessor httpContextAccessor)
         {
             _employeeRepository = employeeRepository;
@@ -40,8 +46,108 @@ namespace ActivityManagement.Employees
             _projectEmployeeRepository = projectEmployeeRepository;
             _taskRepository = taskRepository;
             _projectRepository = projectRepository;
+            _requestRepository = requestRepository;
+            _taskCommentRepository = taskCommentRepository;
+            _requestCommentRepository = requestCommentRepository;
             _httpContextAccessor = httpContextAccessor;
         }
+
+        // (Handover) Kişi izne çıkınca / pasife alınınca / silinince AÇIK işleri 2. sorumluya (yedek) devredilir;
+        // her devirde iç not bırakılır ("neden" belli olsun). Yedek yoksa iş elde bırakılır + uyarı notu düşülür.
+        // Dönüş: devir özet metni (kullanıcıya bilgi için).
+        private async Task<string> HandoverOpenWorkAsync(Employee person, string reason)
+        {
+            if (person == null) return null;
+            // İsim haritası (tek sorgu)
+            var nameMap = await _employeeRepository.GetAll().AsNoTracking()
+                .Select(e => new { e.Id, e.FirstName, e.LastName })
+                .ToDictionaryAsync(e => e.Id, e => (e.FirstName + " " + e.LastName).Trim());
+            string NameOf(long? id) => id.HasValue && nameMap.TryGetValue(id.Value, out var n) ? n : "?";
+            var stamp = DateTime.Now.ToString("dd.MM.yyyy");
+            int movedTasks = 0, orphanTasks = 0, movedReqs = 0, orphanReqs = 0;
+
+            // AÇIK GÖREVLER (tamamlanmamış/iptal olmamış), 1. sorumlu = kişi
+            var tasks = await _taskRepository.GetAll()
+                .Where(t => t.AssignedEmployeeId == person.Id
+                            && t.Status != Entities.TaskStatus.Tamamlandi
+                            && t.Status != Entities.TaskStatus.Kapatildi
+                            && t.Status != Entities.TaskStatus.Iptal)
+                .ToListAsync();
+            foreach (var t in tasks)
+            {
+                if (t.SecondaryEmployeeId.HasValue && t.SecondaryEmployeeId.Value != person.Id)
+                {
+                    var sec = t.SecondaryEmployeeId.Value;
+                    t.AssignedEmployeeId = sec;           // 2. sorumlu ana sorumlu olur
+                    t.SecondaryEmployeeId = person.Id;    // kişi yedeğe geçer
+                    await _taskCommentRepository.InsertAsync(new TaskComment
+                    {
+                        TenantId = AbpSession.TenantId ?? 1,
+                        TaskItemId = t.Id, IsInternal = true, AuthorName = "Sistem",
+                        Comment = $"[{reason}] {person.FullName} nedeniyle görev 2. sorumlu {NameOf(sec)} kişisine devredildi ({stamp})."
+                    });
+                    movedTasks++;
+                }
+                else
+                {
+                    await _taskCommentRepository.InsertAsync(new TaskComment
+                    {
+                        TenantId = AbpSession.TenantId ?? 1,
+                        TaskItemId = t.Id, IsInternal = true, AuthorName = "Sistem",
+                        Comment = $"[{reason}] {person.FullName} — tanımlı yedek (2. sorumlu) yok; görev ELDE kaldı, elle yeniden atanmalı ({stamp})."
+                    });
+                    orphanTasks++;
+                }
+            }
+
+            // AÇIK TALEPLER (kapanmamış/iptal olmamış), 1. sorumlu = kişi
+            var reqs = await _requestRepository.GetAll()
+                .Where(r => r.AssignedEmployeeId == person.Id
+                            && r.Status != RequestStatus.Kapandi
+                            && r.Status != RequestStatus.Iptal)
+                .ToListAsync();
+            foreach (var r in reqs)
+            {
+                if (r.SecondaryEmployeeId.HasValue && r.SecondaryEmployeeId.Value != person.Id)
+                {
+                    var sec = r.SecondaryEmployeeId.Value;
+                    r.AssignedEmployeeId = sec;
+                    r.SecondaryEmployeeId = person.Id;
+                    await _requestCommentRepository.InsertAsync(new ServiceRequestComment
+                    {
+                        TenantId = r.TenantId, ServiceRequestId = r.Id, IsInternal = true,
+                        AuthorName = "Sistem", CommentDate = DateTime.Now,
+                        Body = $"[{reason}] {person.FullName} nedeniyle talep 2. sorumlu {NameOf(sec)} kişisine devredildi ({stamp})."
+                    });
+                    movedReqs++;
+                }
+                else
+                {
+                    await _requestCommentRepository.InsertAsync(new ServiceRequestComment
+                    {
+                        TenantId = r.TenantId, ServiceRequestId = r.Id, IsInternal = true,
+                        AuthorName = "Sistem", CommentDate = DateTime.Now,
+                        Body = $"[{reason}] {person.FullName} — yedek yok; talep ELDE kaldı, elle atanmalı ({stamp})."
+                    });
+                    orphanReqs++;
+                }
+            }
+
+            await CurrentUnitOfWork.SaveChangesAsync();
+            if (movedTasks + orphanTasks + movedReqs + orphanReqs == 0) return null;
+            var parts = new System.Collections.Generic.List<string>();
+            if (movedTasks > 0) parts.Add($"{movedTasks} görev yedeğe devredildi");
+            if (movedReqs > 0) parts.Add($"{movedReqs} talep yedeğe devredildi");
+            if (orphanTasks > 0) parts.Add($"{orphanTasks} görev yedeksiz (elde kaldı)");
+            if (orphanReqs > 0) parts.Add($"{orphanReqs} talep yedeksiz (elde kaldı)");
+            return $"{person.FullName}: " + string.Join(", ", parts) + ".";
+        }
+
+        // Kişi bugün fiilen izinli mi (işaret + tarih aralığı)
+        private static bool IsOnLeaveNow(Employee e) =>
+            e != null && e.IsOnLeave
+            && (!e.LeaveStartDate.HasValue || e.LeaveStartDate.Value.Date <= DateTime.Today)
+            && (!e.LeaveEndDate.HasValue || e.LeaveEndDate.Value.Date >= DateTime.Today);
 
         // Personel sayfasını düzenleme (ekle/güncelle/sil) yetkisi: sadece Admin/Takım Lideri.
         // Görüntüleme (GetAll/GetAsync/GetCard) herkese açık kalır.
@@ -289,9 +395,23 @@ namespace ActivityManagement.Employees
             // Manager admin gibi TÜM takımları görür → takımsız kalır (rol Manager ise takım bağını kaldır).
             if (string.Equals(input.AppRole, "Manager", StringComparison.OrdinalIgnoreCase)) input.TeamId = null;
 
+            // DEVİR (handover) için ÖNCEKİ durumu yakala.
+            bool wasOnLeaveNow = IsOnLeaveNow(employee);
+            bool wasActive = employee.IsActive;
+
             ObjectMapper.Map(input, employee);
             await _employeeRepository.UpdateAsync(employee);
-            return ObjectMapper.Map<EmployeeDto>(employee);
+
+            // Geçiş: (a) yeni fiilen izinli oldu, (b) aktifken pasife alındı → açık işleri yedeğe devret + iz bırak.
+            string handoverInfo = null;
+            if (!wasOnLeaveNow && IsOnLeaveNow(employee))
+                handoverInfo = await HandoverOpenWorkAsync(employee, "İzin");
+            else if (wasActive && !employee.IsActive)
+                handoverInfo = await HandoverOpenWorkAsync(employee, "Personel pasife alındı");
+
+            var dto = ObjectMapper.Map<EmployeeDto>(employee);
+            dto.HandoverInfo = handoverInfo; // controller TempData ile kullanıcıya bildirir
+            return dto;
         }
 
         public async Task DeleteAsync(long id)
@@ -302,6 +422,8 @@ namespace ActivityManagement.Employees
             var (scoped, teamId) = await TeamScopeAsync();
             if (scoped && target.TeamId != teamId)
                 throw new UserFriendlyException("Yalnızca kendi takımınızdaki personeli silebilirsiniz.");
+            // AYRILMA/SİLME: silmeden ÖNCE açık işleri yedeğe devret + iz bırak.
+            await HandoverOpenWorkAsync(target, "Personel silindi/ayrıldı");
             await _employeeRepository.DeleteAsync(id);
         }
 

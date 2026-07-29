@@ -24,6 +24,7 @@ namespace ActivityManagement.EntityFrameworkCore
         public DbSet<Team> Teams { get; set; }
         public DbSet<EmailSettings> EmailSettings { get; set; }
         public DbSet<SystemAuditLog> SystemAuditLogs { get; set; }
+        public DbSet<SystemAuditLogArchive> SystemAuditLogArchives { get; set; }
         public DbSet<SubCategoryResponsibility> SubCategoryResponsibilities { get; set; }
         public DbSet<ActivityTypeDef> ActivityTypes { get; set; }
         public DbSet<ThemeSettings> ThemeSettings { get; set; }
@@ -457,6 +458,19 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.HasIndex(a => a.ExecutionTime);
                 b.HasIndex(a => a.EntityName);
             });
+
+            modelBuilder.Entity<SystemAuditLogArchive>(b =>
+            {
+                b.ToTable("SystemAuditLogArchives");
+                b.Property(a => a.ActionType).HasMaxLength(16);
+                b.Property(a => a.EntityName).HasMaxLength(128);
+                b.Property(a => a.EntityId).HasMaxLength(64);
+                b.Property(a => a.UserName).HasMaxLength(256);
+                b.Property(a => a.ClientIpAddress).HasMaxLength(64);
+                b.HasIndex(a => a.ExecutionTime);
+                b.HasIndex(a => a.EntityName);
+                b.HasIndex(a => a.OriginalId);
+            });
         }
 
         // --- Denetim (Audit) interceptor: tüm Create/Update/Delete otomatik loglanır ---
@@ -495,6 +509,8 @@ namespace ActivityManagement.EntityFrameworkCore
             foreach (var entry in ChangeTracker.Entries())
             {
                 if (entry.Entity is SystemAuditLog) continue;
+                if (entry.Entity is SystemAuditLogArchive) continue; // arşivleme kendini loglamaz (özyineleme/gürültü önlenir)
+                if (entry.Entity is Notification) continue;           // in-app bildirim geçici UX kaydı → denetlenmez (audit büyümesini de azaltır)
                 if (entry.State != EntityState.Added && entry.State != EntityState.Modified && entry.State != EntityState.Deleted) continue;
 
                 var pa = new PendingAudit

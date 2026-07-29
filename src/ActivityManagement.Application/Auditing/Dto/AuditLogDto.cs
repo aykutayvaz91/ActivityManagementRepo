@@ -5,7 +5,7 @@ using ActivityManagement.Entities;
 
 namespace ActivityManagement.Auditing.Dto
 {
-    [AutoMapFrom(typeof(SystemAuditLog))]
+    [AutoMapFrom(typeof(SystemAuditLog), typeof(SystemAuditLogArchive))]
     public class AuditLogDto : EntityDto<long>
     {
         public long? UserId { get; set; }
@@ -26,5 +26,13 @@ namespace ActivityManagement.Auditing.Dto
         public string UserName { get; set; }
         public string ActionType { get; set; }
         public string EntityName { get; set; }
+    }
+
+    // Arşiv ekranı başlığı için özet.
+    public class ArchiveSummaryDto
+    {
+        public int Count { get; set; }
+        public DateTime? Oldest { get; set; }
+        public DateTime? Newest { get; set; }
     }
 }

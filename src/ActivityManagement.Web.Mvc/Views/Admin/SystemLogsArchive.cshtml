@@ -1,9 +1,10 @@
 @model System.Collections.Generic.IReadOnlyList<ActivityManagement.Auditing.Dto.AuditLogDto>
 @{
-    ViewData["Title"] = "Sistem Logları";
+    ViewData["Title"] = "Denetim Arşivi";
     Layout = "~/Views/Shared/_Layout.cshtml";
     var input = ViewBag.Input as ActivityManagement.Auditing.Dto.GetAuditLogsInput ?? new ActivityManagement.Auditing.Dto.GetAuditLogsInput();
     var total = (int)(ViewBag.TotalCount ?? 0);
+    var summary = ViewBag.Summary as ActivityManagement.Auditing.Dto.ArchiveSummaryDto;
     string ActBadge(string a) => a == "Create" ? "success" : a == "Update" ? "warning" : a == "Delete" ? "danger" : "secondary";
 }
 
@@ -11,13 +12,26 @@
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="/Admin">Admin Panel</a></li>
-            <li class="breadcrumb-item active">Sistem Logları</li>
+            <li class="breadcrumb-item"><a href="/Admin/SystemLogs">Sistem Logları</a></li>
+            <li class="breadcrumb-item active">Arşiv</li>
         </ol>
     </nav>
-    <div class="d-flex gap-2">
-        <a href="/Admin/SystemLogsArchive" class="btn btn-outline-secondary btn-sm"><i class="fas fa-box-archive me-1"></i>Arşiv</a>
-        <a href="/Admin/ExportSystemLogsExcel?startDate=@(input.StartDate?.ToString("yyyy-MM-dd"))&endDate=@(input.EndDate?.ToString("yyyy-MM-dd"))&userName=@input.UserName&actionType=@input.ActionType&entityName=@input.EntityName"
-           class="btn btn-success btn-sm"><i class="fas fa-file-excel me-1"></i>Excel</a>
+    <a href="/Admin/ExportSystemLogsArchiveExcel?startDate=@(input.StartDate?.ToString("yyyy-MM-dd"))&endDate=@(input.EndDate?.ToString("yyyy-MM-dd"))&userName=@input.UserName&actionType=@input.ActionType&entityName=@input.EntityName"
+       class="btn btn-success btn-sm"><i class="fas fa-file-excel me-1"></i>Excel</a>
+</div>
+
+<div class="alert alert-secondary d-flex align-items-center py-2 small">
+    <i class="fas fa-box-archive me-2"></i>
+    <div>
+        Bu ekran, yıllık arşiv işiyle <strong>geçmiş yıllara</strong> ait taşınan denetim kayıtlarını gösterir (sıcak tablodan çıkarılmıştır).
+        @if (summary != null && summary.Count > 0)
+        {
+            <text> Arşivde <strong>@summary.Count</strong> kayıt var — @summary.Oldest?.ToString("dd.MM.yyyy") ile @summary.Newest?.ToString("dd.MM.yyyy") arası.</text>
+        }
+        else
+        {
+            <text> Arşiv henüz boş (geçmiş yıla ait kayıt oluştuğunda otomatik dolar).</text>
+        }
     </div>
 </div>
 
@@ -107,4 +121,4 @@
         </table>
     </div>
 </div>
-<p class="text-muted small mt-2">Toplam @total kayıt (en son 100 gösteriliyor; filtre ile daraltın veya Excel'e aktarın).</p>
+<p class="text-muted small mt-2">Filtreye uyan @total kayıt (en son 100 gösteriliyor; filtre ile daraltın veya Excel'e aktarın).</p>
