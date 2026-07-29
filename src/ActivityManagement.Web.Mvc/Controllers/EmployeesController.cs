@@ -28,6 +28,9 @@ namespace ActivityManagement.Web.Controllers
         private async Task<string> SavePhotoAsync(Microsoft.AspNetCore.Http.IFormFile photo)
         {
             if (photo == null || photo.Length == 0) return null;
+            // GÜVENLİK: yalnız güvenli görsel türü (svg/html vb. reddedilir → depolanmış XSS önlenir)
+            if (!ActivityManagement.Web.Helpers.UploadValidator.IsInlineSafe(photo.FileName))
+                throw new Abp.UI.UserFriendlyException("Fotoğraf yalnızca PNG/JPG/GIF/WEBP olabilir.");
             var dir = System.IO.Path.Combine(_env.WebRootPath, "uploads", "photos");
             System.IO.Directory.CreateDirectory(dir);
             var ext = System.IO.Path.GetExtension(photo.FileName);

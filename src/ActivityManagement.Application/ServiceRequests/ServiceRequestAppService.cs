@@ -215,11 +215,12 @@ namespace ActivityManagement.ServiceRequests
         public async Task<ServiceRequestDto> GetAsync(long id)
         {
             var ctx = CurrentContext();
-            var r = await WithIncludes(_requestRepository.GetAll().AsNoTracking())
+            // GÜVENLİK (IDOR): detay da listelerle AYNI görünürlük kapsamına tabi — kapsam dışıysa kayıt "yok" sayılır.
+            var r = await WithIncludes(ApplyVisibilityScope(_requestRepository.GetAll().AsNoTracking()))
                 .Include(x => x.Comments)      // detayda portal yorumları + dosya ekleri (listelerde yüklenmez)
                 .Include(x => x.Attachments)
                 .FirstOrDefaultAsync(x => x.Id == id);
-            if (r == null) throw new UserFriendlyException("Talep bulunamadı.");
+            if (r == null) throw new UserFriendlyException("Talep bulunamadı veya erişim yetkiniz yok.");
             var dto = MapRequest(r, ctx);
             // (C13) Portal talebinde durum/yorum write-back UI'si için kaynağın write-back durumu
             if (dto.IsPortal)
@@ -561,6 +562,43 @@ namespace ActivityManagement.ServiceRequests
         private static string PortalBasePath(string baseUrl)
             => baseUrl.Contains("?") ? baseUrl.Substring(0, baseUrl.IndexOf('?')) : baseUrl;
 
+        // Bilinen portal dosya backend host'ları (destek/Cortex ekleri bu Azure backend'inden servis edilir).
+        // Not: ileride kaynak başına yapılandırılabilir alana taşınabilir (şimdilik sabit allow-list).
+        private static readonly System.Collections.Generic.HashSet<string> KnownPortalFileHosts =
+            new(StringComparer.OrdinalIgnoreCase) { "cortixsuite.azurewebsites.net" };
+
+        // Portal dosya URL'si güvenli mi: https + host allow-list (BaseUrl host + bilinen backend) + özel-IP reddi.
+        private static bool IsAllowedPortalFileUrl(string baseUrl, string fileUrl, out Uri uri)
+        {
+            uri = null;
+            if (string.IsNullOrWhiteSpace(fileUrl) || !Uri.TryCreate(fileUrl, UriKind.Absolute, out var u)) return false;
+            if (!string.Equals(u.Scheme, "https", StringComparison.OrdinalIgnoreCase)) return false;
+
+            var allowed = new System.Collections.Generic.HashSet<string>(KnownPortalFileHosts, StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(baseUrl) && Uri.TryCreate(baseUrl, UriKind.Absolute, out var bu))
+                allowed.Add(bu.Host);
+            if (!allowed.Contains(u.Host)) return false;
+
+            if (System.Net.IPAddress.TryParse(u.Host, out var ip) && IsPrivateOrLoopback(ip)) return false;
+            uri = u;
+            return true;
+        }
+
+        private static bool IsPrivateOrLoopback(System.Net.IPAddress ip)
+        {
+            if (System.Net.IPAddress.IsLoopback(ip)) return true;
+            var b = ip.GetAddressBytes();
+            if (b.Length == 4)
+            {
+                if (b[0] == 10) return true;
+                if (b[0] == 172 && b[1] >= 16 && b[1] <= 31) return true;
+                if (b[0] == 192 && b[1] == 168) return true;
+                if (b[0] == 169 && b[1] == 254) return true;   // link-local / cloud metadata
+                if (b[0] == 127) return true;
+            }
+            return false;
+        }
+
         private Task PushStatusToPortalAsync(ServiceRequest r, RequestStatus status, string note)
             => PushStatusRawToPortalAsync(r, StatusToPortalText(status), note);
 
@@ -723,6 +761,11 @@ namespace ActivityManagement.ServiceRequests
 
         public async Task<List<ActivityLogDto>> GetEffortsAsync(long serviceRequestId)
         {
+            // GÜVENLİK (IDOR): talebi göremeyen kullanıcı eforlarını da göremez.
+            var canSee = await ApplyVisibilityScope(_requestRepository.GetAll().AsNoTracking())
+                .AnyAsync(x => x.Id == serviceRequestId);
+            if (!canSee) throw new UserFriendlyException("Talep bulunamadı veya erişim yetkiniz yok.");
+
             var items = await _logRepository.GetAll().AsNoTracking()
                 .Include(a => a.Employee).Include(a => a.ServiceRequest)
                 .Where(a => a.ServiceRequestId == serviceRequestId)
@@ -901,8 +944,14 @@ namespace ActivityManagement.ServiceRequests
             var authHeader = string.IsNullOrWhiteSpace(src.AuthHeader) ? "Authorization" : src.AuthHeader;
             var authScheme = src.AuthScheme ?? "";
 
+            // GÜVENLİK (SSRF/token sızması): att.Url PORTAL verisidir → körü körüne çekilmez.
+            // Yalnız https + host allow-list (kaynağın BaseUrl host'u + bilinen portal dosya backend'i) +
+            // özel/loopback IP reddi. Token yalnız bu doğrulamayı geçen host'a gönderilir.
+            if (!IsAllowedPortalFileUrl(src.BaseUrl, att.Url, out var fileUri))
+                throw new UserFriendlyException("Dosya adresi güvenlik doğrulamasını geçemedi.");
+
             // 3) Sunucu-içi indir
-            using var req = new HttpRequestMessage(HttpMethod.Get, att.Url);
+            using var req = new HttpRequestMessage(HttpMethod.Get, fileUri);
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
                 var val = string.IsNullOrWhiteSpace(authScheme) ? apiKey : authScheme.Trim() + " " + apiKey;

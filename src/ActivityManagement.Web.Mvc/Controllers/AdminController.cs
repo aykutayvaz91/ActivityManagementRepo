@@ -191,6 +191,9 @@ namespace ActivityManagement.Web.Controllers
 
                 if (logoFile != null && logoFile.Length > 0)
                 {
+                    // GÜVENLİK: logo yalnızca güvenli raster görsel (svg reddedilir — script taşıyabilir → XSS)
+                    if (!ActivityManagement.Web.Helpers.UploadValidator.IsInlineSafe(logoFile.FileName))
+                    { TempData["Error"] = "Logo yalnızca PNG/JPG/GIF/WEBP olabilir."; return RedirectToAction("Theme"); }
                     var uploads = System.IO.Path.Combine(_env.WebRootPath, "uploads", "brand");
                     System.IO.Directory.CreateDirectory(uploads);
                     var ext = System.IO.Path.GetExtension(logoFile.FileName);

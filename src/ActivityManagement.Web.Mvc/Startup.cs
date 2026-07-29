@@ -176,7 +176,19 @@ namespace ActivityManagement.Web
             // Hatalarda sayfa patlamasın: kullanıcı dostu hata sayfası + dosyaya loglama (/Home/Error).
             app.UseExceptionHandler("/Home/Error");
 
-            app.UseStaticFiles();
+            // GÜVENLİK: nosniff (MIME sniffing kapalı) + /uploads altında görsel-olmayan dosyaları
+            // "attachment" (indirme) olarak sun → yüklenen metin/HTML tarayıcıda ÇALIŞTIRILMAZ (depolanmış XSS önlenir).
+            app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
+            {
+                OnPrepareResponse = ctx =>
+                {
+                    ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                    var p = ctx.Context.Request.Path.Value ?? "";
+                    if (p.StartsWith("/uploads", System.StringComparison.OrdinalIgnoreCase)
+                        && !ActivityManagement.Web.Helpers.UploadValidator.IsInlineSafe(p))
+                        ctx.Context.Response.Headers["Content-Disposition"] = "attachment";
+                }
+            });
 
             // Tarih/sayı formatı için kültürü tr-TR'ye sabitle (dd.MM.yyyy)
             app.UseRequestLocalization();

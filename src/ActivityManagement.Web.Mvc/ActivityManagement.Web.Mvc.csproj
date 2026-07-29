@@ -12,6 +12,7 @@
   <ItemGroup>
     <!-- Abp.AspNetCore hem MVC authorization hem Zero ASP.NET Core entegrasyonunu içerir -->
     <PackageReference Include="Abp.AspNetCore" Version="8.4.0" />
+    <PackageReference Include="HtmlSanitizer" Version="9.1.973" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">

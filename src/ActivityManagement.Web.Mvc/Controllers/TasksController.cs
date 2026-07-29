@@ -295,6 +295,7 @@ namespace ActivityManagement.Web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(CreateUpdateTaskItemDto input, string startDatePart, string startTimePart)
         {
             input.StartDate = CombineStartDate(startDatePart, startTimePart);
@@ -342,6 +343,7 @@ namespace ActivityManagement.Web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(CreateUpdateTaskItemDto input, string startDatePart, string startTimePart)
         {
             input.StartDate = CombineStartDate(startDatePart, startTimePart);
@@ -368,6 +370,7 @@ namespace ActivityManagement.Web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(long id)
         {
             await _taskAppService.DeleteAsync(id);
@@ -375,6 +378,7 @@ namespace ActivityManagement.Web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateStatus(long id, Entities.TaskStatus status, int percentage)
         {
             bool ajax = Request.Headers["X-Requested-With"] == "XMLHttpRequest";
@@ -401,6 +405,7 @@ namespace ActivityManagement.Web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         [RequestSizeLimit(52428800)] // 50 MB
         public async Task<IActionResult> AddComment(long taskId, string comment, bool isInternal = false, List<IFormFile> files = null, decimal? hoursSpent = null, string effortDate = null)
         {
@@ -413,6 +418,13 @@ namespace ActivityManagement.Web.Controllers
                 if (!hasComment && !hasFiles && !hasEffort)
                 {
                     TempData["Uyari"] = "Yapılan işi (yorum), dosya veya efor süresini girmelisiniz.";
+                    return RedirectToAction("Detail", new { id = taskId });
+                }
+
+                // GÜVENLİK: yalnız güvenli dosya türleri (html/svg/js/exe reddedilir — depolanmış XSS önlenir)
+                if (hasFiles && files.Any(f => f != null && f.Length > 0 && !ActivityManagement.Web.Helpers.UploadValidator.IsAllowed(f.FileName)))
+                {
+                    TempData["Uyari"] = "İzin verilmeyen dosya türü. İzinli türler: " + ActivityManagement.Web.Helpers.UploadValidator.AllowedListText();
                     return RedirectToAction("Detail", new { id = taskId });
                 }
 
@@ -480,6 +492,7 @@ namespace ActivityManagement.Web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Approve(long id)
         {
             try
@@ -492,6 +505,7 @@ namespace ActivityManagement.Web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Reject(long id)
         {
             try
