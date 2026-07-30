@@ -32,4 +32,26 @@ namespace ActivityManagement.Notifications.Dto
         public string Name { get; set; }
         public string RoleLabel { get; set; }
     }
+
+    // Bildirim tercihleri (kullanıcı ekranı).
+    public class NotificationPreferenceDto
+    {
+        public bool HasEmployee { get; set; }          // personel kaydı yoksa tercih kaydedilemez
+        public bool EmailEnabled { get; set; } = true;
+        public List<NotificationTypePrefDto> Types { get; set; } = new List<NotificationTypePrefDto>();
+    }
+
+    public class NotificationTypePrefDto
+    {
+        public int Type { get; set; }
+        public string Label { get; set; }
+        public bool InAppEnabled { get; set; }   // true = açık (susturulmamış)
+    }
+
+    public class SaveNotificationPreferenceInput
+    {
+        public bool EmailEnabled { get; set; }
+        // in-app'te AÇIK bırakılan tipler (checkbox işaretli olanlar). Muted = tüm tipler − bunlar.
+        public List<int> EnabledInAppTypes { get; set; } = new List<int>();
+    }
 }

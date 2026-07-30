@@ -14,5 +14,9 @@ namespace ActivityManagement.Notifications
         // İstek/mesaj: gönderilebilecek üst yöneticiler + gönderme.
         Task<System.Collections.Generic.List<MessageRecipientDto>> GetMessageRecipientsAsync();
         Task SendMessageAsync(long recipientEmployeeId, string message);
+
+        // Bildirim tercihleri (geçerli kullanıcı).
+        Task<Dto.NotificationPreferenceDto> GetMyPreferencesAsync();
+        Task SaveMyPreferencesAsync(Dto.SaveNotificationPreferenceInput input);
     }
 }

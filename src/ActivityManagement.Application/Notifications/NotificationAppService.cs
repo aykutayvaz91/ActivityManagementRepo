@@ -16,13 +16,85 @@ namespace ActivityManagement.Notifications
     {
         private readonly IRepository<Notification, long> _repo;
         private readonly IRepository<Employee, long> _empRepo;
+        private readonly IRepository<NotificationPreference, long> _prefRepo;
         private readonly IHttpContextAccessor _http;
 
-        public NotificationAppService(IRepository<Notification, long> repo, IRepository<Employee, long> empRepo, IHttpContextAccessor http)
+        public NotificationAppService(IRepository<Notification, long> repo, IRepository<Employee, long> empRepo,
+            IRepository<NotificationPreference, long> prefRepo, IHttpContextAccessor http)
         {
             _repo = repo;
             _empRepo = empRepo;
+            _prefRepo = prefRepo;
             _http = http;
+        }
+
+        // Kullanıcıya gösterilen bildirim tipleri (dostça etiket).
+        private static readonly (NotificationType Type, string Label)[] PrefTypes =
+        {
+            (NotificationType.GorevAtandi,  "Görev atandığında"),
+            (NotificationType.TalepAtandi,  "Talep atandığında"),
+            (NotificationType.FaaliyetAtandi,"Faaliyet atandığında"),
+            (NotificationType.SlaYaklasti,  "SLA yaklaştığında / ihlal"),
+            (NotificationType.DurumDegisti, "Durum değiştiğinde"),
+            (NotificationType.YorumEklendi, "Yorum eklendiğinde"),
+            (NotificationType.Mesaj,        "İstek/mesaj geldiğinde"),
+            (NotificationType.Genel,        "Genel/sistem bildirimleri"),
+        };
+
+        // Geçerli kullanıcının bildirim tercihleri (kayıt yoksa varsayılan: her şey açık).
+        public async Task<Dto.NotificationPreferenceDto> GetMyPreferencesAsync()
+        {
+            var empId = CurrentEmployeeId();
+            var pref = empId.HasValue
+                ? await _prefRepo.GetAll().AsNoTracking().FirstOrDefaultAsync(p => p.EmployeeId == empId.Value)
+                : null;
+            var muted = new System.Collections.Generic.HashSet<int>();
+            if (!string.IsNullOrWhiteSpace(pref?.MutedTypes))
+                foreach (var s in pref.MutedTypes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    if (int.TryParse(s, out var v)) muted.Add(v);
+
+            return new Dto.NotificationPreferenceDto
+            {
+                HasEmployee = empId.HasValue,
+                EmailEnabled = pref == null || pref.EmailEnabled,
+                Types = PrefTypes.Select(t => new Dto.NotificationTypePrefDto
+                {
+                    Type = (int)t.Type,
+                    Label = t.Label,
+                    InAppEnabled = !muted.Contains((int)t.Type)
+                }).ToList()
+            };
+        }
+
+        // Tercihleri kaydeder (upsert). mutedTypes = in-app'te KAPATILAN tipler.
+        public async Task SaveMyPreferencesAsync(Dto.SaveNotificationPreferenceInput input)
+        {
+            var empId = CurrentEmployeeId();
+            if (!empId.HasValue)
+                throw new Abp.UI.UserFriendlyException("Bildirim tercihi için personel kaydınız bulunmuyor.");
+            var enabled = new System.Collections.Generic.HashSet<int>(
+                (input?.EnabledInAppTypes ?? new System.Collections.Generic.List<int>()));
+            // Muted = tüm tipler − açık bırakılanlar (checkbox işaretli = açık).
+            var muted = PrefTypes.Select(t => (int)t.Type).Where(v => !enabled.Contains(v)).OrderBy(v => v);
+            var csv = string.Join(",", muted);
+
+            var pref = await _prefRepo.FirstOrDefaultAsync(p => p.EmployeeId == empId.Value);
+            if (pref == null)
+            {
+                await _prefRepo.InsertAsync(new NotificationPreference
+                {
+                    TenantId = AbpSession.TenantId ?? 1,
+                    EmployeeId = empId.Value,
+                    EmailEnabled = input?.EmailEnabled ?? true,
+                    MutedTypes = csv
+                });
+            }
+            else
+            {
+                pref.EmailEnabled = input?.EmailEnabled ?? true;
+                pref.MutedTypes = csv;
+            }
+            await CurrentUnitOfWork.SaveChangesAsync();
         }
 
         private long? CurrentEmployeeId()

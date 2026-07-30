@@ -78,7 +78,7 @@ namespace ActivityManagement.Web.BackgroundJobs
                     link, severity: "warning");
 
                 var emp = await empRepo.GetAll().AsNoTracking().FirstOrDefaultAsync(e => e.Id == t.AssignedEmployeeId.Value);
-                if (emp != null && !string.IsNullOrWhiteSpace(emp.Email))
+                if (emp != null && !string.IsNullOrWhiteSpace(emp.Email) && await notifier.IsEmailEnabledAsync(emp.Id))
                 {
                     // E-posta hatası tek işi etkiler, tüm turu KESMEZ (in-app bildirim zaten gitti).
                     try

@@ -382,7 +382,8 @@ namespace ActivityManagement.Tasks
 
                     var emp = await _employeeRepository.GetAll().AsNoTracking()
                         .FirstOrDefaultAsync(e => e.Id == task.AssignedEmployeeId.Value);
-                    if (emp != null && !string.IsNullOrWhiteSpace(emp.Email))
+                    if (emp != null && !string.IsNullOrWhiteSpace(emp.Email)
+                        && await _notificationManager.IsEmailEnabledAsync(emp.Id))
                     {
                         var due = task.DueDate?.ToString("dd.MM.yyyy") ?? "-";
                         await _emailSender.SendAsync(emp.Email,

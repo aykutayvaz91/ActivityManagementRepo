@@ -36,6 +36,7 @@ namespace ActivityManagement.EntityFrameworkCore
         public DbSet<IntegrationSettings> IntegrationSettings { get; set; }
         public DbSet<IntegrationSource> IntegrationSources { get; set; }
         public DbSet<Notification> AppNotifications { get; set; }
+        public DbSet<NotificationPreference> NotificationPreferences { get; set; }
 
         public ActivityManagementDbContext(DbContextOptions<ActivityManagementDbContext> options)
             : base(options)
@@ -398,6 +399,13 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.Property(n => n.Icon).HasMaxLength(64);
                 b.Property(n => n.Severity).HasMaxLength(16);
                 b.HasIndex(n => new { n.RecipientEmployeeId, n.IsRead });
+            });
+
+            modelBuilder.Entity<NotificationPreference>(b =>
+            {
+                b.ToTable("NotificationPreferences");
+                b.Property(p => p.MutedTypes).HasMaxLength(256);
+                b.HasIndex(p => p.EmployeeId).IsUnique();
             });
 
             modelBuilder.Entity<WorkflowStatus>(b =>

@@ -12,5 +12,8 @@ namespace ActivityManagement.Notifications
         // (kendi yaptığın işlem için kendine bildirim gitmez). Alıcı yoksa (null/0) hiçbir şey yapmaz.
         Task NotifyAsync(long? recipientEmployeeId, NotificationType type, string title, string message,
                          string link = null, string icon = null, string severity = "info", long? actorEmployeeId = null);
+
+        // E-posta bildirimleri bu kişiye açık mı (tercih yoksa varsayılan açık).
+        Task<bool> IsEmailEnabledAsync(long employeeId);
     }
 }

@@ -46,6 +46,32 @@ namespace ActivityManagement.Web.Controllers
             catch { return Json(new System.Collections.Generic.List<object>()); }
         }
 
+        // Bildirim tercihleri ekranı (geçerli kullanıcı)
+        [HttpGet]
+        public async Task<IActionResult> Preferences()
+        {
+            var dto = await _svc.GetMyPreferencesAsync();
+            return View(dto);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Preferences(bool emailEnabled, System.Collections.Generic.List<int> enabledTypes)
+        {
+            try
+            {
+                await _svc.SaveMyPreferencesAsync(new SaveNotificationPreferenceInput
+                {
+                    EmailEnabled = emailEnabled,
+                    EnabledInAppTypes = enabledTypes ?? new System.Collections.Generic.List<int>()
+                });
+                TempData["Success"] = "Bildirim tercihleri kaydedildi.";
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
+            catch (System.Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Notifications/Preferences"); TempData["Uyari"] = "Tercihler kaydedilemedi."; }
+            return RedirectToAction("Preferences");
+        }
+
         // İstek/mesaj gönder (üst yöneticiye)
         [HttpPost]
         [ValidateAntiForgeryToken]

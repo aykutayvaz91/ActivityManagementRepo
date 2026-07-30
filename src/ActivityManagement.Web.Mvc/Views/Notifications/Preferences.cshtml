@@ -1,0 +1,57 @@
+@model ActivityManagement.Notifications.Dto.NotificationPreferenceDto
+@{
+    ViewData["Title"] = "Bildirim Tercihleri";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="/">Ana Sayfa</a></li>
+                <li class="breadcrumb-item active">Bildirim Tercihleri</li>
+            </ol>
+        </nav>
+
+        @if (!Model.HasEmployee)
+        {
+            <div class="alert alert-warning"><i class="fas fa-triangle-exclamation me-1"></i>Personel kaydınız bulunmadığından bildirim tercihi ayarlanamıyor.</div>
+        }
+        else
+        {
+            <form method="post" action="/Notifications/Preferences">
+                @Html.AntiForgeryToken()
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-transparent">
+                        <h5 class="mb-0"><i class="fas fa-bell me-2 text-warning"></i>Bildirim Tercihleri</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="emailEnabled" name="emailEnabled" value="true" @(Model.EmailEnabled ? "checked" : "") />
+                            <input type="hidden" name="emailEnabled" value="false" />
+                            <label class="form-check-label" for="emailEnabled">
+                                <i class="fas fa-envelope me-1 text-primary"></i><strong>E-posta bildirimleri</strong>
+                                <small class="text-muted d-block">SLA hatırlatma, görev atama gibi e-postalar size gönderilsin.</small>
+                            </label>
+                        </div>
+
+                        <hr />
+                        <div class="fw-semibold mb-2"><i class="fas fa-desktop me-1 text-secondary"></i>Uygulama içi bildirimler (zil)</div>
+                        <p class="text-muted small">Kapatılan tipler için zil bildirimi oluşturulmaz.</p>
+                        @foreach (var t in Model.Types)
+                        {
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       id="type_@t.Type" name="enabledTypes" value="@t.Type" @(t.InAppEnabled ? "checked" : "") />
+                                <label class="form-check-label" for="type_@t.Type">@t.Label</label>
+                            </div>
+                        }
+                    </div>
+                    <div class="card-footer bg-transparent text-end">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Kaydet</button>
+                    </div>
+                </div>
+            </form>
+        }
+    </div>
+</div>
