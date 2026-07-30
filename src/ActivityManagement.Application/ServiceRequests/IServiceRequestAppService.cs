@@ -18,6 +18,7 @@ namespace ActivityManagement.ServiceRequests
 
         // Talebi bir uzmana (ve opsiyonel yedeğe) ata — yönetici.
         Task<ServiceRequestDto> AssignAsync(long id, long? assignedEmployeeId, long? secondaryEmployeeId = null);
+        Task<int> BulkAssignAsync(System.Collections.Generic.List<long> ids, long? assignedEmployeeId, long? secondaryEmployeeId = null);
         // Durum + ilerleme güncelle — atanan kişi veya yönetici. Portal + write-back açıksa portala da POST edilir (note opsiyonel).
         Task<ServiceRequestDto> UpdateStatusAsync(long id, RequestStatus status, int percentage, string note = null);
 

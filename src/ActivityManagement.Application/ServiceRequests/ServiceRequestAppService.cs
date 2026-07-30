@@ -383,6 +383,32 @@ namespace ActivityManagement.ServiceRequests
             return await GetAsync(r.Id);
         }
 
+        // TOPLU ATAMA: seçili taleplerin sorumlusunu topluca belirler. Yetkisi olmayan talep ATLANIR.
+        // Özellikle atanmamış (PSM/destek) yığınının triyajı için. Dönüş: gerçekten atanan adet.
+        public async Task<int> BulkAssignAsync(List<long> ids, long? assignedEmployeeId, long? secondaryEmployeeId = null)
+        {
+            var ctx = CurrentContext();
+            if (ids == null || ids.Count == 0) return 0;
+            var reqs = await _requestRepository.GetAll().Where(r => ids.Contains(r.Id)).ToListAsync();
+            int done = 0;
+            foreach (var r in reqs)
+            {
+                if (!IsManagerForRequest(r, ctx)) continue; // yetki dışını sessizce atla
+                var prev = r.AssignedEmployeeId;
+                r.AssignedEmployeeId = assignedEmployeeId;
+                r.SecondaryEmployeeId = secondaryEmployeeId;
+                r.TeamId = await ResolveTeamIdAsync(assignedEmployeeId, ctx.EmployeeId) ?? r.TeamId;
+                if (assignedEmployeeId.HasValue && r.Status == RequestStatus.Yeni)
+                    r.Status = RequestStatus.Atandi;
+                if (assignedEmployeeId.HasValue && assignedEmployeeId != prev)
+                    await _notificationManager.NotifyAsync(assignedEmployeeId, NotificationType.TalepAtandi,
+                        "Size bir talep atandı", r.Title, $"/Requests/Detail/{r.Id}", severity: "info", actorEmployeeId: ctx.EmployeeId);
+                done++;
+            }
+            await CurrentUnitOfWork.SaveChangesAsync();
+            return done;
+        }
+
         public async Task<ServiceRequestDto> UpdateStatusAsync(long id, RequestStatus status, int percentage, string note = null)
         {
             var ctx = CurrentContext();

@@ -222,6 +222,24 @@ namespace ActivityManagement.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> BulkAssign(string ids, long? assignedEmployeeId, long? secondaryEmployeeId, string returnUrl = null)
+        {
+            if (!IsManager()) return AccessDeniedRedirect("/Requests");
+            try
+            {
+                var idList = (ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(x => long.TryParse(x, out var v) ? v : 0).Where(v => v > 0).Distinct().ToList();
+                if (idList.Count == 0) { TempData["Uyari"] = "Seçili talep yok."; return SafeBack(returnUrl); }
+                var n = await _requestAppService.BulkAssignAsync(idList, assignedEmployeeId, secondaryEmployeeId);
+                TempData["Success"] = $"{n} talep atandı" + (n < idList.Count ? $" ({idList.Count - n} tanesi yetki dışı, atlandı)." : ".");
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
+            catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Requests/BulkAssign"); TempData["Uyari"] = "Toplu atama yapılamadı."; }
+            return SafeBack(returnUrl);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateStatus(long id, RequestStatus status, int percentage, string note = null, string returnUrl = null)
         {
             try

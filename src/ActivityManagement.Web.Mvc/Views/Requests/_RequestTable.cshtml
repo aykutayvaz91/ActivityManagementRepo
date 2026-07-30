@@ -3,6 +3,7 @@
 @{
     var reqList = Model ?? new System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto>();
     bool readOnly = (ViewData["ReadOnly"] as bool?) ?? false; // Sorgu ekranında salt-okunur (yalnız Detay)
+    bool bulk = (ViewData["Bulk"] as bool?) ?? false;         // toplu işlem sütunu (yalnız Index/yönetici)
     // (Y5) PSM talepleri farklı arayüze (PsmDetail) gider; destek → Detail.
     System.Func<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto, string> detailUrl = r =>
         (r.Source == RequestSource.SunucuKurulum ? "/Requests/PsmDetail/" : "/Requests/Detail/") + r.Id;
@@ -28,6 +29,7 @@ else
         <table class="table table-hover align-middle">
             <thead class="table-light">
                 <tr>
+                    @if (bulk) { <th style="width:32px"><input type="checkbox" class="form-check-input bulk-all" title="Tümünü seç"></th> }
                     <th>Ref</th>
                     <th>Başlık</th>
                     <th>Talep Eden</th>
@@ -44,6 +46,7 @@ else
                 @foreach (var r in reqList)
                 {
                     <tr class="@(r.IsOverdue ? "table-danger" : "")" data-assignee="@(r.AssignedEmployeeId?.ToString() ?? "0")">
+                        @if (bulk) { <td><input type="checkbox" class="form-check-input bulk-check" value="@r.Id"></td> }
                         <td>
                             @if (!string.IsNullOrEmpty(r.ExternalUrl))
                             {

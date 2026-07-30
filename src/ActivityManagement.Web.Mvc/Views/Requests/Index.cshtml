@@ -13,6 +13,7 @@
     var types = ViewBag.ActivityTypes as System.Collections.Generic.IReadOnlyList<ActivityManagement.Activities.Dto.ActivityTypeDefDto>
                     ?? new System.Collections.Generic.List<ActivityManagement.Activities.Dto.ActivityTypeDefDto>();
     bool isManager = ViewBag.IsManager == true;
+    ViewData["Bulk"] = isManager; // toplu işlem sütunu (destek/sunucu/atanmamış sekmelerinde)
     int cntDestek = (int?)ViewBag.CountDestek ?? destek.Count;
     int cntSunucu = (int?)ViewBag.CountSunucu ?? sunucu.Count;
     int cntAtanmamis = (int?)ViewBag.CountUnassigned ?? atanmamis.Count;
@@ -101,6 +102,7 @@
         </div></div>
     </div>
     <div class="tab-pane fade" id="tab-kapatilan">
+        @{ ViewData["Bulk"] = false; }
         <div class="alert alert-secondary py-2 small mb-2"><i class="fas fa-box-archive me-1"></i>Kapatılmış/çözülmüş ve eforu girilmiş talepler (arşiv). Detaylı sorgu için <a href="/Requests/Query">Talep Sorgula</a>.</div>
         @CapNote(kapatilan.Count, cntKapatilan, cap)
         <div class="card shadow-sm"><div class="card-body p-2">
@@ -108,6 +110,44 @@
         </div></div>
     </div>
 </div>
+
+@if (isManager)
+{
+    @* ===== Toplu işlem araç çubuğu (seçim yapılınca görünür) ===== *@
+    <div id="bulkBar" class="position-fixed bottom-0 start-50 translate-middle-x mb-3 shadow-lg rounded-pill bg-dark text-white px-3 py-2 d-none" style="z-index:1050">
+        <span class="me-2"><i class="fas fa-check-square me-1"></i><span id="bulkCount">0</span> talep seçildi</span>
+        <button type="button" class="btn btn-sm btn-primary rounded-pill" onclick="openBulkAssign()"><i class="fas fa-user-plus me-1"></i>Seçilenleri Ata</button>
+        <button type="button" class="btn btn-sm btn-outline-light rounded-pill" onclick="clearBulk()">Temizle</button>
+    </div>
+
+    @* ===== Toplu Ata Modal ===== *@
+    <div class="modal fade" id="bulkAssignModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="/Requests/BulkAssign">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ids" id="bulk_ids" />
+            <input type="hidden" name="returnUrl" value="/Requests" />
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-users-gear me-2"></i>Toplu Ata (<span id="bulk_modal_count">0</span> talep)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Atanan Kişi</label>
+                    <select name="assignedEmployeeId" class="form-select">
+                        <option value="">— Atama yok (kaldır) —</option>
+                        @foreach (var e in employees) { <option value="@e.Id">@e.FullName</option> }
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">2. Sorumlu <small class="text-muted">(opsiyonel)</small></label>
+                    <select name="secondaryEmployeeId" class="form-select">
+                        <option value="">— Yok —</option>
+                        @foreach (var e in employees) { <option value="@e.Id">@e.FullName</option> }
+                    </select>
+                </div>
+                <div class="alert alert-info py-2 small mb-0">Yetkiniz dışındaki talepler atlanır. Yalnız yönetebildiğiniz talepler atanır.</div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Vazgeç</button><button type="submit" class="btn btn-primary">Ata</button></div>
+        </form>
+    </div></div></div>
+}
 
 @* ===== Ata Modal ===== *@
 <div class="modal fade" id="assignModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
@@ -293,6 +333,35 @@ function openEffort(id, title) {
     document.getElementById('ef_title').textContent = title;
     new bootstrap.Modal(document.getElementById('effortModal')).show();
 }
+// ===== Toplu seçim / toplu atama =====
+function bulkChecked() { return Array.prototype.slice.call(document.querySelectorAll('.bulk-check:checked')); }
+function refreshBulkBar() {
+    var n = bulkChecked().length;
+    var bar = document.getElementById('bulkBar');
+    if (!bar) return;
+    document.getElementById('bulkCount').textContent = n;
+    bar.classList.toggle('d-none', n === 0);
+}
+function clearBulk() {
+    document.querySelectorAll('.bulk-check:checked, .bulk-all:checked').forEach(function (c) { c.checked = false; });
+    refreshBulkBar();
+}
+function openBulkAssign() {
+    var ids = bulkChecked().map(function (c) { return c.value; });
+    if (ids.length === 0) return;
+    document.getElementById('bulk_ids').value = ids.join(',');
+    document.getElementById('bulk_modal_count').textContent = ids.length;
+    new bootstrap.Modal(document.getElementById('bulkAssignModal')).show();
+}
+document.addEventListener('change', function (e) {
+    if (e.target.classList.contains('bulk-all')) {
+        var table = e.target.closest('table');
+        if (table) table.querySelectorAll('.bulk-check').forEach(function (c) { c.checked = e.target.checked; });
+        refreshBulkBar();
+    } else if (e.target.classList.contains('bulk-check')) {
+        refreshBulkBar();
+    }
+});
 // Destek sekmesi kişi filtresi (istemci tarafı — yüklü satırlar üzerinde anında)
 function filterDestekByPerson(val) {
     var wrap = document.getElementById('destekTableWrap');
