@@ -104,9 +104,11 @@ namespace ActivityManagement.Web.Controllers
                 var idx = await _requestAppService.GetIndexAsync(500);
                 ViewBag.Sunucu = idx.ActiveSunucu;
                 ViewBag.Destek = idx.ActiveDestek;
+                ViewBag.Atanmamis = idx.Unassigned;
                 ViewBag.Kapatilan = idx.Archived;
                 ViewBag.CountSunucu = idx.CountSunucu;
                 ViewBag.CountDestek = idx.CountDestek;
+                ViewBag.CountUnassigned = idx.CountUnassigned;
                 ViewBag.CountArchived = idx.CountArchived;
                 ViewBag.Cap = idx.Cap;
                 ViewBag.Employees = (await _employeeAppService.GetAllListAsync()).Items;

@@ -207,9 +207,11 @@ namespace ActivityManagement.ServiceRequests.Dto
     {
         public System.Collections.Generic.List<ServiceRequestDto> ActiveSunucu { get; set; } = new();
         public System.Collections.Generic.List<ServiceRequestDto> ActiveDestek { get; set; } = new();
+        public System.Collections.Generic.List<ServiceRequestDto> Unassigned { get; set; } = new();
         public System.Collections.Generic.List<ServiceRequestDto> Archived { get; set; } = new();
         public int CountSunucu { get; set; }
         public int CountDestek { get; set; }
+        public int CountUnassigned { get; set; }
         public int CountArchived { get; set; }
         public int Cap { get; set; }
     }

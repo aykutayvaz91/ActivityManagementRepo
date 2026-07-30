@@ -4,6 +4,7 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
     var sunucu = ViewBag.Sunucu as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto> ?? new();
     var destek = ViewBag.Destek as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto> ?? new();
+    var atanmamis = ViewBag.Atanmamis as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto> ?? new();
     var kapatilan = ViewBag.Kapatilan as System.Collections.Generic.List<ActivityManagement.ServiceRequests.Dto.ServiceRequestDto> ?? new();
     var employees = ViewBag.Employees as System.Collections.Generic.IReadOnlyList<ActivityManagement.Employees.Dto.EmployeeDto>
                     ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EmployeeDto>();
@@ -14,6 +15,7 @@
     bool isManager = ViewBag.IsManager == true;
     int cntDestek = (int?)ViewBag.CountDestek ?? destek.Count;
     int cntSunucu = (int?)ViewBag.CountSunucu ?? sunucu.Count;
+    int cntAtanmamis = (int?)ViewBag.CountUnassigned ?? atanmamis.Count;
     int cntKapatilan = (int?)ViewBag.CountArchived ?? kapatilan.Count;
     int cap = (int?)ViewBag.Cap ?? 500;
     var statuses = System.Enum.GetValues(typeof(RequestStatus)).Cast<RequestStatus>().ToList();
@@ -48,6 +50,12 @@
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-atanmamis" title="Sorumlusu atanmamış açık talepler — herkese görünür (triyaj)">
+            <i class="fas fa-user-slash me-1"></i>Atanmamış Talepler
+            <span class="badge @(cntAtanmamis > 0 ? "bg-warning text-dark" : "bg-secondary") ms-1">@cntAtanmamis</span>
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#tab-kapatilan">
             <i class="fas fa-box-archive me-1"></i>Kapatılan Talepler
             <span class="badge bg-dark ms-1" title="Kapandı/Çözüldü + efor girilmiş (arşiv)">@cntKapatilan</span>
@@ -74,6 +82,13 @@
         @CapNote(sunucu.Count, cntSunucu, cap)
         <div class="card shadow-sm"><div class="card-body p-2">
             @await Html.PartialAsync("_RequestTable", sunucu)
+        </div></div>
+    </div>
+    <div class="tab-pane fade" id="tab-atanmamis">
+        <div class="alert alert-warning py-2 small mb-2"><i class="fas fa-user-slash me-1"></i><strong>Sorumlusu atanmamış</strong> açık talepler (PSM/destek/elle — kaynak fark etmeksizin). Bu liste <strong>herkese</strong> görünür; kaybolmasın diye buraya düşer. Yönetici/lider detaydan "Ata" ile sorumlu belirleyebilir.</div>
+        @CapNote(atanmamis.Count, cntAtanmamis, cap)
+        <div class="card shadow-sm"><div class="card-body p-2">
+            @await Html.PartialAsync("_RequestTable", atanmamis)
         </div></div>
     </div>
     <div class="tab-pane fade" id="tab-kapatilan">

@@ -142,18 +142,22 @@ namespace ActivityManagement.ServiceRequests
         }
 
         // (B10) Görünürlük kapsamı: Admin/Manager tümü; TakımLideri kendi TAKIMI + kendine atanan; Uzman yalnız kendine atanan.
+        // ATANMAMIŞ talepler (AssignedEmployeeId=null; ör. PSM'den atansız gelen) HERKESE görünür — aksi halde
+        // kimseye görünmeyip kaybolur. Böylece triyaj için "Atanmamış Talepler" listesinden görülüp yöneticiye iletilir.
         private IQueryable<ServiceRequest> ApplyVisibilityScope(IQueryable<ServiceRequest> q)
         {
             if (SeesAllTeams()) return q;
             long? empId = long.TryParse(_httpContextAccessor.HttpContext?.User?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
-            if (!empId.HasValue) return q.Where(r => false); // kimlik yok → güvenli boş
+            if (!empId.HasValue) return q.Where(r => r.AssignedEmployeeId == null); // kimlik yok → yalnız atanmamışlar
             if (string.Equals(EffectiveRole(), "TakımLideri", StringComparison.OrdinalIgnoreCase))
             {
                 var myTeam = CurrentEmployeeTeamId(empId);
-                return q.Where(r => r.AssignedEmployeeId == empId.Value || r.SecondaryEmployeeId == empId.Value
+                return q.Where(r => r.AssignedEmployeeId == null
+                                    || r.AssignedEmployeeId == empId.Value || r.SecondaryEmployeeId == empId.Value
                                     || (myTeam != null && r.TeamId == myTeam));
             }
-            return q.Where(r => r.AssignedEmployeeId == empId.Value || r.SecondaryEmployeeId == empId.Value);
+            return q.Where(r => r.AssignedEmployeeId == null
+                                || r.AssignedEmployeeId == empId.Value || r.SecondaryEmployeeId == empId.Value);
         }
 
         // Yönetici bu talebi yönetebilir mi: Admin her zaman; TakımLideri yalnız kendi takımının (takımsız dahil).
@@ -242,6 +246,10 @@ namespace ActivityManagement.ServiceRequests
                             && !(r.Status == RequestStatus.Kapandi && r.Logs.Any()));
             IQueryable<ServiceRequest> Archived() => Scoped()
                 .Where(r => r.Status == RequestStatus.Kapandi && r.Logs.Any());
+            // ATANMAMIŞ (triyaj): sorumlusu olmayan + açık talepler (tüm kaynaklar). Scoped() atanmamışları herkese içerir.
+            IQueryable<ServiceRequest> Unassigned() => Scoped()
+                .Where(r => r.AssignedEmployeeId == null
+                            && r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal);
 
             async Task<System.Collections.Generic.List<ServiceRequestDto>> Materialize(IQueryable<ServiceRequest> orderedIdQuery)
             {
@@ -255,6 +263,7 @@ namespace ActivityManagement.ServiceRequests
             var dto = new ServiceRequestsIndexDto { Cap = cap };
             dto.CountSunucu = await Active(RequestSource.SunucuKurulum).CountAsync();
             dto.CountDestek = await Active(RequestSource.DisDestek).CountAsync();
+            dto.CountUnassigned = await Unassigned().CountAsync();
             dto.CountArchived = await Archived().CountAsync();
 
             // Aktif: açık talepler önce, sonra önem, sonra SLA. Arşiv: en son çözülen/kapanan önce.
@@ -264,6 +273,9 @@ namespace ActivityManagement.ServiceRequests
             dto.ActiveDestek = await Materialize(Active(RequestSource.DisDestek)
                 .OrderByDescending(r => r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal && r.Status != RequestStatus.Cozuldu)
                 .ThenByDescending(r => r.PriorityScore).ThenBy(r => r.DueDate ?? DateTime.MaxValue));
+            // Atanmamış: en yeni gelen önce, sonra önem — triyaj için.
+            dto.Unassigned = await Materialize(Unassigned()
+                .OrderByDescending(r => r.PriorityScore).ThenByDescending(r => r.CreationTime));
             dto.Archived = await Materialize(Archived()
                 .OrderByDescending(r => r.ResolvedDate ?? r.ClosedDate ?? r.DueDate));
             return dto;
