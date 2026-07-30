@@ -17,6 +17,9 @@
         <a href="/Reports/ExportTeamExcel?startDate=@Model.StartDate.ToString("yyyy-MM-dd")&endDate=@Model.EndDate.ToString("yyyy-MM-dd")" class="btn btn-success btn-sm">
             <i class="fas fa-file-excel me-1"></i>Excel
         </a>
+        <a href="/Reports/ExportTeamPdf?startDate=@Model.StartDate.ToString("yyyy-MM-dd")&endDate=@Model.EndDate.ToString("yyyy-MM-dd")" class="btn btn-danger btn-sm">
+            <i class="fas fa-file-pdf me-1"></i>PDF
+        </a>
         <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-print"></i>
         </button>

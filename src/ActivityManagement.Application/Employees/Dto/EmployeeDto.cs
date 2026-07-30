@@ -46,6 +46,15 @@ namespace ActivityManagement.Employees.Dto
 
         // İzin/pasif/silme sonrası açık işlerin yedeğe devir özeti (Employee'de yok; yalnız Update dönüşünde doldurulur).
         public string HandoverInfo { get; set; }
+
+        // Kişi kartı 360° — son 12 ay aylık efor trendi (GetCardAsync doldurur).
+        public List<EffortTrendPointDto> EffortTrend { get; set; } = new List<EffortTrendPointDto>();
+    }
+
+    public class EffortTrendPointDto
+    {
+        public string Label { get; set; }   // "MM.yyyy"
+        public decimal Hours { get; set; }
     }
 
     public class ResponsibilityDto

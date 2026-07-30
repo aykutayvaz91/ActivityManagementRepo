@@ -28,6 +28,7 @@ namespace ActivityManagement.Employees
         private readonly IRepository<ServiceRequest, long> _requestRepository;
         private readonly IRepository<TaskComment, long> _taskCommentRepository;
         private readonly IRepository<ServiceRequestComment, long> _requestCommentRepository;
+        private readonly IRepository<ActivityLog, long> _logRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public EmployeeAppService(
@@ -39,6 +40,7 @@ namespace ActivityManagement.Employees
             IRepository<ServiceRequest, long> requestRepository,
             IRepository<TaskComment, long> taskCommentRepository,
             IRepository<ServiceRequestComment, long> requestCommentRepository,
+            IRepository<ActivityLog, long> logRepository,
             IHttpContextAccessor httpContextAccessor)
         {
             _employeeRepository = employeeRepository;
@@ -49,6 +51,7 @@ namespace ActivityManagement.Employees
             _requestRepository = requestRepository;
             _taskCommentRepository = taskCommentRepository;
             _requestCommentRepository = requestCommentRepository;
+            _logRepository = logRepository;
             _httpContextAccessor = httpContextAccessor;
         }
 
@@ -308,6 +311,26 @@ namespace ActivityManagement.Employees
             dto.PendingTaskCount = tasks.Count(t => t.Status == Entities.TaskStatus.Beklemede);
             dto.InProgressTaskCount = tasks.Count(t => t.Status == Entities.TaskStatus.DevamEdiyor);
             dto.CompletedTaskCount = tasks.Count(t => t.Status == Entities.TaskStatus.Tamamlandi);
+
+            // Efor trendi: son 12 ay, aylık toplam saat (ActivityLog). Eksik aylar 0 ile doldurulur.
+            var firstMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-11);
+            var monthly = await _logRepository.GetAll().AsNoTracking()
+                .Where(l => l.EmployeeId == id && l.ActivityDate >= firstMonth)
+                .GroupBy(l => new { l.ActivityDate.Year, l.ActivityDate.Month })
+                .Select(g => new { g.Key.Year, g.Key.Month, Hours = g.Sum(x => x.HoursSpent) })
+                .ToListAsync();
+            var trend = new List<EffortTrendPointDto>();
+            for (int i = 0; i < 12; i++)
+            {
+                var m = firstMonth.AddMonths(i);
+                var hit = monthly.FirstOrDefault(x => x.Year == m.Year && x.Month == m.Month);
+                trend.Add(new EffortTrendPointDto
+                {
+                    Label = m.ToString("MM.yyyy"),
+                    Hours = hit == null ? 0m : Math.Round(hit.Hours, 1)
+                });
+            }
+            dto.EffortTrend = trend;
 
             return dto;
         }

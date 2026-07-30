@@ -18,6 +18,9 @@
         <button onclick="exportReport()" class="btn btn-success btn-sm">
             <i class="fas fa-file-excel me-1"></i>Excel
         </button>
+        <button onclick="exportReportPdf()" class="btn btn-danger btn-sm">
+            <i class="fas fa-file-pdf me-1"></i>PDF
+        </button>
     </div>
 </div>
 
@@ -302,6 +305,12 @@
 <script>
 function exportReport() {
     var url = '/Reports/ExportPersonalExcel?employeeId=@Model.EmployeeId'
+        + '&startDate=@Model.StartDate.ToString("yyyy-MM-dd")'
+        + '&endDate=@Model.EndDate.ToString("yyyy-MM-dd")';
+    window.location.href = url;
+}
+function exportReportPdf() {
+    var url = '/Reports/ExportPersonalPdf?employeeId=@Model.EmployeeId'
         + '&startDate=@Model.StartDate.ToString("yyyy-MM-dd")'
         + '&endDate=@Model.EndDate.ToString("yyyy-MM-dd")';
     window.location.href = url;

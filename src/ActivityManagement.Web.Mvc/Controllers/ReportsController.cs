@@ -146,6 +146,45 @@ namespace ActivityManagement.Web.Controllers
                 $"KisiselRapor_{r.EmployeeName}_{DateTime.Today:yyyyMMdd}.xlsx");
         }
 
+        // === PDF export'lar (Excel ile aynı yetki/kapsam kuralları) ===
+        public async Task<IActionResult> ExportPersonalPdf(long employeeId, DateTime? startDate, DateTime? endDate)
+        {
+            if (!IsManager()) employeeId = CurrentEmployeeId() ?? employeeId;
+            if (employeeId <= 0)
+            {
+                TempData["Uyari"] = "Lütfen önce bir personel seçin.";
+                return RedirectToAction("Personal");
+            }
+            if (!SeesAll())
+            {
+                var scoped = await ScopedEmployeesAsync();
+                if (scoped.All(e => e.Id != employeeId)) return AccessDeniedRedirect("/Reports/Personal");
+            }
+            var input = new GetReportInput
+            {
+                EmployeeId = employeeId,
+                StartDate = startDate ?? DateTime.Today.AddDays(-30),
+                EndDate = endDate ?? DateTime.Today
+            };
+            var r = await _reportAppService.GetPersonalReportAsync(input);
+            var pdf = ActivityManagement.Web.Helpers.ReportPdfBuilder.BuildPersonal(r);
+            return File(pdf, "application/pdf", $"KisiselRapor_{r.EmployeeName}_{DateTime.Today:yyyyMMdd}.pdf");
+        }
+
+        public async Task<IActionResult> ExportTeamPdf(DateTime? startDate, DateTime? endDate)
+        {
+            if (!IsManager()) return AccessDeniedRedirect("/Reports/Personal");
+            var input = new GetReportInput
+            {
+                StartDate = startDate ?? DateTime.Today.AddDays(-30),
+                EndDate = endDate ?? DateTime.Today,
+                TeamId = SeesAll() ? null : await CurrentTeamIdAsync()
+            };
+            var r = await _reportAppService.GetTeamReportAsync(input);
+            var pdf = ActivityManagement.Web.Helpers.ReportPdfBuilder.BuildTeam(r);
+            return File(pdf, "application/pdf", $"EkipRaporu_{DateTime.Today:yyyyMMdd}.pdf");
+        }
+
         public async Task<IActionResult> ExportTeamExcel(DateTime? startDate, DateTime? endDate)
         {
             if (!IsManager()) return AccessDeniedRedirect("/Reports/Personal");

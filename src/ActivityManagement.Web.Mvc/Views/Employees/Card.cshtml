@@ -187,6 +187,45 @@
             </div>
         </div>
 
+        <!-- Efor Trendi (son 12 ay) -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-chart-column me-2 text-success"></i>Efor Trendi <small class="text-muted">(son 12 ay)</small></h6>
+                @{ var toplamEfor = Model.EffortTrend?.Sum(x => x.Hours) ?? 0m; }
+                <span class="badge bg-success-subtle text-success border border-success-subtle">Toplam @toplamEfor.ToString("0.#") s</span>
+            </div>
+            <div class="card-body">
+                @{
+                    var trend = Model.EffortTrend ?? new System.Collections.Generic.List<ActivityManagement.Employees.Dto.EffortTrendPointDto>();
+                    var maxH = trend.Count > 0 ? Math.Max(trend.Max(x => x.Hours), 0.001m) : 1m;
+                }
+                @if (trend.Count == 0 || toplamEfor == 0)
+                {
+                    <div class="text-muted text-center py-3 small">Son 12 ayda efor kaydı yok.</div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-end justify-content-between gap-1" style="height:140px">
+                        @foreach (var pt in trend)
+                        {
+                            var pct = (int)Math.Round((double)(pt.Hours / maxH) * 100);
+                            if (pt.Hours > 0 && pct < 4) { pct = 4; }
+                            <div class="d-flex flex-column align-items-center flex-fill" style="min-width:0" title="@pt.Label: @pt.Hours.ToString("0.#") saat">
+                                <div class="small text-muted mb-1" style="font-size:.62rem">@(pt.Hours > 0 ? pt.Hours.ToString("0.#") : "")</div>
+                                <div class="w-100 rounded-top @(pt.Hours > 0 ? "bg-success" : "bg-light border")" style="height:@(pct)%; min-height:2px; transition:height .3s"></div>
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between gap-1 mt-1">
+                        @foreach (var pt in trend)
+                        {
+                            <div class="text-center flex-fill text-muted" style="font-size:.58rem; min-width:0; transform:rotate(0)">@pt.Label.Substring(0,2)<br/>@pt.Label.Substring(3)</div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
         <!-- Projeler -->
         @if (Model.AssignedProjects.Any())
         {
