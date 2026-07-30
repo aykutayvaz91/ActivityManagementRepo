@@ -44,6 +44,8 @@ namespace ActivityManagement.Activities
             _responsibilityRepository = responsibilityRepository;
             _taskRepository = taskRepository;
             _httpContextAccessor = httpContextAccessor;
+            AuthHttpContextAccessor = httpContextAccessor;   // base yetki yardımcıları için garanti atama
+            AuthEmployeeRepository = employeeRepository;
         }
 
         // Parti 1c: Bir görevin ActualHours'unu ActivityLog toplamıyla senkronlar (efor eklenince/silinince/değişince).
@@ -76,54 +78,8 @@ namespace ActivityManagement.Activities
             }
         }
 
-        private (string Role, string Email, long? EmployeeId) CurrentContext()
-        {
-            var user = _httpContextAccessor.HttpContext?.User;
-            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
-            var email = user?.FindFirst(ClaimTypes.Email)?.Value ?? user?.FindFirst(ClaimTypes.Name)?.Value;
-            var empIdStr = user?.FindFirst("EmployeeId")?.Value;
-            long? empId = long.TryParse(empIdStr, out var parsed) ? parsed : (long?)null;
-            return (role, email, empId);
-        }
-
-        private static bool IsManager(string role) =>
-            string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
-
-        // Tüm takımlarda geçerli yönetici (config hariç admin gibi): Admin veya Manager.
-        private static bool IsCrossTeamManager(string role) =>
-            string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
-
-        // Admin-self mi (Sistem Yöneticisi)? Login-as ile başka kişiye geçmişse false → takım kapsamı uygulanır.
-        private bool IsAdminSelfContext()
-        {
-            var user = _httpContextAccessor.HttpContext?.User;
-            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
-            if (!string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)) return false;
-            long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
-            long? ownId = long.TryParse(user?.FindFirst("AdminOwnEmployeeId")?.Value, out var o) ? o : (long?)null;
-            // config-admin kendi kimliğinde VEYA AdminOwnEmployeeId olmayan (Google) admin → self (tümünü görür)
-            return !empId.HasValue || !ownId.HasValue || empId == ownId;
-        }
-
-        // Tüm takımları görebilir mi (kapsam yok): admin-self VEYA Manager.
-        private bool SeesAllTeams()
-        {
-            var user = _httpContextAccessor.HttpContext?.User;
-            var role = user?.FindFirst(ClaimTypes.Role)?.Value ?? "Uzman";
-            if (IsAdminSelfContext() || string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase)) return true;
-            // Login-as (admin başka kişiye geçmiş; rol claim'i Admin kalır): temsil edilen kişi Manager/Admin ise tümünü görür.
-            if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
-            {
-                long? empId = long.TryParse(user?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
-                var effRole = CurrentEmployeeAppRole(empId);
-                if (string.Equals(effRole, "Manager", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(effRole, "Admin", StringComparison.OrdinalIgnoreCase)) return true;
-            }
-            return false;
-        }
+        // CurrentContext / IsManager(role) / IsCrossTeamManager(role) / IsAdminSelfContext / SeesAllTeams
+        // → ortak base sınıfa taşındı (ActivityManagementAppServiceBase). Davranış birebir aynı.
 
         // (Y2) Faaliyet listesinde TÜMÜNÜ gören roller: Admin / Manager / TakımLideri (login-as etkin rol dahil).
         // Uzman yalnız kendine ait faaliyetleri görür.
@@ -141,31 +97,7 @@ namespace ActivityManagement.Activities
             return false;
         }
 
-        // Login-as ile temsil edilen kişinin gerçek AppRole'ü (istek başına cache'li).
-        private bool _empRoleLoaded;
-        private string _currentEmpRole;
-        private string CurrentEmployeeAppRole(long? employeeId)
-        {
-            if (_empRoleLoaded) return _currentEmpRole;
-            _empRoleLoaded = true;
-            if (employeeId.HasValue)
-                _currentEmpRole = _employeeRepository.GetAll()
-                    .Where(e => e.Id == employeeId.Value).Select(e => e.AppRole).FirstOrDefault();
-            return _currentEmpRole;
-        }
-
-        // Mevcut kullanıcının takımı — istek başına bir kez sorgulanır (cache'lenir)
-        private bool _teamIdLoaded;
-        private long? _currentTeamId;
-        private long? CurrentEmployeeTeamId(long? employeeId)
-        {
-            if (_teamIdLoaded) return _currentTeamId;
-            _teamIdLoaded = true;
-            if (employeeId.HasValue)
-                _currentTeamId = _employeeRepository.GetAll()
-                    .Where(e => e.Id == employeeId.Value).Select(e => e.TeamId).FirstOrDefault();
-            return _currentTeamId;
-        }
+        // CurrentEmployeeAppRole / CurrentEmployeeTeamId → ortak base sınıfa taşındı (ActivityManagementAppServiceBase).
 
         // Yönetici bu faaliyet konusunu YÖNETEBİLİR mi: Admin her zaman; TakımLideri yalnız kendi takımının
         // (takımsız da dahil) konusu. Uzman için false (kendi kaydı ayrı kontrol edilir).

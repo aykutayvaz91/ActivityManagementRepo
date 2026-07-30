@@ -37,7 +37,9 @@ namespace ActivityManagement.Responsibilities
             return (role, emp);
         }
 
-        private bool IsManager(string role) =>
+        // NOT: base'teki IsManager (Admin/Manager/TakımLideri) DEĞİL — burada KASITLI olarak "Manager" hariç
+        // (sorumluluk matrisini yalnız Admin + TakımLideri yönetir). new ile bilinçli gizleme.
+        private new bool IsManager(string role) =>
             string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(role, "TakımLideri", StringComparison.OrdinalIgnoreCase);
 
