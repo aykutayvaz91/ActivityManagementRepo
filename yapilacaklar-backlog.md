@@ -1,5 +1,7 @@
 # Yapılacaklar — Backlog
 
+> **DURUM (2026-07-30, v1.22.4 canlı): TÜM BACKLOG BİTTİ.** Uzun vadeli işler de tamamlandı — yetki base-refactor + Batch E (PDF, Gantt bağımlılık/kritik yol, toplu atama, bildirim tercihleri, kişi kartı efor trendi) + Atanmamış (PSM) talepler + destek kişi filtresi. **Bilinen bekleyen iş YOK.** Detay: `history/2026-07-30.md`.
+
 > DURUM (2026-07-29 sonu, v1.21.0 canlı): Y1–Y5 + denetim ORTA/DÜŞÜK + **TASARIM BOŞLUĞU KAPATMA EPIC'İ (H1–H7)** TAMAMLANDI ve canlıda. Detay: `history/2026-07-29.md` "Tasarım boşluğu kapatma epic'i" bölümü. **Bekleyen tasarım boşluğu YOK.** Kalanlar aşağıda **[BEKLİYOR]** (uzun vadeli: yetki-refactor + Batch E özellikleri). "Devam et"te bu dosya + `history/2026-07-29.md` okunmalı.
 
 ## ✅ TASARIM BOŞLUĞU KAPATMA (2026-07-29, v1.20.0→1.21.0, canlı)
@@ -25,16 +27,16 @@
 ### Y5 — Destek vs PSM talep DETAY ayrı arayüz  [BEKLİYOR]
 - Destek: `/Requests/Detail/{no}`. PSM: farklı URL (ör. `/Requests/PsmDetail/{no}`) + PSM'e özel arayüz (sunucu künyesi).
 
-### [BEKLİYOR] Yetki yardımcıları base'e taşıma (~50x tekrar)
-- En büyük teknik borç; RİSKLİ (12 dosya, login-as edge). Kendi odaklı turunda + kapsamlı doğrulamayla yapılmalı.
+### ✅ Yetki yardımcıları base'e taşıma — TAMAMLANDI (v1.22.4, 2026-07-30)
+- ServiceRequest/TaskItem/ActivitySubject'teki birebir tekrar `ActivityManagementAppServiceBase`'e taşındı; base deps 3 ctor'da açıkça atandı. Family B (Project/Category/SubCatResp — "Manager" hariç) korundu (`new`). Canlı doğrulandı (admin-self vs login-as scoping). Detay: `history/2026-07-30.md`.
 
 ### Kalan düşük/perf — ✅ KÜÇÜK KOVA KAPANDI
 - ✅ (v1.18.2) global arama. ✅ (v1.18.4) ACL fail-open→rol-varsayılanı; Project AsSplitQuery; TaskItem AsNoTracking; Reports bounds.
 - ✅ (v1.18.5) AsNoTracking sweep tamam (Employee/Team/Category/ActivityLog okuma); ActivityTypeLabels → tek Core helper (Entities.ActivityTypeLabels); ölü kod kaldırıldı (kullanılmayan IsAdmin x2, WireItem StatusLabel/UpdatedAt/ClosedAt).
 - ✅ (v1.19.1) RoutineTask/ParentTaskId ölü şema TEMİZLENDİ — RoutineTask entity/tablo/DbSet/config, TaskItem.ParentTaskId/ParentTask/SubTasks/IsRoutine/RoutineTaskId/RoutineTask, Employee.RoutineTasks nav, RoutineTasks permission tanımları + DTO alanları kaldırıldı; migration (veri yoktu). Tasks sayfaları 200.
 
-### [BEKLİYOR] Eksik özellikler (Batch E)
-- PDF raporlama; Gantt bağımlılık/kritik yol; toplu (bulk) işlemler; bildirim tercihleri; kişi kartı efor trendi.
+### ✅ Eksik özellikler (Batch E) — TAMAMLANDI (v1.22.0→1.22.4, 2026-07-30)
+- ✅ PDF raporlama (PDFsharp/MigraDoc, Türkçe font); ✅ Gantt bağımlılık/kritik yol (TaskDependency + CPM); ✅ toplu (bulk) atama (talepler); ✅ bildirim tercihleri (NotificationPreference); ✅ kişi kartı efor trendi (son 12 ay). Detay: `history/2026-07-30.md`. **Bekleyen backlog YOK.**
 
 ---
 ## (özgün kayıt) — Yeni istekler (2026-07-29)
