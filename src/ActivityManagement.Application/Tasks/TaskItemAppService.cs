@@ -26,6 +26,7 @@ namespace ActivityManagement.Tasks
         private readonly IRepository<Project, long> _projectRepository;
         private readonly IRepository<Team, long> _teamRepository;
         private readonly IRepository<ActivityLog, long> _activityLogRepository;
+        private readonly IRepository<TaskDependency, long> _dependencyRepository;
         private readonly ActivityManagement.Notifications.IAppEmailSender _emailSender;
         private readonly ActivityManagement.Notifications.INotificationManager _notificationManager;
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -39,6 +40,7 @@ namespace ActivityManagement.Tasks
             IRepository<Project, long> projectRepository,
             IRepository<Team, long> teamRepository,
             IRepository<ActivityLog, long> activityLogRepository,
+            IRepository<TaskDependency, long> dependencyRepository,
             ActivityManagement.Notifications.IAppEmailSender emailSender,
             ActivityManagement.Notifications.INotificationManager notificationManager,
             IHttpContextAccessor httpContextAccessor)
@@ -51,6 +53,7 @@ namespace ActivityManagement.Tasks
             _projectRepository = projectRepository;
             _teamRepository = teamRepository;
             _activityLogRepository = activityLogRepository;
+            _dependencyRepository = dependencyRepository;
             _emailSender = emailSender;
             _notificationManager = notificationManager;
             _httpContextAccessor = httpContextAccessor;
@@ -703,6 +706,168 @@ namespace ActivityManagement.Tasks
             Id = a.Id, FileName = a.FileName, FilePath = a.FilePath,
             FileSize = a.FileSize, ContentType = a.ContentType
         };
+
+        // ================= GANTT + BAĞIMLILIK (kritik yol) =================
+
+        // Görünürlük kapsamlı görev sorgusu (GetAllAsync ile aynı kural).
+        private IQueryable<TaskItem> VisibleTasksQuery()
+        {
+            var q = _taskRepository.GetAll().AsNoTracking();
+            var ctx = CurrentContext();
+            if (!SeesAllTeams() && ctx.EmployeeId.HasValue)
+            {
+                var myTeamId = CurrentEmployeeTeamId(ctx.EmployeeId);
+                q = q.Where(t => t.TeamId == null || t.TeamId == myTeamId
+                                 || t.AssignedEmployeeId == ctx.EmployeeId.Value
+                                 || t.SecondaryEmployeeId == ctx.EmployeeId.Value);
+            }
+            return q;
+        }
+
+        // Gantt verisi: görünür + son tarihi olan görevler + aralarındaki bağımlılıklar + kritik yol (CPM).
+        public async Task<List<GanttTaskDto>> GetGanttAsync()
+        {
+            var tasks = await VisibleTasksQuery()
+                .Where(t => t.DueDate != null)
+                .Select(t => new { t.Id, t.Title, t.StartDate, t.DueDate, t.CompletionPercentage, t.Status })
+                .ToListAsync();
+            var ids = tasks.Select(t => t.Id).ToHashSet();
+
+            var deps = await _dependencyRepository.GetAll().AsNoTracking()
+                .Where(d => ids.Contains(d.TaskItemId) && ids.Contains(d.DependsOnTaskId))
+                .Select(d => new { d.TaskItemId, d.DependsOnTaskId })
+                .ToListAsync();
+            var predMap = deps.GroupBy(d => d.TaskItemId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.DependsOnTaskId).ToList());
+
+            var result = tasks.Select(t => new GanttTaskDto
+            {
+                Id = t.Id,
+                Name = (t.Title ?? "").Length > 60 ? t.Title.Substring(0, 60) : (t.Title ?? ""),
+                Start = (t.StartDate ?? t.DueDate.Value).Date,
+                End = t.DueDate.Value.Date,
+                Progress = t.CompletionPercentage,
+                Status = (int)t.Status,
+                DependsOn = predMap.TryGetValue(t.Id, out var p) ? string.Join(",", p) : ""
+            }).ToList();
+            foreach (var g in result) if (g.Start > g.End) g.Start = g.End;
+
+            ComputeCriticalPath(result, deps.Select(d => (d.TaskItemId, d.DependsOnTaskId)).ToList());
+            return result;
+        }
+
+        // CPM: forward/backward pass ile slack≈0 olan (kritik yoldaki) görevleri işaretler.
+        private static void ComputeCriticalPath(List<GanttTaskDto> tasks, List<(long succ, long pred)> edges)
+        {
+            if (edges.Count == 0) return;
+            var byId = tasks.ToDictionary(t => t.Id);
+            double Dur(GanttTaskDto t) => Math.Max(1, (t.End - t.Start).TotalDays + 1);
+
+            var preds = edges.Where(e => byId.ContainsKey(e.succ) && byId.ContainsKey(e.pred))
+                .GroupBy(e => e.succ).ToDictionary(g => g.Key, g => g.Select(x => x.pred).ToList());
+            var succs = edges.Where(e => byId.ContainsKey(e.succ) && byId.ContainsKey(e.pred))
+                .GroupBy(e => e.pred).ToDictionary(g => g.Key, g => g.Select(x => x.succ).ToList());
+            var inGraph = new HashSet<long>();
+            foreach (var e in edges) { if (byId.ContainsKey(e.succ)) inGraph.Add(e.succ); if (byId.ContainsKey(e.pred)) inGraph.Add(e.pred); }
+            if (inGraph.Count == 0) return;
+
+            // Topolojik sıra (Kahn)
+            var indeg = inGraph.ToDictionary(id => id, id => preds.TryGetValue(id, out var pp) ? pp.Count : 0);
+            var queue = new Queue<long>(inGraph.Where(id => indeg[id] == 0));
+            var topo = new List<long>();
+            while (queue.Count > 0)
+            {
+                var n = queue.Dequeue(); topo.Add(n);
+                if (succs.TryGetValue(n, out var ss)) foreach (var s in ss) if (--indeg[s] == 0) queue.Enqueue(s);
+            }
+            if (topo.Count != inGraph.Count) return; // döngü (olmamalı) → hesaplama yok
+
+            var ES = inGraph.ToDictionary(id => id, id => 0.0);
+            var EF = inGraph.ToDictionary(id => id, id => 0.0);
+            foreach (var n in topo)
+            {
+                double es = 0;
+                if (preds.TryGetValue(n, out var pp)) foreach (var p in pp) es = Math.Max(es, EF[p]);
+                ES[n] = es; EF[n] = es + Dur(byId[n]);
+            }
+            double projEnd = EF.Values.DefaultIfEmpty(0).Max();
+            var LS = inGraph.ToDictionary(id => id, id => projEnd);
+            for (int i = topo.Count - 1; i >= 0; i--)
+            {
+                var n = topo[i];
+                double lf = projEnd;
+                if (succs.TryGetValue(n, out var ss) && ss.Count > 0) { lf = double.MaxValue; foreach (var s in ss) lf = Math.Min(lf, LS[s]); }
+                LS[n] = lf - Dur(byId[n]);
+            }
+            foreach (var n in inGraph)
+                if (Math.Abs(LS[n] - ES[n]) < 0.001) byId[n].IsCritical = true;
+        }
+
+        // Görev detayı için: mevcut öncüller + eklenebilecek aday görevler.
+        public async Task<TaskDependencyInfoDto> GetDependenciesAsync(long taskId)
+        {
+            var task = await _taskRepository.GetAsync(taskId);
+            var ctx = CurrentContext();
+            var info = new TaskDependencyInfoDto { TaskId = taskId, CanManage = IsManagerForTask(task, ctx) || CanEdit(task, ctx) };
+
+            var predIds = await _dependencyRepository.GetAll().AsNoTracking()
+                .Where(d => d.TaskItemId == taskId).Select(d => d.DependsOnTaskId).ToListAsync();
+            var visible = await VisibleTasksQuery().Select(t => new { t.Id, t.Title }).ToListAsync();
+            var titleMap = visible.ToDictionary(x => x.Id, x => x.Title);
+            info.Predecessors = predIds.Where(titleMap.ContainsKey)
+                .Select(id => new DependencyItemDto { Id = id, Title = titleMap[id] }).ToList();
+            var predSet = predIds.ToHashSet();
+            info.Candidates = visible.Where(t => t.Id != taskId && !predSet.Contains(t.Id))
+                .Select(t => new DependencyItemDto { Id = t.Id, Title = t.Title })
+                .OrderBy(x => x.Title).ToList();
+            return info;
+        }
+
+        public async Task AddDependencyAsync(long taskId, long dependsOnTaskId)
+        {
+            if (taskId == dependsOnTaskId) throw new UserFriendlyException("Bir görev kendine bağımlı olamaz.");
+            var task = await _taskRepository.GetAsync(taskId);
+            EnsureCanModify(task);
+            var dep = await _taskRepository.FirstOrDefaultAsync(dependsOnTaskId);
+            if (dep == null) throw new UserFriendlyException("Öncül görev bulunamadı.");
+            if (await _dependencyRepository.GetAll().AnyAsync(d => d.TaskItemId == taskId && d.DependsOnTaskId == dependsOnTaskId))
+                return; // zaten var
+            if (await WouldCreateCycleAsync(taskId, dependsOnTaskId))
+                throw new UserFriendlyException("Bu bağımlılık döngü oluşturur (görevler birbirini bekleyemez).");
+            await _dependencyRepository.InsertAsync(new TaskDependency
+            {
+                TenantId = AbpSession.TenantId ?? 1,
+                TaskItemId = taskId,
+                DependsOnTaskId = dependsOnTaskId
+            });
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+
+        public async Task RemoveDependencyAsync(long taskId, long dependsOnTaskId)
+        {
+            var task = await _taskRepository.GetAsync(taskId);
+            EnsureCanModify(task);
+            var d = await _dependencyRepository.FirstOrDefaultAsync(x => x.TaskItemId == taskId && x.DependsOnTaskId == dependsOnTaskId);
+            if (d != null) { await _dependencyRepository.DeleteAsync(d.Id); await CurrentUnitOfWork.SaveChangesAsync(); }
+        }
+
+        // Yeni "taskId → dependsOnTaskId" kenarı döngü yaratır mı: dependsOnTaskId'nin öncül zincirinde taskId varsa evet.
+        private async Task<bool> WouldCreateCycleAsync(long taskId, long dependsOnTaskId)
+        {
+            var all = await _dependencyRepository.GetAll().AsNoTracking()
+                .Select(d => new { d.TaskItemId, d.DependsOnTaskId }).ToListAsync();
+            var predMap = all.GroupBy(d => d.TaskItemId).ToDictionary(g => g.Key, g => g.Select(x => x.DependsOnTaskId).ToList());
+            var stack = new Stack<long>(); stack.Push(dependsOnTaskId);
+            var seen = new HashSet<long>();
+            while (stack.Count > 0)
+            {
+                var n = stack.Pop();
+                if (n == taskId) return true;
+                if (!seen.Add(n)) continue;
+                if (predMap.TryGetValue(n, out var pp)) foreach (var p in pp) stack.Push(p);
+            }
+            return false;
+        }
 
         private TaskItemDto MapToDto(TaskItem t)
         {

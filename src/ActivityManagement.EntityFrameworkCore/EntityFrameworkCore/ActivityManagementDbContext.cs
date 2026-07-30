@@ -37,6 +37,7 @@ namespace ActivityManagement.EntityFrameworkCore
         public DbSet<IntegrationSource> IntegrationSources { get; set; }
         public DbSet<Notification> AppNotifications { get; set; }
         public DbSet<NotificationPreference> NotificationPreferences { get; set; }
+        public DbSet<TaskDependency> TaskDependencies { get; set; }
 
         public ActivityManagementDbContext(DbContextOptions<ActivityManagementDbContext> options)
             : base(options)
@@ -406,6 +407,13 @@ namespace ActivityManagement.EntityFrameworkCore
                 b.ToTable("NotificationPreferences");
                 b.Property(p => p.MutedTypes).HasMaxLength(256);
                 b.HasIndex(p => p.EmployeeId).IsUnique();
+            });
+
+            modelBuilder.Entity<TaskDependency>(b =>
+            {
+                b.ToTable("TaskDependencies");
+                b.HasIndex(d => new { d.TaskItemId, d.DependsOnTaskId }).IsUnique();
+                b.HasIndex(d => d.DependsOnTaskId);
             });
 
             modelBuilder.Entity<WorkflowStatus>(b =>

@@ -9,6 +9,12 @@ namespace ActivityManagement.Tasks
     {
         Task<PagedResultDto<TaskItemDto>> GetAllAsync(GetTasksInput input);
         Task<TaskItemDto> GetAsync(long id);
+
+        // Gantt (bağımlılık okları + kritik yol) ve bağımlılık yönetimi
+        Task<System.Collections.Generic.List<Dto.GanttTaskDto>> GetGanttAsync();
+        Task<Dto.TaskDependencyInfoDto> GetDependenciesAsync(long taskId);
+        Task AddDependencyAsync(long taskId, long dependsOnTaskId);
+        Task RemoveDependencyAsync(long taskId, long dependsOnTaskId);
         Task<TaskItemDto> CreateAsync(CreateUpdateTaskItemDto input);
         Task<TaskItemDto> UpdateAsync(CreateUpdateTaskItemDto input);
         Task DeleteAsync(long id);

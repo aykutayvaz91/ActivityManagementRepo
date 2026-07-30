@@ -21,6 +21,9 @@
 
 <div class="card shadow-sm">
     <div class="card-body">
+        <div id="critLegend" class="alert alert-danger py-1 px-2 small mb-2" style="display:none">
+            <i class="fas fa-triangle-exclamation me-1"></i><strong>Kırmızı</strong> barlar <strong id="critCount">0</strong> görevlik <strong>kritik yol</strong>u gösterir — gecikmesi projeyi doğrudan geciktirir. Oklar bağımlılıkları gösterir.
+        </div>
         <div id="ganttWrap" style="overflow-x:auto">
             <svg id="gantt"></svg>
         </div>
@@ -37,25 +40,28 @@
 var gantt = null;
 $(document).ready(function () {
     $.ajax({
-        url: '/api/services/app/TaskItem/GetAll',
-        data: { maxResultCount: 1000 },
+        url: '/api/services/app/TaskItem/GetGantt',
         success: function (res) {
-            var items = res.result.items || [];
+            var items = res.result || [];
             function fmt(d) { return new Date(d).toISOString().split('T')[0]; }
-            var tasks = items.filter(function (t) { return t.dueDate; }).map(function (t) {
-                var end = fmt(t.dueDate);
-                var start = t.startDate ? fmt(t.startDate) : end; // başlangıç yoksa son tarihe eşitle
+            var criticalCount = 0;
+            var tasks = items.map(function (t) {
+                var end = fmt(t.end);
+                var start = t.start ? fmt(t.start) : end;
                 if (new Date(start) > new Date(end)) start = end;
+                if (t.isCritical) criticalCount++;
                 return {
                     id: String(t.id),
-                    name: (t.title || '').substring(0, 60),
+                    name: (t.name || '').substring(0, 60),
                     start: start,
                     end: end,
-                    progress: t.completionPercentage || 0,
-                    custom_class: t.priority === 3 ? 'bar-critical' : (t.status === 2 ? 'bar-done' : '')
+                    progress: t.progress || 0,
+                    dependencies: t.dependsOn || '',   // frappe: virgülle ayrık öncül id'ler → oklar
+                    custom_class: t.isCritical ? 'bar-critical' : (t.status === 2 ? 'bar-done' : '')
                 };
             });
             if (!tasks.length) { document.getElementById('gantt').style.display = 'none'; document.getElementById('ganttEmpty').style.display = ''; return; }
+            var lg = document.getElementById('critLegend'); if (lg && criticalCount > 0) { lg.style.display = ''; document.getElementById('critCount').textContent = criticalCount; }
             gantt = new Gantt("#gantt", tasks, {
                 language: 'tr',
                 view_mode: 'Week',
@@ -63,8 +69,9 @@ $(document).ready(function () {
                 on_click: function (task) { window.location.href = '/Tasks/Detail/' + task.id; },
                 custom_popup_html: function (task) {
                     return '<div class="p-2 small"><strong>' + task.name + '</strong><br>' +
-                        new Date(task.start).toLocaleDateString('tr-TR') + ' → ' + new Date(task.end).toLocaleDateString('tr-TR') +
-                        '<br>%' + task.progress + ' tamamlandı</div>';
+                        new Date(task._start || task.start).toLocaleDateString('tr-TR') + ' → ' + new Date(task._end || task.end).toLocaleDateString('tr-TR') +
+                        '<br>%' + task.progress + ' tamamlandı' +
+                        (task.custom_class === 'bar-critical' ? '<br><span class="text-danger">● Kritik yolda</span>' : '') + '</div>';
                 }
             });
         },

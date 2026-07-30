@@ -129,6 +129,7 @@ namespace ActivityManagement.Web.Controllers
                     TempData["Uyari"] = "Görev bulunamadı.";
                     return RedirectToAction("MyTasks");
                 }
+                try { ViewBag.Dependencies = await _taskAppService.GetDependenciesAsync(id); } catch { }
                 return View(task);
             }
             catch (Abp.UI.UserFriendlyException ex)
@@ -142,6 +143,34 @@ namespace ActivityManagement.Web.Controllers
                 TempData["Uyari"] = "Görev detayı açılırken bir hata oluştu, kayıt alındı.";
                 return RedirectToAction("MyTasks");
             }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddDependency(long id, long dependsOnTaskId)
+        {
+            try
+            {
+                await _taskAppService.AddDependencyAsync(id, dependsOnTaskId);
+                TempData["Success"] = "Bağımlılık eklendi.";
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
+            catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Tasks/AddDependency"); TempData["Uyari"] = "Bağımlılık eklenemedi."; }
+            return RedirectToAction("Detail", new { id });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemoveDependency(long id, long dependsOnTaskId)
+        {
+            try
+            {
+                await _taskAppService.RemoveDependencyAsync(id, dependsOnTaskId);
+                TempData["Success"] = "Bağımlılık kaldırıldı.";
+            }
+            catch (Abp.UI.UserFriendlyException ex) { TempData["Uyari"] = ex.Message; }
+            catch (Exception ex) { ActivityManagement.Logging.ErrorLog.Write(ex, "Tasks/RemoveDependency"); TempData["Uyari"] = "Bağımlılık kaldırılamadı."; }
+            return RedirectToAction("Detail", new { id });
         }
 
         // Rol bazlı GÖRÜNÜRLÜK: Admin tüm görevler; TakımLideri ve Uzman kendi TAKIMININ görevlerini görür
