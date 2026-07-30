@@ -142,21 +142,24 @@ namespace ActivityManagement.ServiceRequests
         }
 
         // (B10) Görünürlük kapsamı: Admin/Manager tümü; TakımLideri kendi TAKIMI + kendine atanan; Uzman yalnız kendine atanan.
-        // ATANMAMIŞ talepler (AssignedEmployeeId=null; ör. PSM'den atansız gelen) HERKESE görünür — aksi halde
-        // kimseye görünmeyip kaybolur. Böylece triyaj için "Atanmamış Talepler" listesinden görülüp yöneticiye iletilir.
+        // ATANMAMIŞ + PSM (SunucuKurulum) talepleri HERKESE görünür — PSM'den atansız gelen talep aksi halde
+        // kimseye görünmeyip kaybolur (triyaj için "Atanmamış Talepler" sekmesi). Destek'te bu KURAL YOK
+        // (destek atansız yığını herkese açılmaz; destek kendi kapsamı + kişi filtresiyle yönetilir).
         private IQueryable<ServiceRequest> ApplyVisibilityScope(IQueryable<ServiceRequest> q)
         {
             if (SeesAllTeams()) return q;
             long? empId = long.TryParse(_httpContextAccessor.HttpContext?.User?.FindFirst("EmployeeId")?.Value, out var e) ? e : (long?)null;
-            if (!empId.HasValue) return q.Where(r => r.AssignedEmployeeId == null); // kimlik yok → yalnız atanmamışlar
+            // Yalnız PSM (SunucuKurulum) + atanmamış talepler kapsam dışı herkese görünür.
+            if (!empId.HasValue)
+                return q.Where(r => r.AssignedEmployeeId == null && r.Source == RequestSource.SunucuKurulum);
             if (string.Equals(EffectiveRole(), "TakımLideri", StringComparison.OrdinalIgnoreCase))
             {
                 var myTeam = CurrentEmployeeTeamId(empId);
-                return q.Where(r => r.AssignedEmployeeId == null
+                return q.Where(r => (r.AssignedEmployeeId == null && r.Source == RequestSource.SunucuKurulum)
                                     || r.AssignedEmployeeId == empId.Value || r.SecondaryEmployeeId == empId.Value
                                     || (myTeam != null && r.TeamId == myTeam));
             }
-            return q.Where(r => r.AssignedEmployeeId == null
+            return q.Where(r => (r.AssignedEmployeeId == null && r.Source == RequestSource.SunucuKurulum)
                                 || r.AssignedEmployeeId == empId.Value || r.SecondaryEmployeeId == empId.Value);
         }
 
@@ -246,9 +249,9 @@ namespace ActivityManagement.ServiceRequests
                             && !(r.Status == RequestStatus.Kapandi && r.Logs.Any()));
             IQueryable<ServiceRequest> Archived() => Scoped()
                 .Where(r => r.Status == RequestStatus.Kapandi && r.Logs.Any());
-            // ATANMAMIŞ (triyaj): sorumlusu olmayan + açık talepler (tüm kaynaklar). Scoped() atanmamışları herkese içerir.
+            // ATANMAMIŞ (triyaj): YALNIZ PSM (SunucuKurulum) + sorumlusu olmayan + açık talepler. Herkese görünür.
             IQueryable<ServiceRequest> Unassigned() => Scoped()
-                .Where(r => r.AssignedEmployeeId == null
+                .Where(r => r.AssignedEmployeeId == null && r.Source == RequestSource.SunucuKurulum
                             && r.Status != RequestStatus.Kapandi && r.Status != RequestStatus.Iptal);
 
             async Task<System.Collections.Generic.List<ServiceRequestDto>> Materialize(IQueryable<ServiceRequest> orderedIdQuery)

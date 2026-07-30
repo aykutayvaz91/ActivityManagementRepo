@@ -50,8 +50,8 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#tab-atanmamis" title="Sorumlusu atanmamış açık talepler — herkese görünür (triyaj)">
-            <i class="fas fa-user-slash me-1"></i>Atanmamış Talepler
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-atanmamis" title="PSM'den sorumlusu atanmadan gelen açık talepler — herkese görünür (triyaj)">
+            <i class="fas fa-user-slash me-1"></i>Atanmamış (PSM)
             <span class="badge @(cntAtanmamis > 0 ? "bg-warning text-dark" : "bg-secondary") ms-1">@cntAtanmamis</span>
         </a>
     </li>
@@ -74,7 +74,16 @@
 <div class="tab-content">
     <div class="tab-pane fade show active" id="tab-destek">
         @CapNote(destek.Count, cntDestek, cap)
-        <div class="card shadow-sm"><div class="card-body p-2">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <label class="form-label small mb-0 text-nowrap"><i class="fas fa-user-filter me-1"></i>Kişiye göre:</label>
+            <select id="destekPersonFilter" class="form-select form-select-sm" style="max-width:280px" onchange="filterDestekByPerson(this.value)">
+                <option value="">Tümü</option>
+                <option value="0">— Atanmamış —</option>
+                @foreach (var e in employees) { <option value="@e.Id">@e.FullName</option> }
+            </select>
+            <span id="destekFilterCount" class="text-muted small"></span>
+        </div>
+        <div id="destekTableWrap" class="card shadow-sm"><div class="card-body p-2">
             @await Html.PartialAsync("_RequestTable", destek)
         </div></div>
     </div>
@@ -85,7 +94,7 @@
         </div></div>
     </div>
     <div class="tab-pane fade" id="tab-atanmamis">
-        <div class="alert alert-warning py-2 small mb-2"><i class="fas fa-user-slash me-1"></i><strong>Sorumlusu atanmamış</strong> açık talepler (PSM/destek/elle — kaynak fark etmeksizin). Bu liste <strong>herkese</strong> görünür; kaybolmasın diye buraya düşer. Yönetici/lider detaydan "Ata" ile sorumlu belirleyebilir.</div>
+        <div class="alert alert-warning py-2 small mb-2"><i class="fas fa-user-slash me-1"></i><strong>PSM'den sorumlusu atanmadan</strong> gelen açık talepler. Bu liste <strong>herkese</strong> görünür; kaybolmasın diye buraya düşer. Yönetici/lider detaydan "Ata" ile sorumlu belirleyebilir.</div>
         @CapNote(atanmamis.Count, cntAtanmamis, cap)
         <div class="card shadow-sm"><div class="card-body p-2">
             @await Html.PartialAsync("_RequestTable", atanmamis)
@@ -283,6 +292,20 @@ function openEffort(id, title) {
     document.getElementById('ef_id').value = id;
     document.getElementById('ef_title').textContent = title;
     new bootstrap.Modal(document.getElementById('effortModal')).show();
+}
+// Destek sekmesi kişi filtresi (istemci tarafı — yüklü satırlar üzerinde anında)
+function filterDestekByPerson(val) {
+    var wrap = document.getElementById('destekTableWrap');
+    if (!wrap) return;
+    var rows = wrap.querySelectorAll('tbody tr[data-assignee]');
+    var shown = 0;
+    rows.forEach(function (tr) {
+        var match = (val === '' || tr.getAttribute('data-assignee') === val);
+        tr.style.display = match ? '' : 'none';
+        if (match) shown++;
+    });
+    var cnt = document.getElementById('destekFilterCount');
+    if (cnt) cnt.textContent = (val === '') ? '' : (shown + ' talep');
 }
 // Menüden #tab-destek / #tab-sunucu ile gelindiğinde ilgili sekmeyi aç
 document.addEventListener('DOMContentLoaded', function () {

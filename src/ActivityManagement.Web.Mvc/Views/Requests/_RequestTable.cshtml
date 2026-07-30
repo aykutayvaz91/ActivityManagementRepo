@@ -43,7 +43,7 @@ else
             <tbody>
                 @foreach (var r in reqList)
                 {
-                    <tr class="@(r.IsOverdue ? "table-danger" : "")">
+                    <tr class="@(r.IsOverdue ? "table-danger" : "")" data-assignee="@(r.AssignedEmployeeId?.ToString() ?? "0")">
                         <td>
                             @if (!string.IsNullOrEmpty(r.ExternalUrl))
                             {
